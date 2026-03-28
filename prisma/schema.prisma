@@ -1,0 +1,63 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum GenerationStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+model Problem {
+  id        String @id @default(cuid())
+  contestId Int
+  index     String // "A", "B", "C", etc.
+  name      String
+  rating    Int? // difficulty rating (e.g. 800, 1200, 2400)
+  points    Float?
+  tags      String[] // PostgreSQL array
+
+  generationStatus GenerationStatus @default(PENDING)
+
+  hints     Hint[]
+  editorial Editorial?
+  solution  Solution?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([contestId, index])
+}
+
+model Hint {
+  id      String @id @default(cuid())
+  number  Int // 1-5, progressive difficulty
+  content String @db.Text
+
+  problem   Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  problemId String
+
+  @@unique([problemId, number])
+}
+
+model Editorial {
+  id      String @id @default(cuid())
+  content String @db.Text // prose editorial
+
+  problem   Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  problemId String  @unique
+}
+
+model Solution {
+  id   String @id @default(cuid())
+  code String @db.Text // C++ solution using user's template
+
+  problem   Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  problemId String  @unique
+}
