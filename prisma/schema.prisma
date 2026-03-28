@@ -1,6 +1,5 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
@@ -8,6 +7,7 @@ datasource db {
 }
 
 enum GenerationStatus {
+  UNQUEUED
   PENDING
   PROCESSING
   COMPLETED
@@ -15,15 +15,14 @@ enum GenerationStatus {
 }
 
 model Problem {
-  id        String @id @default(cuid())
+  id        String   @id @default(cuid())
   contestId Int
-  index     String // "A", "B", "C", etc.
+  index     String // e.g. "A", "B1"
   name      String
-  rating    Int? // difficulty rating (e.g. 800, 1200, 2400)
-  points    Float?
-  tags      String[] // PostgreSQL array
+  rating    Int?
+  tags      String[] // e.g. ["dp", "greedy"]
 
-  generationStatus GenerationStatus @default(PENDING)
+  generationStatus GenerationStatus @default(UNQUEUED)
 
   hints     Hint[]
   editorial Editorial?
@@ -37,27 +36,33 @@ model Problem {
 
 model Hint {
   id      String @id @default(cuid())
-  number  Int // 1-5, progressive difficulty
+  order   Int // 1-5
   content String @db.Text
 
-  problem   Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
   problemId String
+  problem   Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
 
-  @@unique([problemId, number])
+  createdAt DateTime @default(now())
+
+  @@unique([problemId, order])
 }
 
 model Editorial {
   id      String @id @default(cuid())
-  content String @db.Text // prose editorial
+  content String @db.Text
 
-  problem   Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
   problemId String  @unique
+  problem   Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
 }
 
 model Solution {
-  id   String @id @default(cuid())
-  code String @db.Text // C++ solution using user's template
+  id      String @id @default(cuid())
+  content String @db.Text // C++ code
 
-  problem   Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
   problemId String  @unique
+  problem   Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
 }
