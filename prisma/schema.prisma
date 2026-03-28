@@ -23,6 +23,7 @@ model Problem {
   tags      String[] // e.g. ["dp", "greedy"]
 
   generationStatus GenerationStatus @default(UNQUEUED)
+  verified         Boolean          @default(false)
 
   hints     Hint[]
   editorial Editorial?
