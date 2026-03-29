@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { Input } from "@/components/ui/input";
 
 const RATING_TIERS = [
@@ -27,6 +27,7 @@ export function ProblemFilters({
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const [searchValue, setSearchValue] = useState(query);
 
   function updateParams(updates: Record<string, string | null>) {
     const params = new URLSearchParams(searchParams.toString());
@@ -43,6 +44,7 @@ export function ProblemFilters({
   }
 
   function handleSearch(term: string) {
+    setSearchValue(term);
     clearTimeout(timeoutRef.current);
     timeoutRef.current = setTimeout(() => {
       updateParams({ q: term || null });
@@ -63,7 +65,7 @@ export function ProblemFilters({
       <div className="flex items-center gap-3">
         <Input
           placeholder="Search by name or contest ID..."
-          defaultValue={query}
+          value={searchValue}
           onChange={(e) => handleSearch(e.target.value)}
           className="h-10 flex-1 rounded-xl bg-muted/30 border-border/50 text-sm placeholder:text-muted-foreground/50 focus:bg-muted/50"
         />

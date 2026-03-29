@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useRef, useCallback, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import ReactMarkdown from "react-markdown";
@@ -69,6 +69,77 @@ function Markdown({ content }: { content: string }) {
   );
 }
 
+function AnimatedCollapse({
+  open,
+  children,
+}: {
+  open: boolean;
+  children: React.ReactNode;
+}) {
+  const contentRef = useRef<HTMLDivElement>(null);
+  const [height, setHeight] = useState<number | undefined>(undefined);
+  const [isAnimating, setIsAnimating] = useState(false);
+
+  const prevOpen = useRef(open);
+
+  // Measure and animate on open/close changes
+  const containerRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (!node) return;
+      if (prevOpen.current === open && height !== undefined) return;
+      prevOpen.current = open;
+
+      if (open) {
+        // Opening: measure the content, animate from 0 to measured height
+        node.style.height = "0px";
+        node.style.opacity = "0";
+        // Force layout read
+        const scrollHeight = node.scrollHeight;
+        setHeight(scrollHeight);
+        setIsAnimating(true);
+        requestAnimationFrame(() => {
+          node.style.height = `${scrollHeight}px`;
+          node.style.opacity = "1";
+        });
+      } else {
+        // Closing: animate from current height to 0
+        const currentHeight = node.scrollHeight;
+        node.style.height = `${currentHeight}px`;
+        node.style.opacity = "1";
+        setIsAnimating(true);
+        requestAnimationFrame(() => {
+          node.style.height = "0px";
+          node.style.opacity = "0";
+        });
+      }
+    },
+    [open],
+  );
+
+  function handleTransitionEnd() {
+    setIsAnimating(false);
+    if (open) {
+      // After opening, set height to auto so content can reflow
+      setHeight(undefined);
+    }
+  }
+
+  if (!open && !isAnimating) return null;
+
+  return (
+    <div
+      ref={containerRef}
+      onTransitionEnd={handleTransitionEnd}
+      className="overflow-hidden transition-[height,opacity] duration-250 ease-out"
+      style={
+        open && !isAnimating ? { height: "auto", opacity: 1 } : undefined
+      }
+    >
+      <div ref={contentRef}>{children}</div>
+    </div>
+  );
+}
+
 function ChevronIcon({ open }: { open: boolean }) {
   return (
     <svg
@@ -76,7 +147,7 @@ function ChevronIcon({ open }: { open: boolean }) {
       height="16"
       viewBox="0 0 16 16"
       fill="none"
-      className={`text-muted-foreground/60 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
+      className={`text-muted-foreground/60 transition-transform duration-250 ease-out ${open ? "rotate-180" : ""}`}
     >
       <path
         d="M4 6L8 10L12 6"
@@ -111,13 +182,13 @@ function HintCard({ hint, index }: { hint: Problem["hints"][0]; index: number })
           </div>
         </CardHeader>
       </button>
-      {open && (
+      <AnimatedCollapse open={open}>
         <CardContent className="pt-0 pb-5 px-5">
           <div className="ml-[1.875rem]">
             <Markdown content={hint.content} />
           </div>
         </CardContent>
-      )}
+      </AnimatedCollapse>
     </Card>
   );
 }
@@ -130,13 +201,14 @@ function SolutionCode({ code }: { code: string }) {
 }
 
 export function ProblemContent({ problem }: { problem: Problem }) {
+  const [showEditorial, setShowEditorial] = useState(false);
   const [showSolution, setShowSolution] = useState(false);
   const cfUrl = `https://codeforces.com/contest/${problem.contestId}/problem/${problem.index}`;
   const hasContent = problem.generationStatus === "COMPLETED";
 
   return (
     <main className="min-h-screen">
-      <div className="mx-auto max-w-2xl px-6 py-12 sm:py-16">
+      <div className="mx-auto max-w-4xl px-6 py-12 sm:py-16">
         {/* Back link */}
         <nav className="mb-10">
           <Link
@@ -232,11 +304,28 @@ export function ProblemContent({ problem }: { problem: Problem }) {
                 <h2 className="text-xs font-semibold text-muted-foreground/60 uppercase tracking-widest mb-4">
                   Editorial
                 </h2>
-                <Card className="bg-card/50 border-border/40">
-                  <CardContent className="py-6 px-6">
-                    <Markdown content={problem.editorial.content} />
-                  </CardContent>
-                </Card>
+                {!showEditorial ? (
+                  <button
+                    type="button"
+                    onClick={() => setShowEditorial(true)}
+                    className="w-full rounded-xl border border-dashed border-border/40 py-10 text-sm text-muted-foreground/60 hover:text-foreground hover:border-border/70 hover:bg-muted/20 transition-all cursor-pointer"
+                  >
+                    Click to reveal editorial
+                  </button>
+                ) : (
+                  <Card className="bg-card/50 border-border/40">
+                    <CardContent className="py-6 px-6">
+                      <Markdown content={problem.editorial.content} />
+                      <button
+                        type="button"
+                        onClick={() => setShowEditorial(false)}
+                        className="mt-5 text-xs text-muted-foreground/60 hover:text-foreground transition-colors cursor-pointer"
+                      >
+                        Hide editorial
+                      </button>
+                    </CardContent>
+                  </Card>
+                )}
               </section>
             )}
 
