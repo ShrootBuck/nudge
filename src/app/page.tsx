@@ -6,7 +6,7 @@ import { ProblemFilters } from "./problem-filters";
 const PAGE_SIZE = 50;
 
 function ratingColor(rating: number | null): string {
-  if (!rating) return "text-muted-foreground";
+  if (!rating) return "text-muted-foreground/50";
   if (rating < 1200) return "text-emerald-400";
   if (rating < 1600) return "text-cyan-400";
   if (rating < 1900) return "text-violet-400";
@@ -33,7 +33,6 @@ export default async function Home({
   };
 
   if (query) {
-    // Support searching by contest ID (e.g. "1A", "1234") or by name
     const contestMatch = query.match(/^(\d+)([A-Za-z]\d?)?$/);
     if (contestMatch) {
       where.contestId = Number(contestMatch[1]);
@@ -78,16 +77,16 @@ export default async function Home({
   const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
   return (
-    <main className="min-h-screen bg-background">
-      <div className="mx-auto max-w-3xl px-4 py-16">
+    <main className="min-h-screen">
+      <div className="mx-auto max-w-4xl px-6 py-16 sm:py-20">
         {/* Header */}
-        <div className="mb-10">
-          <h1 className="text-3xl font-semibold tracking-tight mb-1">nudge</h1>
-          <p className="text-sm text-muted-foreground">
-            AI-generated hints, editorials, and solutions for competitive
+        <header className="mb-12">
+          <h1 className="text-4xl font-bold tracking-tight">nudge</h1>
+          <p className="mt-2 text-base text-muted-foreground">
+            AI-powered hints, editorials, and solutions for competitive
             programming
           </p>
-        </div>
+        </header>
 
         {/* Filters */}
         <ProblemFilters
@@ -99,24 +98,24 @@ export default async function Home({
 
         {/* Problem list */}
         {problems.length === 0 ? (
-          <div className="py-24 text-center">
-            <p className="text-sm text-muted-foreground">
+          <div className="mt-8 flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/60 py-20">
+            <div className="text-muted-foreground/60 text-sm">
               {query || ratingParam || tagParam
                 ? "No problems match your filters."
                 : "No problems available yet. Check back soon."}
-            </p>
+            </div>
           </div>
         ) : (
-          <div className="mt-6 divide-y divide-border/50">
+          <div className="mt-8 overflow-hidden rounded-xl border border-border/50 bg-card/40">
             {problems.map((problem) => (
               <Link
                 key={problem.id}
                 href={`/problem/${problem.contestId}/${problem.index}`}
-                className="group flex items-start gap-4 py-3 px-3 -mx-3 rounded-lg transition-colors hover:bg-muted/50"
+                className="group flex items-start gap-4 border-b border-border/30 px-5 py-3.5 transition-colors last:border-b-0 hover:bg-muted/30"
               >
-                {/* Left: ID */}
-                <div className="flex items-center gap-1.5 pt-0.5 shrink-0 w-20">
-                  <span className="font-mono text-sm text-muted-foreground group-hover:text-foreground transition-colors">
+                {/* ID + verified */}
+                <div className="flex shrink-0 items-center gap-1.5 pt-0.5 w-16">
+                  <span className="font-mono text-sm text-muted-foreground transition-colors group-hover:text-foreground/70">
                     {problem.contestId}
                     {problem.index}
                   </span>
@@ -125,18 +124,18 @@ export default async function Home({
                   )}
                 </div>
 
-                {/* Center: Name + Tags */}
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium group-hover:text-foreground transition-colors truncate">
+                {/* Name + tags */}
+                <div className="min-w-0 flex-1">
+                  <p className="text-[15px] font-medium leading-snug transition-colors group-hover:text-foreground truncate">
                     {problem.name}
-                  </div>
+                  </p>
                   {problem.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1">
+                    <div className="mt-1.5 flex flex-wrap gap-1">
                       {problem.tags.map((tag) => (
                         <Badge
                           key={tag}
                           variant="secondary"
-                          className="text-[10px] font-normal px-1.5 py-0 h-4"
+                          className="text-[10px] font-normal px-1.5 py-0 h-4 bg-muted/60 text-muted-foreground"
                         >
                           {tag}
                         </Badge>
@@ -145,16 +144,16 @@ export default async function Home({
                   )}
                 </div>
 
-                {/* Right: Rating */}
-                <div className="pt-0.5 shrink-0">
+                {/* Rating */}
+                <div className="shrink-0 pt-0.5">
                   {problem.rating ? (
                     <span
-                      className={`text-sm font-mono font-medium ${ratingColor(problem.rating)}`}
+                      className={`text-sm font-mono font-semibold ${ratingColor(problem.rating)}`}
                     >
                       {problem.rating}
                     </span>
                   ) : (
-                    <span className="text-sm font-mono text-muted-foreground/50">
+                    <span className="text-sm font-mono text-muted-foreground/30">
                       &mdash;
                     </span>
                   )}
@@ -220,12 +219,12 @@ function Pagination({
       {currentPage > 1 ? (
         <Link
           href={pageUrl(currentPage - 1)}
-          className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          className="flex size-9 items-center justify-center rounded-lg text-sm text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
         >
           &larr;
         </Link>
       ) : (
-        <span className="px-3 py-1.5 text-sm text-muted-foreground/30">
+        <span className="flex size-9 items-center justify-center text-sm text-muted-foreground/25">
           &larr;
         </span>
       )}
@@ -234,7 +233,7 @@ function Pagination({
         p === "..." ? (
           <span
             key={`ellipsis-${i}`}
-            className="px-2 py-1.5 text-sm text-muted-foreground/50"
+            className="flex size-9 items-center justify-center text-sm text-muted-foreground/40"
           >
             ...
           </span>
@@ -242,10 +241,10 @@ function Pagination({
           <Link
             key={p}
             href={pageUrl(p)}
-            className={`px-3 py-1.5 text-sm rounded-md transition-colors ${
+            className={`flex size-9 items-center justify-center rounded-lg text-sm transition-colors ${
               p === currentPage
-                ? "bg-foreground/10 text-foreground font-medium"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-foreground/10 font-medium text-foreground"
+                : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
             }`}
           >
             {p}
@@ -256,12 +255,12 @@ function Pagination({
       {currentPage < totalPages ? (
         <Link
           href={pageUrl(currentPage + 1)}
-          className="px-3 py-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors"
+          className="flex size-9 items-center justify-center rounded-lg text-sm text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
         >
           &rarr;
         </Link>
       ) : (
-        <span className="px-3 py-1.5 text-sm text-muted-foreground/30">
+        <span className="flex size-9 items-center justify-center text-sm text-muted-foreground/25">
           &rarr;
         </span>
       )}

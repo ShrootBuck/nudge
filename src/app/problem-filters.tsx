@@ -58,31 +58,31 @@ export function ProblemFilters({
   }
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-4">
       {/* Search + count */}
       <div className="flex items-center gap-3">
         <Input
           placeholder="Search by name or contest ID..."
           defaultValue={query}
           onChange={(e) => handleSearch(e.target.value)}
-          className="flex-1"
+          className="h-10 flex-1 rounded-xl bg-muted/30 border-border/50 text-sm placeholder:text-muted-foreground/50 focus:bg-muted/50"
         />
-        <span className="text-xs text-muted-foreground whitespace-nowrap tabular-nums">
+        <span className="text-xs text-muted-foreground/70 whitespace-nowrap tabular-nums">
           {totalCount.toLocaleString()} {totalCount === 1 ? "problem" : "problems"}
         </span>
       </div>
 
       {/* Rating filter pills */}
-      <div className="flex flex-wrap gap-1.5">
+      <div className="flex flex-wrap gap-2">
         {RATING_TIERS.map((tier) => (
           <button
             key={tier.value}
             type="button"
             onClick={() => handleRating(tier.value)}
-            className={`px-2.5 py-1 text-xs rounded-md border transition-colors cursor-pointer ${
+            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all cursor-pointer ${
               ratingFilter === tier.value
-                ? "border-foreground/20 bg-foreground/10 text-foreground"
-                : "border-border/50 text-muted-foreground hover:text-foreground hover:border-border"
+                ? "bg-foreground text-background shadow-sm"
+                : "bg-muted/40 text-muted-foreground hover:bg-muted/70 hover:text-foreground"
             }`}
           >
             {tier.label}
@@ -93,14 +93,14 @@ export function ProblemFilters({
       {/* Active tag filter */}
       {tagFilter && (
         <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">Tag:</span>
+          <span className="text-xs text-muted-foreground/60">Filtered by tag:</span>
           <button
             type="button"
             onClick={clearTag}
-            className="inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded-md bg-foreground/10 text-foreground cursor-pointer hover:bg-foreground/20 transition-colors"
+            className="inline-flex items-center gap-1.5 rounded-lg bg-foreground/10 px-2.5 py-1 text-xs font-medium text-foreground cursor-pointer hover:bg-foreground/15 transition-colors"
           >
             {tagFilter}
-            <span className="text-muted-foreground">&times;</span>
+            <span className="text-muted-foreground/60">&times;</span>
           </button>
         </div>
       )}
