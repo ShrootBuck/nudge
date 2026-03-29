@@ -53,22 +53,29 @@ Codeforces API -> sync-problems (weekly) -> DB -> backfill (manual) -> generate-
 - `DIRECT_URL` — Supabase direct connection (Prisma CLI)
 - `TRIGGER_SECRET_KEY` / `TRIGGER_PROJECT_REF` — trigger.dev credentials
 - `ANTHROPIC_API_KEY` — for AI generation
+- `VERIFY_PASSWORD` — plaintext password for marking problems as verified
 
-## Verification System (not yet implemented)
+## Verification System
 
 AI-generated content is unverified by default. Problems need manual verification before being shown as trusted.
 
-- Each problem page has a hidden "Verify" button at the bottom
-- Clicking it prompts for a password
-- Password is checked against a value stored in an env var (e.g. `VERIFY_PASSWORD`)
+- Hidden "verify" link at the bottom of each problem page (barely visible, intentional)
+- Clicking it shows a password input
+- Password checked server-side against `VERIFY_PASSWORD` env var (plaintext comparison)
 - No auth system — just a simple password check
-- Verified problems get a checkmark in the UI
-- `verified` field already exists on Problem model (`Boolean @default(false)`)
+- Verified problems get a green checkmark next to the problem ID
+- `verified` field on Problem model (`Boolean @default(false)`)
+- Implementation: server action in `src/app/problem/[contestId]/[index]/actions.ts`
+
+## Future Ideas
+
+- **Multi-language solutions**: Currently C++ only. Could support Python, Java, etc. Would need schema changes (multiple solutions per problem, each with a `language` field) and UI for language switching.
 
 ## Current State
 
 - First Codeforces sync complete (~11k problems in DB, all `UNQUEUED`)
 - AI generation pipeline uses Anthropic Batch API (50% cost savings, 1-day checkpointed wait per problem, zero compute while waiting)
 - Generation not yet run (waiting on API credits)
-- Frontend not yet built
-- Sample seed data: problem 1A "Theatre Square" with full content (`prisma/seed.ts`)
+- Problem page built (`/problem/[contestId]/[index]`) with collapsible hints, markdown editorial, syntax-highlighted C++ solution
+- Sample seed data: problem 1A "Theatre Square" with full content
+- Verification UI functional (hidden at bottom of problem page)

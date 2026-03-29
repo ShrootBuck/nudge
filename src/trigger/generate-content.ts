@@ -55,7 +55,7 @@ const contentToolSchema = {
     },
     required: ["hints", "editorial", "solution"],
   },
-} as const;
+};
 
 const SYSTEM_PROMPT = `You are an expert competitive programmer and teacher. You have deep knowledge of algorithms, data structures, and Codeforces problems. When generating hints, make them truly progressive: hint 1 should be a gentle nudge about what area to think about, while hint 5 should basically give away the key insight. The editorial should be clear prose (not code), and the solution must be correct, efficient C++ that handles all edge cases.
 
@@ -167,7 +167,8 @@ export const generateProblemContent = task({
       // Stream through results (we only submitted 1 request)
       let resultMessage: Anthropic.Messages.Message | null = null;
 
-      for await (const entry of anthropic.messages.batches.results(batch.id)) {
+      const results = await anthropic.messages.batches.results(batch.id);
+      for await (const entry of results) {
         if (entry.result.type === "succeeded") {
           resultMessage = entry.result.message;
         } else {
