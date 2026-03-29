@@ -13,7 +13,7 @@ Nudge is a read-only platform for Codeforces competitive programming problems. I
 ## Core Flow
 
 ```
-Codeforces API -> sync-problems (weekly) -> DB -> backfill (manual) -> generate-content-scheduler (daily) -> generate-problem-content -> Anthropic API -> hints + editorial + solution -> DB
+Codeforces API -> sync-problems (weekly) -> DB -> backfill (manual) -> generate-content-scheduler (daily) -> generate-problem-content -> Anthropic Batch API -> wait 1 day (checkpointed) -> collect result -> hints + editorial + solution -> DB
 ```
 
 ## Tech Stack
@@ -23,7 +23,7 @@ Codeforces API -> sync-problems (weekly) -> DB -> backfill (manual) -> generate-
 - **Database**: PostgreSQL on Supabase (transaction pooler for runtime, direct connection for CLI)
 - **ORM**: Prisma v7 with `@prisma/adapter-pg`
 - **Background jobs**: trigger.dev v4
-- **AI**: Vercel AI SDK + Anthropic (`claude-sonnet-4-5`)
+- **AI**: Anthropic Batch API via `@anthropic-ai/sdk` (`claude-sonnet-4-5`)
 - **Styling**: Tailwind CSS v4, ShadCN will be added soon-ish
 - **Linting/Formatting**: Biome
 
@@ -44,7 +44,7 @@ Codeforces API -> sync-problems (weekly) -> DB -> backfill (manual) -> generate-
 - `src/trigger/db.ts` — trigger.dev Prisma client (same pooler)
 - `src/trigger/sync-problems.ts` — weekly Codeforces API sync (scheduled)
 - `src/trigger/backfill.ts` — manually mark problems as PENDING by filters
-- `src/trigger/generate-content.ts` — AI generation per problem + daily scheduler
+- `src/trigger/generate-content.ts` — Batch API submission + 1-day checkpointed wait + result collection, plus daily scheduler
 - `trigger.config.ts` — trigger.dev build config with Prisma extension
 
 ## Environment Variables
@@ -63,11 +63,12 @@ AI-generated content is unverified by default. Problems need manual verification
 - Password is checked against a value stored in an env var (e.g. `VERIFY_PASSWORD`)
 - No auth system — just a simple password check
 - Verified problems get a checkmark in the UI
-- Requires a new field on the Problem model (e.g. `verified: Boolean @default(false)`)
+- `verified` field already exists on Problem model (`Boolean @default(false)`)
 
 ## Current State
 
 - First Codeforces sync complete (~11k problems in DB, all `UNQUEUED`)
-- AI generation pipeline built but not yet run (waiting on API credits)
+- AI generation pipeline uses Anthropic Batch API (50% cost savings, 1-day checkpointed wait per problem, zero compute while waiting)
+- Generation not yet run (waiting on API credits)
 - Frontend not yet built
 - Sample seed data: problem 1A "Theatre Square" with full content (`prisma/seed.ts`)

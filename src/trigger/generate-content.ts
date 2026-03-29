@@ -1,29 +1,65 @@
-import { schedules, logger, task } from "@trigger.dev/sdk";
-import { generateText, Output } from "ai";
-import { anthropic } from "@ai-sdk/anthropic";
+import { schedules, logger, task, wait } from "@trigger.dev/sdk";
+import Anthropic from "@anthropic-ai/sdk";
 import { z } from "zod";
 import { prisma } from "./db";
 
+const anthropic = new Anthropic(); // uses ANTHROPIC_API_KEY env var
+
 const contentSchema = z.object({
-  hints: z
-    .array(
-      z.object({
-        order: z.number().describe("Hint number, 1 through 5."),
-        content: z
-          .string()
-          .describe("The hint text, building on previous hints."),
-      }),
-    )
-    .describe("Exactly 5 progressive hints, each building on the last."),
-  editorial: z
-    .string()
-    .describe(
-      "A prose editorial explaining the full solution approach. Write in nice, neat markdown.",
-    ),
-  solution: z
-    .string()
-    .describe("A complete, correct C++ solution using the template given."),
+  hints: z.array(
+    z.object({
+      order: z.number(),
+      content: z.string(),
+    }),
+  ),
+  editorial: z.string(),
+  solution: z.string(),
 });
+
+// JSON Schema for the tool_use structured output
+const contentToolSchema = {
+  name: "submit_content",
+  description:
+    "Submit the generated hints, editorial, and solution for this problem.",
+  input_schema: {
+    type: "object" as const,
+    properties: {
+      hints: {
+        type: "array",
+        description: "Exactly 5 progressive hints, each building on the last.",
+        items: {
+          type: "object",
+          properties: {
+            order: {
+              type: "number",
+              description: "Hint number, 1 through 5.",
+            },
+            content: {
+              type: "string",
+              description: "The hint text, building on previous hints.",
+            },
+          },
+          required: ["order", "content"],
+        },
+      },
+      editorial: {
+        type: "string",
+        description:
+          "A prose editorial explaining the full solution approach. Write in nice, neat markdown.",
+      },
+      solution: {
+        type: "string",
+        description:
+          "A complete, correct C++ solution using the template given.",
+      },
+    },
+    required: ["hints", "editorial", "solution"],
+  },
+} as const;
+
+const SYSTEM_PROMPT = `You are an expert competitive programmer and teacher. You have deep knowledge of algorithms, data structures, and Codeforces problems. When generating hints, make them truly progressive: hint 1 should be a gentle nudge about what area to think about, while hint 5 should basically give away the key insight. The editorial should be clear prose (not code), and the solution must be correct, efficient C++ that handles all edge cases.
+
+Use quick and clever humor when appropriate. Tell it like it is (don't sugar-coat responses), and use very casual language. You are fully allowed to swear, just don't overdo it like a sailor (be natural).`;
 
 function buildPrompt(problem: {
   contestId: number;
@@ -71,7 +107,7 @@ int main() { setIO(); }
 \`\`\``;
 }
 
-// Process a single problem — called by the daily scheduler
+// Submit a batch request for a single problem, wait 1 day, then collect results
 export const generateProblemContent = task({
   id: "generate-problem-content",
   queue: {
@@ -86,30 +122,80 @@ export const generateProblemContent = task({
     });
 
     logger.info(
-      `Generating content for ${problem.contestId}${problem.index}: ${problem.name}`,
+      `Submitting batch for ${problem.contestId}${problem.index}: ${problem.name}`,
     );
 
-    // Mark as processing
     await prisma.problem.update({
       where: { id: problem.id },
       data: { generationStatus: "PROCESSING" },
     });
 
     try {
-      const { output, usage } = await generateText({
-        model: anthropic("claude-sonnet-4-5"),
-        output: Output.object({ schema: contentSchema }),
-        system: `You are an expert competitive programmer and teacher. You have deep knowledge of algorithms, data structures, and Codeforces problems. When generating hints, make them truly progressive: hint 1 should be a gentle nudge about what area to think about, while hint 5 should basically give away the key insight. The editorial should be clear prose (not code), and the solution must be correct, efficient C++ that handles all edge cases.
-
-        Use quick and clever humor when appropriate. Tell it like it is (don't sugar-coat responses), and use very casual language. You are fully allowed to swear, just don't overdo it like a sailor (be natural).`,
-        prompt: buildPrompt(problem),
+      // Submit a single-item batch request (50% cost discount vs synchronous)
+      const batch = await anthropic.messages.batches.create({
+        requests: [
+          {
+            custom_id: problem.id,
+            params: {
+              model: "claude-sonnet-4-5-20250514",
+              max_tokens: 8096,
+              system: SYSTEM_PROMPT,
+              messages: [{ role: "user", content: buildPrompt(problem) }],
+              tool_choice: { type: "any" },
+              tools: [contentToolSchema],
+            },
+          },
+        ],
       });
 
-      if (!output) {
-        throw new Error("Model returned no structured output");
+      logger.info(
+        `Batch ${batch.id} submitted for ${problem.contestId}${problem.index}, waiting 1 day`,
+      );
+
+      // Checkpointed wait — zero compute cost while suspended
+      await wait.for({ days: 1 });
+
+      // Retrieve batch status
+      const completed = await anthropic.messages.batches.retrieve(batch.id);
+
+      if (completed.processing_status !== "ended") {
+        throw new Error(
+          `Batch ${batch.id} still ${completed.processing_status} after 1 day`,
+        );
       }
 
-      logger.info(`Generated content, usage: ${JSON.stringify(usage)}`);
+      // Stream through results (we only submitted 1 request)
+      let resultMessage: Anthropic.Messages.Message | null = null;
+
+      for await (const entry of anthropic.messages.batches.results(batch.id)) {
+        if (entry.result.type === "succeeded") {
+          resultMessage = entry.result.message;
+        } else {
+          throw new Error(
+            `Batch request failed with type: ${entry.result.type}`,
+          );
+        }
+      }
+
+      if (!resultMessage) {
+        throw new Error("No result returned from batch");
+      }
+
+      // Extract structured output from tool_use block
+      const toolUse = resultMessage.content.find(
+        (block): block is Anthropic.Messages.ToolUseBlock =>
+          block.type === "tool_use",
+      );
+
+      if (!toolUse) {
+        throw new Error("No tool_use block in response");
+      }
+
+      const parsed = contentSchema.parse(toolUse.input);
+
+      logger.info(
+        `Batch ${batch.id} complete — ${parsed.hints.length} hints, editorial + solution`,
+      );
 
       // Save all generated content in a transaction
       await prisma.$transaction([
@@ -119,7 +205,7 @@ export const generateProblemContent = task({
         prisma.solution.deleteMany({ where: { problemId: problem.id } }),
 
         // Create hints
-        ...output.hints.map((hint) =>
+        ...parsed.hints.map((hint) =>
           prisma.hint.create({
             data: {
               problemId: problem.id,
@@ -133,7 +219,7 @@ export const generateProblemContent = task({
         prisma.editorial.create({
           data: {
             problemId: problem.id,
-            content: output.editorial,
+            content: parsed.editorial,
           },
         }),
 
@@ -141,7 +227,7 @@ export const generateProblemContent = task({
         prisma.solution.create({
           data: {
             problemId: problem.id,
-            content: output.solution,
+            content: parsed.solution,
           },
         }),
 
@@ -155,8 +241,7 @@ export const generateProblemContent = task({
       return {
         problemId: problem.id,
         problem: `${problem.contestId}${problem.index}`,
-        hintsGenerated: output.hints.length,
-        usage,
+        batchId: batch.id,
       };
     } catch (error) {
       await prisma.problem.update({
@@ -172,11 +257,10 @@ export const generateProblemContent = task({
 export const generateContentScheduler = schedules.task({
   id: "generate-content-scheduler",
   cron: {
-    pattern: "0 0 * * *", // midnight daily
+    pattern: "0 0 * * *",
     timezone: "America/Phoenix",
   },
   run: async () => {
-    // Grab up to 10 PENDING problems (newest first)
     const problems = await prisma.problem.findMany({
       where: { generationStatus: "PENDING" },
       orderBy: { createdAt: "desc" },
@@ -191,7 +275,6 @@ export const generateContentScheduler = schedules.task({
 
     logger.info(`Triggering generation for ${problems.length} problems`);
 
-    // Batch trigger individual generation tasks
     await generateProblemContent.batchTrigger(
       problems.map((p: { id: string }) => ({
         payload: { problemId: p.id },
