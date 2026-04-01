@@ -121,9 +121,6 @@ export const generateProblemContent = task({
   queue: {
     concurrencyLimit: 10,
   },
-  retry: {
-    maxAttempts: 3,
-  },
   run: async (payload: { problemId: string }) => {
     const problem = await prisma.problem.findUniqueOrThrow({
       where: { id: payload.problemId },
