@@ -142,8 +142,12 @@ export const generateProblemContent = task({
           {
             custom_id: problem.id,
             params: {
-              model: "claude-sonnet-4-5-20250514",
-              max_tokens: 8096,
+              model: "claude-opus-4-6",
+              max_tokens: 128000,
+              thinking: {
+                type: "enabled",
+                budget_tokens: 120000,
+              },
               system: SYSTEM_PROMPT,
               messages: [{ role: "user", content: buildPrompt(problem) }],
               tool_choice: { type: "any" },
