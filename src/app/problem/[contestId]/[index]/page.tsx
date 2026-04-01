@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ProblemContent } from "./problem-content";
 
@@ -7,6 +8,8 @@ export default async function ProblemPage({
 }: {
   params: Promise<{ contestId: string; index: string }>;
 }) {
+  await connection();
+
   const { contestId, index } = await params;
   const contestIdNum = Number.parseInt(contestId, 10);
 

@@ -10,7 +10,8 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "Nudge",
-  description: "AI-powered hints, editorials, and solutions for Codeforces problems",
+  description:
+    "AI-powered hints, editorials, and solutions for Codeforces problems",
 };
 
 export default function RootLayout({
@@ -24,10 +25,10 @@ export default function RootLayout({
       className={`${inter.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">
+      <body className="flex min-h-dvh flex-col">
         <ThemeProvider
           attribute="class"
-          defaultTheme="dark"
+          defaultTheme="system"
           enableSystem
           disableTransitionOnChange
         >

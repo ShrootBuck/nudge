@@ -1,5 +1,5 @@
-import { schedules, logger, task, wait } from "@trigger.dev/sdk";
 import Anthropic from "@anthropic-ai/sdk";
+import { logger, schedules, task, wait } from "@trigger.dev/sdk";
 import { z } from "zod";
 import { prisma } from "./db";
 
@@ -36,7 +36,8 @@ const contentToolSchema = {
             },
             content: {
               type: "string",
-              description: "The hint text, building on previous hints.",
+              description:
+                "Markdown hint text, building on previous hints. Inline ($...$) and display ($$...$$) LaTeX are allowed when they improve clarity.",
             },
           },
           required: ["order", "content"],
@@ -45,12 +46,12 @@ const contentToolSchema = {
       editorial: {
         type: "string",
         description:
-          "A prose editorial explaining the full solution approach. Write in nice, neat markdown.",
+          "A prose editorial explaining the full solution approach. Write in clean Markdown and use inline ($...$) or display ($$...$$) LaTeX whenever mathematical notation improves clarity.",
       },
       solution: {
         type: "string",
         description:
-          "A complete, correct C++ solution using the template given.",
+          "A complete, correct C++ solution using the template given. Return raw C++ only, with no surrounding Markdown fence or prose.",
       },
     },
     required: ["hints", "editorial", "solution"],
@@ -58,6 +59,8 @@ const contentToolSchema = {
 };
 
 const SYSTEM_PROMPT = `You are an expert competitive programmer and teacher. You have deep knowledge of algorithms, data structures, and Codeforces problems. When generating hints, make them truly progressive: hint 1 should be a gentle nudge about what area to think about, while hint 5 should basically give away the key insight. The editorial should be clear prose (not code), and the solution must be correct, efficient C++ that handles all edge cases.
+
+Write hints and editorials in clean Markdown. You may use inline LaTeX ($...$) and display LaTeX ($$...$$) for formulas, invariants, transitions, and complexity expressions, but only when it improves clarity. Never put mathematical notation inside code fences unless it is actual code.
 
 Use quick and clever humor when appropriate. Tell it like it is (don't sugar-coat responses), and use very casual language. You are fully allowed to swear, just don't overdo it like a sailor (be natural).`;
 
@@ -80,6 +83,11 @@ Please generate:
 1. Five progressive hints (hint 1 is the gentlest nudge, hint 5 nearly gives away the approach)
 2. A prose editorial that fully explains the solution strategy, key observations, and complexity analysis
 3. A complete C++ solution that would get full points accepted on Codeforces
+
+Formatting rules:
+- Hints and the editorial should be valid Markdown.
+- You may use inline math like $dp[i]$ and display math like $$\\sum_{i=1}^{n} a_i$$ when it helps.
+- Do not wrap the final C++ solution in Markdown fences and do not add explanation around it.
 
 For the C++ solution, use this template:
 \`\`\`cpp

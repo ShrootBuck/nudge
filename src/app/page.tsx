@@ -1,18 +1,95 @@
+import {
+  ArrowRight,
+  BadgeCheck,
+  ChevronLeft,
+  ChevronRight,
+  SearchX,
+  Sparkles,
+} from "lucide-react";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { connection } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { Badge } from "@/components/ui/badge";
 import { ProblemFilters } from "./problem-filters";
 
 const PAGE_SIZE = 50;
+const COMPLETED_WHERE = {
+  generationStatus: "COMPLETED" as const,
+};
 
-function ratingColor(rating: number | null): string {
-  if (!rating) return "text-muted-foreground/50";
-  if (rating < 1200) return "text-emerald-400";
-  if (rating < 1600) return "text-cyan-400";
-  if (rating < 1900) return "text-violet-400";
-  if (rating < 2200) return "text-amber-400";
-  if (rating < 2400) return "text-orange-400";
-  return "text-red-400";
+function ratingTone(rating: number | null): string {
+  if (!rating) {
+    return "border-border/70 bg-background/80 text-muted-foreground";
+  }
+  if (rating < 1200) {
+    return "border-emerald-500/20 bg-emerald-500/10 text-emerald-300 dark:text-emerald-200";
+  }
+  if (rating < 1600) {
+    return "border-sky-500/20 bg-sky-500/10 text-sky-300 dark:text-sky-200";
+  }
+  if (rating < 1900) {
+    return "border-violet-500/20 bg-violet-500/10 text-violet-300 dark:text-violet-200";
+  }
+  if (rating < 2200) {
+    return "border-amber-500/20 bg-amber-500/10 text-amber-400 dark:text-amber-200";
+  }
+  if (rating < 2400) {
+    return "border-orange-500/20 bg-orange-500/10 text-orange-400 dark:text-orange-200";
+  }
+  return "border-rose-500/20 bg-rose-500/10 text-rose-400 dark:text-rose-200";
+}
+
+function buildPageUrl(
+  searchParams: Record<string, string | string[] | undefined>,
+  page: number,
+) {
+  const params = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(searchParams)) {
+    if (key !== "page" && typeof value === "string") {
+      params.set(key, value);
+    }
+  }
+
+  if (page > 1) {
+    params.set("page", String(page));
+  }
+
+  const qs = params.toString();
+  return qs ? `/?${qs}` : "/";
+}
+
+function buildTagUrl(
+  searchParams: Record<string, string | string[] | undefined>,
+  tag: string,
+) {
+  const params = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(searchParams)) {
+    if (key !== "page" && typeof value === "string") {
+      params.set(key, value);
+    }
+  }
+
+  params.set("tag", tag);
+  const qs = params.toString();
+  return qs ? `/?${qs}` : "/";
+}
+
+function countActiveFilters({
+  query,
+  rating,
+  tag,
+}: {
+  query: string;
+  rating: string;
+  tag: string;
+}) {
+  return [query, rating, tag].filter(Boolean).length;
+}
+
+function formatProblemId(contestId: number, index: string) {
+  return `${contestId}${index}`;
 }
 
 export default async function Home({
@@ -20,6 +97,8 @@ export default async function Home({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  await connection();
+
   const params = await searchParams;
 
   const page = Math.max(1, Number(params.page) || 1);
@@ -27,9 +106,8 @@ export default async function Home({
   const ratingParam = typeof params.rating === "string" ? params.rating : "";
   const tagParam = typeof params.tag === "string" ? params.tag : "";
 
-  // Build where clause — only show completed problems
   const where: Record<string, unknown> = {
-    generationStatus: "COMPLETED" as const,
+    ...COMPLETED_WHERE,
   };
 
   if (query) {
@@ -55,118 +133,197 @@ export default async function Home({
     where.tags = { has: tagParam };
   }
 
-  const [problems, totalCount] = await Promise.all([
-    prisma.problem.findMany({
-      where,
-      orderBy: [{ rating: "asc" }, { contestId: "desc" }, { index: "asc" }],
-      skip: (page - 1) * PAGE_SIZE,
-      take: PAGE_SIZE,
-      select: {
-        id: true,
-        contestId: true,
-        index: true,
-        name: true,
-        rating: true,
-        tags: true,
-        verified: true,
-      },
-    }),
+  const [totalCount, verifiedCount] = await Promise.all([
     prisma.problem.count({ where }),
+    prisma.problem.count({
+      where: { ...COMPLETED_WHERE, verified: true },
+    }),
   ]);
 
-  const totalPages = Math.ceil(totalCount / PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  const safePage = totalCount === 0 ? 1 : Math.min(page, totalPages);
+
+  if (safePage !== page) {
+    redirect(buildPageUrl(params, safePage));
+  }
+
+  const problems = await prisma.problem.findMany({
+    where,
+    orderBy: [{ rating: "asc" }, { contestId: "desc" }, { index: "asc" }],
+    skip: (safePage - 1) * PAGE_SIZE,
+    take: PAGE_SIZE,
+    select: {
+      id: true,
+      contestId: true,
+      index: true,
+      name: true,
+      rating: true,
+      tags: true,
+      verified: true,
+    },
+  });
+
+  const activeFilterCount = countActiveFilters({
+    query,
+    rating: ratingParam,
+    tag: tagParam,
+  });
 
   return (
-    <main className="min-h-screen">
-      <div className="mx-auto max-w-4xl px-6 py-16 sm:py-20">
-        {/* Header */}
-        <header className="mb-12">
-          <h1 className="text-4xl font-bold tracking-tight">nudge</h1>
-          <p className="mt-2 text-base text-muted-foreground">
-            AI-powered hints, editorials, and solutions for competitive
-            programming
-          </p>
-        </header>
+    <main className="min-h-screen pb-16">
+      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+        <section className="relative overflow-hidden rounded-[2rem] border border-border/70 bg-card/80 p-6 shadow-[0_28px_70px_-40px_rgba(15,23,42,0.45)] backdrop-blur sm:p-8">
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.12),transparent_32%),radial-gradient(circle_at_85%_15%,rgba(245,158,11,0.16),transparent_28%)]" />
 
-        {/* Filters */}
-        <ProblemFilters
-          query={query}
-          ratingFilter={ratingParam}
-          tagFilter={tagParam}
-          totalCount={totalCount}
-        />
+          <div className="relative grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
+            <div>
+              <span className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 py-1 text-xs font-medium tracking-wide text-muted-foreground shadow-sm">
+                <Sparkles className="size-3.5" />
+                Competitive programming, slower and smarter
+              </span>
 
-        {/* Problem list */}
-        {problems.length === 0 ? (
-          <div className="mt-8 flex flex-col items-center justify-center rounded-2xl border border-dashed border-border/60 py-20">
-            <div className="text-muted-foreground/60 text-sm">
-              {query || ratingParam || tagParam
-                ? "No problems match your filters."
-                : "No problems available yet. Check back soon."}
+              <h1 className="mt-5 max-w-3xl text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
+                Get unstuck without skipping straight to the answer.
+              </h1>
+
+              <p className="mt-4 max-w-2xl text-base/7 text-muted-foreground sm:text-lg/8">
+                Nudge stores completed Codeforces problems with progressive
+                hints, a clean editorial, and the full C++ write-up once you
+                actually want it.
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+              <StatCard
+                label={
+                  activeFilterCount ? "Matching problems" : "Completed problems"
+                }
+                value={totalCount.toLocaleString()}
+                detail={
+                  activeFilterCount
+                    ? `${activeFilterCount} active filter${activeFilterCount === 1 ? "" : "s"}`
+                    : "ready to read"
+                }
+              />
+              <StatCard
+                label="Verified writeups"
+                value={verifiedCount.toLocaleString()}
+                detail="manually checked so far"
+              />
             </div>
           </div>
-        ) : (
-          <div className="mt-8 overflow-hidden rounded-xl border border-border/50 bg-card/40">
-            {problems.map((problem) => (
-              <Link
-                key={problem.id}
-                href={`/problem/${problem.contestId}/${problem.index}`}
-                className="group flex items-start gap-4 border-b border-border/30 px-5 py-3.5 transition-colors last:border-b-0 hover:bg-muted/30"
-              >
-                {/* ID + verified */}
-                <div className="flex shrink-0 items-center gap-1.5 pt-0.5 w-16">
-                  <span className="font-mono text-sm text-muted-foreground transition-colors group-hover:text-foreground/70">
-                    {problem.contestId}
-                    {problem.index}
-                  </span>
-                  {problem.verified && (
-                    <span className="text-emerald-400 text-xs">&#10003;</span>
-                  )}
-                </div>
+        </section>
 
-                {/* Name + tags */}
-                <div className="min-w-0 flex-1">
-                  <p className="text-[15px] font-medium leading-snug transition-colors group-hover:text-foreground truncate">
-                    {problem.name}
-                  </p>
-                  {problem.tags.length > 0 && (
-                    <div className="mt-1.5 flex flex-wrap gap-1">
-                      {problem.tags.map((tag) => (
-                        <Badge
-                          key={tag}
-                          variant="secondary"
-                          className="text-[10px] font-normal px-1.5 py-0 h-4 bg-muted/60 text-muted-foreground"
-                        >
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                  )}
-                </div>
+        <section className="mt-6 rounded-[1.75rem] border border-border/70 bg-card/75 p-4 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] backdrop-blur sm:p-6">
+          <ProblemFilters
+            query={query}
+            ratingFilter={ratingParam}
+            tagFilter={tagParam}
+            totalCount={totalCount}
+          />
+        </section>
 
-                {/* Rating */}
-                <div className="shrink-0 pt-0.5">
-                  {problem.rating ? (
-                    <span
-                      className={`text-sm font-mono font-semibold ${ratingColor(problem.rating)}`}
-                    >
-                      {problem.rating}
-                    </span>
-                  ) : (
-                    <span className="text-sm font-mono text-muted-foreground/30">
-                      &mdash;
-                    </span>
-                  )}
-                </div>
-              </Link>
-            ))}
+        <section className="mt-8">
+          <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold tracking-tight">
+                Browse problems
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Problem IDs link straight to the full hint stack and editorial.
+              </p>
+            </div>
           </div>
-        )}
 
-        {/* Pagination */}
+          {problems.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-[1.75rem] border border-dashed border-border/60 bg-card/65 px-6 py-18 text-center shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)]">
+              <div className="mb-4 rounded-full border border-border/60 bg-background/80 p-3 text-muted-foreground shadow-sm">
+                <SearchX className="size-5" />
+              </div>
+              <div className="text-sm text-muted-foreground">
+                {query || ratingParam || tagParam
+                  ? "No problems match your filters."
+                  : "No problems available yet. Check back soon."}
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {problems.map((problem) => (
+                <article
+                  key={problem.id}
+                  className="group relative overflow-hidden rounded-[1.5rem] border border-border/60 bg-card/75 p-4 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] transition duration-200 hover:-translate-y-0.5 hover:border-foreground/15 hover:shadow-[0_24px_60px_-36px_rgba(15,23,42,0.5)] sm:p-5"
+                >
+                  <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(56,189,248,0.08),transparent_32%,rgba(245,158,11,0.1))] opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+
+                  <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
+                        <Link
+                          href={`/problem/${problem.contestId}/${problem.index}`}
+                          className="font-mono font-medium text-muted-foreground transition hover:text-foreground"
+                        >
+                          {formatProblemId(problem.contestId, problem.index)}
+                        </Link>
+
+                        {problem.verified && (
+                          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-300 dark:text-emerald-200">
+                            <BadgeCheck className="size-3" />
+                            Verified
+                          </span>
+                        )}
+
+                        {problem.rating && (
+                          <span
+                            className={`inline-flex items-center rounded-full border px-2.5 py-1 font-mono text-[11px] font-semibold sm:hidden ${ratingTone(problem.rating)}`}
+                          >
+                            {problem.rating}
+                          </span>
+                        )}
+                      </div>
+
+                      <h3 className="mt-3 text-lg font-semibold tracking-tight sm:text-xl">
+                        <Link
+                          href={`/problem/${problem.contestId}/${problem.index}`}
+                          className="inline-flex items-baseline gap-2 text-balance transition hover:text-foreground/80"
+                        >
+                          <span>{problem.name}</span>
+                          <ArrowRight className="size-4 shrink-0 translate-y-[0.02em] text-muted-foreground transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-foreground" />
+                        </Link>
+                      </h3>
+
+                      {problem.tags.length > 0 && (
+                        <div className="mt-4 flex flex-wrap gap-2">
+                          {problem.tags.map((tag) => (
+                            <Link
+                              key={tag}
+                              href={buildTagUrl(params, tag)}
+                              scroll={false}
+                              className="relative z-10 inline-flex items-center rounded-full border border-border/60 bg-background/70 px-2.5 py-1 text-xs text-muted-foreground transition hover:border-foreground/15 hover:text-foreground"
+                            >
+                              {tag}
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="hidden shrink-0 sm:block">
+                      <span
+                        className={`inline-flex items-center rounded-full border px-3 py-1.5 font-mono text-xs font-semibold ${ratingTone(problem.rating)}`}
+                      >
+                        {problem.rating ?? "unrated"}
+                      </span>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
+        </section>
+
         {totalPages > 1 && (
           <Pagination
-            currentPage={page}
+            currentPage={safePage}
             totalPages={totalPages}
             searchParams={params}
           />
@@ -185,24 +342,13 @@ function Pagination({
   totalPages: number;
   searchParams: Record<string, string | string[] | undefined>;
 }) {
-  function pageUrl(page: number) {
-    const params = new URLSearchParams();
-    for (const [key, value] of Object.entries(searchParams)) {
-      if (key !== "page" && typeof value === "string") {
-        params.set(key, value);
-      }
-    }
-    if (page > 1) params.set("page", String(page));
-    const qs = params.toString();
-    return qs ? `/?${qs}` : "/";
-  }
+  const pages: Array<number | "ellipsis-left" | "ellipsis-right"> = [];
 
-  const pages: (number | "...")[] = [];
   if (totalPages <= 7) {
     for (let i = 1; i <= totalPages; i++) pages.push(i);
   } else {
     pages.push(1);
-    if (currentPage > 3) pages.push("...");
+    if (currentPage > 3) pages.push("ellipsis-left");
     for (
       let i = Math.max(2, currentPage - 1);
       i <= Math.min(totalPages - 1, currentPage + 1);
@@ -210,41 +356,43 @@ function Pagination({
     ) {
       pages.push(i);
     }
-    if (currentPage < totalPages - 2) pages.push("...");
+    if (currentPage < totalPages - 2) pages.push("ellipsis-right");
     pages.push(totalPages);
   }
 
   return (
-    <nav className="mt-10 flex items-center justify-center gap-1">
+    <nav className="mt-10 flex items-center justify-center gap-1.5">
       {currentPage > 1 ? (
         <Link
-          href={pageUrl(currentPage - 1)}
-          className="flex size-9 items-center justify-center rounded-lg text-sm text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+          href={buildPageUrl(searchParams, currentPage - 1)}
+          scroll={false}
+          className="inline-flex size-10 items-center justify-center rounded-full border border-border/60 bg-card/75 text-muted-foreground transition hover:border-foreground/15 hover:text-foreground"
         >
-          &larr;
+          <ChevronLeft className="size-4" />
         </Link>
       ) : (
-        <span className="flex size-9 items-center justify-center text-sm text-muted-foreground/25">
-          &larr;
+        <span className="inline-flex size-10 items-center justify-center rounded-full border border-border/40 bg-card/40 text-muted-foreground/30">
+          <ChevronLeft className="size-4" />
         </span>
       )}
 
-      {pages.map((p, i) =>
-        p === "..." ? (
+      {pages.map((p) =>
+        p === "ellipsis-left" || p === "ellipsis-right" ? (
           <span
-            key={`ellipsis-${i}`}
-            className="flex size-9 items-center justify-center text-sm text-muted-foreground/40"
+            key={p}
+            className="inline-flex size-10 items-center justify-center text-sm text-muted-foreground/40"
           >
             ...
           </span>
         ) : (
           <Link
             key={p}
-            href={pageUrl(p)}
-            className={`flex size-9 items-center justify-center rounded-lg text-sm transition-colors ${
+            href={buildPageUrl(searchParams, p)}
+            scroll={false}
+            className={`inline-flex size-10 items-center justify-center rounded-full border text-sm transition ${
               p === currentPage
-                ? "bg-foreground/10 font-medium text-foreground"
-                : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                ? "border-foreground bg-foreground font-medium text-background shadow-sm"
+                : "border-border/60 bg-card/75 text-muted-foreground hover:border-foreground/15 hover:text-foreground"
             }`}
           >
             {p}
@@ -254,16 +402,37 @@ function Pagination({
 
       {currentPage < totalPages ? (
         <Link
-          href={pageUrl(currentPage + 1)}
-          className="flex size-9 items-center justify-center rounded-lg text-sm text-muted-foreground transition-colors hover:bg-muted/50 hover:text-foreground"
+          href={buildPageUrl(searchParams, currentPage + 1)}
+          scroll={false}
+          className="inline-flex size-10 items-center justify-center rounded-full border border-border/60 bg-card/75 text-muted-foreground transition hover:border-foreground/15 hover:text-foreground"
         >
-          &rarr;
+          <ChevronRight className="size-4" />
         </Link>
       ) : (
-        <span className="flex size-9 items-center justify-center text-sm text-muted-foreground/25">
-          &rarr;
+        <span className="inline-flex size-10 items-center justify-center rounded-full border border-border/40 bg-card/40 text-muted-foreground/30">
+          <ChevronRight className="size-4" />
         </span>
       )}
     </nav>
+  );
+}
+
+function StatCard({
+  label,
+  value,
+  detail,
+}: {
+  label: string;
+  value: string;
+  detail: string;
+}) {
+  return (
+    <div className="rounded-[1.4rem] border border-border/70 bg-background/78 p-4 shadow-sm backdrop-blur">
+      <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+        {label}
+      </p>
+      <p className="mt-2 text-2xl font-semibold tracking-tight">{value}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{detail}</p>
+    </div>
   );
 }

@@ -1,7 +1,8 @@
 "use client";
 
-import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { useRef, useState } from "react";
+import { Search, SlidersHorizontal, X } from "lucide-react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { Input } from "@/components/ui/input";
 
 const RATING_TIERS = [
@@ -28,6 +29,15 @@ export function ProblemFilters({
   const pathname = usePathname();
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
   const [searchValue, setSearchValue] = useState(query);
+  const [isPending, startTransition] = useTransition();
+
+  useEffect(() => {
+    setSearchValue(query);
+  }, [query]);
+
+  useEffect(() => {
+    return () => clearTimeout(timeoutRef.current);
+  }, []);
 
   function updateParams(updates: Record<string, string | null>) {
     const params = new URLSearchParams(searchParams.toString());
@@ -40,7 +50,9 @@ export function ProblemFilters({
     }
     params.delete("page");
     const qs = params.toString();
-    router.push(qs ? `${pathname}?${qs}` : pathname);
+    startTransition(() => {
+      router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
+    });
   }
 
   function handleSearch(term: string) {
@@ -60,31 +72,35 @@ export function ProblemFilters({
   }
 
   return (
-    <div className="space-y-4">
-      {/* Search + count */}
-      <div className="flex items-center gap-3">
-        <Input
-          placeholder="Search by name or contest ID..."
-          value={searchValue}
-          onChange={(e) => handleSearch(e.target.value)}
-          className="h-10 flex-1 rounded-xl bg-muted/30 border-border/50 text-sm placeholder:text-muted-foreground/50 focus:bg-muted/50"
-        />
-        <span className="text-xs text-muted-foreground/70 whitespace-nowrap tabular-nums">
-          {totalCount.toLocaleString()} {totalCount === 1 ? "problem" : "problems"}
-        </span>
+    <div className="space-y-5" aria-busy={isPending}>
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+        <div className="relative flex-1">
+          <Search className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-muted-foreground/60" />
+          <Input
+            placeholder="Search by name or contest ID..."
+            value={searchValue}
+            onChange={(e) => handleSearch(e.target.value)}
+            className="h-12 rounded-2xl border-border/60 bg-background/80 pr-4 pl-11 text-sm shadow-sm transition-all placeholder:text-muted-foreground/50 focus:bg-background"
+          />
+        </div>
+
+        <div className="inline-flex items-center gap-2 self-start rounded-full border border-border/60 bg-background/80 px-4 py-2 text-xs text-muted-foreground shadow-sm">
+          <SlidersHorizontal className="size-3.5" />
+          <span className="tabular-nums">{totalCount.toLocaleString()}</span>
+          <span>{totalCount === 1 ? "match" : "matches"}</span>
+        </div>
       </div>
 
-      {/* Rating filter pills */}
       <div className="flex flex-wrap gap-2">
         {RATING_TIERS.map((tier) => (
           <button
             key={tier.value}
             type="button"
             onClick={() => handleRating(tier.value)}
-            className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-all cursor-pointer ${
+            className={`cursor-pointer rounded-full border px-3.5 py-2 text-xs font-medium transition-all ${
               ratingFilter === tier.value
-                ? "bg-foreground text-background shadow-sm"
-                : "bg-muted/40 text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+                ? "border-foreground bg-foreground text-background shadow-sm"
+                : "border-border/60 bg-background/70 text-muted-foreground hover:border-foreground/15 hover:text-foreground"
             }`}
           >
             {tier.label}
@@ -92,17 +108,18 @@ export function ProblemFilters({
         ))}
       </div>
 
-      {/* Active tag filter */}
       {tagFilter && (
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-muted-foreground/60">Filtered by tag:</span>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted-foreground/70">
+            Filtered by tag
+          </span>
           <button
             type="button"
             onClick={clearTag}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-foreground/10 px-2.5 py-1 text-xs font-medium text-foreground cursor-pointer hover:bg-foreground/15 transition-colors"
+            className="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-border/60 bg-background/80 px-3 py-1.5 text-xs font-medium text-foreground shadow-sm transition-colors hover:border-foreground/15"
           >
             {tagFilter}
-            <span className="text-muted-foreground/60">&times;</span>
+            <X className="size-3.5 text-muted-foreground/60" />
           </button>
         </div>
       )}
