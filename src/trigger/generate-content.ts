@@ -60,11 +60,11 @@ const contentToolSchema = {
   },
 };
 
-const SYSTEM_PROMPT = `You are an expert competitive programmer and teacher. You have deep knowledge of algorithms, data structures, and Codeforces problems. When generating hints, make them truly progressive: hint 1 should be a gentle nudge about what area to think about, while hint 5 should basically give away the key insight. The editorial should be clear prose (not code), and the solution must be correct, efficient C++ that handles all edge cases.
+const SYSTEM_PROMPT = `You are an expert competitive programmer and teacher. You have deep knowledge of algorithms, data structures, and Codeforces problems. When generating hints, make them truly progressive: hint 1 should be a gentle nudge about what area to think about, while hint 5 should basically give away the key insight. The editorial should be clear prose (not code), and the solution must be correct, efficient C++ that handles all edge cases but also makes sense to read. The goal is to teach here.
 
-Write hints and editorials in clean Markdown. You may use inline LaTeX ($...$) and display LaTeX ($$...$$) for formulas, invariants, transitions, and complexity expressions, but only when it improves clarity. Never put mathematical notation inside code fences unless it is actual code.
+Write hints and editorials in clean Markdown. You may use inline LaTeX ($...$) and display LaTeX ($$...$$) for formulas, invariants, transitions, and complexity expressions wherever it improves clarity. Never put mathematical notation inside code fences unless it is actual code.
 
-Use quick and clever humor when appropriate. Tell it like it is (don't sugar-coat responses), and use very casual language. You are fully allowed to swear, just don't overdo it like a sailor (be natural).`;
+Use quick and clever humor when appropriate. Tell it like it is (don't sugar-coat responses), and use very casual language. You are fully allowed to swear, just don't overdo it like a sailor (be natural but slightly funny!).`;
 
 function buildPrompt(problem: {
   contestId: number;
@@ -84,14 +84,14 @@ Problem URL: https://codeforces.com/contest/${problem.contestId}/problem/${probl
 Please generate:
 1. Five progressive hints (hint 1 is the gentlest nudge, hint 5 nearly gives away the approach)
 2. A prose editorial that fully explains the solution strategy, key observations, and complexity analysis
-3. A complete C++ solution that would get full points accepted on Codeforces
+3. A complete C++ solution that would get full points on Codeforces judge
 
 Formatting rules:
 - Hints and the editorial should be valid Markdown.
 - You may use inline math like $dp[i]$ and display math like $$\\sum_{i=1}^{n} a_i$$ when it helps.
-- Do not wrap the final C++ solution in Markdown fences and do not add explanation around it.
+- Do not wrap the final C++ solution in Markdown fences and do not add explanation around it. Comments are fine.
 
-For the C++ solution, use this template:
+For the C++ solution, use this template and work around it:
 \`\`\`cpp
 #include <bits/stdc++.h>
 using namespace std;
@@ -203,7 +203,9 @@ export const generateBatchContent = task({
               budget_tokens: 120000,
             },
             system: SYSTEM_PROMPT,
-            messages: [{ role: "user" as const, content: buildPrompt(problem) }],
+            messages: [
+              { role: "user" as const, content: buildPrompt(problem) },
+            ],
             tools: [contentToolSchema],
           },
         })),
@@ -220,7 +222,9 @@ export const generateBatchContent = task({
       throw error;
     }
 
-    logger.info(`Batch ${batch.id} submitted (${problems.length} problems), waiting 1 day`);
+    logger.info(
+      `Batch ${batch.id} submitted (${problems.length} problems), waiting 1 day`,
+    );
 
     // Checkpointed wait — zero compute cost while suspended
     await wait.for({ days: 1 });
@@ -231,7 +235,9 @@ export const generateBatchContent = task({
 
     if (completed.processing_status !== "ended") {
       // Not done yet — wait another 12 hours and check again
-      logger.warn(`Batch ${batch.id} still ${completed.processing_status}, waiting 12 more hours`);
+      logger.warn(
+        `Batch ${batch.id} still ${completed.processing_status}, waiting 12 more hours`,
+      );
       await wait.for({ hours: 12 });
 
       const retryCheck = await anthropic.messages.batches.retrieve(batch.id);
@@ -245,7 +251,9 @@ export const generateBatchContent = task({
           },
           data: { generationStatus: "FAILED" },
         });
-        throw new Error(`Batch ${batch.id} still ${retryCheck.processing_status} after 36h`);
+        throw new Error(
+          `Batch ${batch.id} still ${retryCheck.processing_status} after 36h`,
+        );
       }
     }
 
@@ -332,9 +340,7 @@ export const generateContentScheduler = schedules.task({
     // Chunk into batches of BATCH_SIZE
     const chunks: string[][] = [];
     for (let i = 0; i < problems.length; i += BATCH_SIZE) {
-      chunks.push(
-        problems.slice(i, i + BATCH_SIZE).map((p) => p.id),
-      );
+      chunks.push(problems.slice(i, i + BATCH_SIZE).map((p) => p.id));
     }
 
     logger.info(

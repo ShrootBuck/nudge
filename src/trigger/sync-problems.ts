@@ -92,7 +92,9 @@ export const syncProblems = schedules.task({
         }
       }
 
-      logger.info(`Processed ${Math.min(i + batchSize, problems.length)}/${problems.length}`);
+      logger.info(
+        `Processed ${Math.min(i + batchSize, problems.length)}/${problems.length}`,
+      );
     }
 
     logger.info(`Sync complete: ${created} created, ${updated} updated`);

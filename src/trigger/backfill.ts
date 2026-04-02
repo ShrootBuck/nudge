@@ -24,7 +24,14 @@ export const backfill = task({
       limit = 100,
     } = payload;
 
-    logger.info("Starting backfill", { ratingMin, ratingMax, contestIdMin, contestIdMax, tags, limit });
+    logger.info("Starting backfill", {
+      ratingMin,
+      ratingMax,
+      contestIdMin,
+      contestIdMax,
+      tags,
+      limit,
+    });
 
     const where: Prisma.ProblemWhereInput = {
       generationStatus: "UNQUEUED",
@@ -52,7 +59,13 @@ export const backfill = task({
       where,
       orderBy: { contestId: "asc" },
       take: limit,
-      select: { id: true, contestId: true, index: true, name: true, rating: true },
+      select: {
+        id: true,
+        contestId: true,
+        index: true,
+        name: true,
+        rating: true,
+      },
     });
 
     if (problems.length === 0) {
@@ -66,17 +79,14 @@ export const backfill = task({
       data: { generationStatus: "PENDING" },
     });
 
-    logger.info(
-      `Queued ${problems.length} problems for generation`,
-      {
-        sample: problems
-          .slice(0, 5)
-          .map(
-            (p: { contestId: number; index: string; rating: number | null }) =>
-              `${p.contestId}${p.index} (${p.rating ?? "unrated"})`,
-          ),
-      },
-    );
+    logger.info(`Queued ${problems.length} problems for generation`, {
+      sample: problems
+        .slice(0, 5)
+        .map(
+          (p: { contestId: number; index: string; rating: number | null }) =>
+            `${p.contestId}${p.index} (${p.rating ?? "unrated"})`,
+        ),
+    });
 
     return { queued: problems.length };
   },
