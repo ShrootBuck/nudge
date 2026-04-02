@@ -28,8 +28,9 @@ model Problem {
   rating    Int?
   tags      String[] // e.g. ["dp", "greedy"]
 
-  generationStatus GenerationStatus @default(UNQUEUED)
-  reviewStatus     ReviewStatus     @default(UNREVIEWED)
+  generationStatus   GenerationStatus @default(UNQUEUED)
+  generationAttempts Int              @default(0)
+  reviewStatus       ReviewStatus     @default(UNREVIEWED)
 
   hints     Hint[]
   editorial Editorial?

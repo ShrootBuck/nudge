@@ -6,6 +6,7 @@ import { prisma } from "./db";
 const anthropic = new Anthropic(); // uses ANTHROPIC_API_KEY env var
 
 const BATCH_SIZE = 10;
+const MAX_GENERATION_ATTEMPTS = 3;
 
 const contentSchema = z.object({
   hints: z.array(
@@ -92,6 +93,11 @@ Formatting rules:
 - Do not wrap the final C++ solution in Markdown fences and do not add explanation around it. Comments are fine.
 - You are writing single-file competitive programming C++ that isn't being maintained, not production C++.
   - This obviously means don't be writing super safe code if it's not something tourist would write.
+
+Output format:
+- Each hint should be just the hint text. No title, label, or subtitle — the UI adds those.
+- The editorial is rendered inside an "Editorial" section already, so DO NOT start it with an "Editorial" heading. Jump straight into the content (e.g. start with "## Observation" or whatever your first section is).
+- Please no leading blank lines or spaces on anything!
 
 For the C++ solution, use this template and work around it:
 \`\`\`cpp
@@ -184,10 +190,13 @@ export const generateBatchContent = task({
       problemMap.set(p.id, p);
     }
 
-    // Mark all as PROCESSING
+    // Mark all as PROCESSING and increment attempt counter
     await prisma.problem.updateMany({
       where: { id: { in: payload.problemIds } },
-      data: { generationStatus: "PROCESSING" },
+      data: {
+        generationStatus: "PROCESSING",
+        generationAttempts: { increment: 1 },
+      },
     });
 
     logger.info(`Creating batch with ${problems.length} requests`);
@@ -253,9 +262,7 @@ export const generateBatchContent = task({
         },
         data: { generationStatus: "FAILED" },
       });
-      throw new Error(
-        `Batch ${batch.id} not completed after 24 hourly checks`,
-      );
+      throw new Error(`Batch ${batch.id} not completed after 24 hourly checks`);
     }
 
     // Process results — handle each problem independently
@@ -285,6 +292,13 @@ export const generateBatchContent = task({
         }
 
         const parsed = contentSchema.parse(toolUse.input);
+
+        // Trim whitespace from solution (model sometimes adds leading newlines)
+        parsed.solution = parsed.solution.trim();
+        parsed.editorial = parsed.editorial.trim();
+        for (const hint of parsed.hints) {
+          hint.content = hint.content.trim();
+        }
 
         await saveProblemContent(problemId, parsed);
         succeeded++;
@@ -328,7 +342,10 @@ export const generateContentScheduler = schedules.task({
   },
   run: async () => {
     const problems = await prisma.problem.findMany({
-      where: { generationStatus: { in: ["PENDING", "FAILED"] } },
+      where: {
+        generationStatus: { in: ["PENDING", "FAILED"] },
+        generationAttempts: { lt: MAX_GENERATION_ATTEMPTS },
+      },
       orderBy: { createdAt: "desc" },
       select: { id: true, contestId: true, index: true, name: true },
     });

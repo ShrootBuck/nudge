@@ -60,23 +60,6 @@ function buildPageUrl(
   return qs ? `/?${qs}` : "/";
 }
 
-function buildTagUrl(
-  searchParams: Record<string, string | string[] | undefined>,
-  tag: string,
-) {
-  const params = new URLSearchParams();
-
-  for (const [key, value] of Object.entries(searchParams)) {
-    if (key !== "page" && typeof value === "string") {
-      params.set(key, value);
-    }
-  }
-
-  params.set("tag", tag);
-  const qs = params.toString();
-  return qs ? `/?${qs}` : "/";
-}
-
 function countActiveFilters({
   query,
   rating,
@@ -271,21 +254,19 @@ export default async function Home({
           ) : (
             <div className="space-y-3">
               {problems.map((problem) => (
-                <article
+                <Link
                   key={problem.id}
-                  className="group relative overflow-hidden rounded-[1.5rem] border border-border/60 bg-card/75 p-4 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] transition duration-200 hover:-translate-y-0.5 hover:border-foreground/15 hover:shadow-[0_24px_60px_-36px_rgba(15,23,42,0.5)] sm:p-5"
+                  href={`/problem/${problem.contestId}/${problem.index}`}
+                  className="group relative block overflow-hidden rounded-[1.5rem] border border-border/60 bg-card/75 p-4 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] transition duration-200 hover:-translate-y-0.5 hover:border-foreground/15 hover:shadow-[0_24px_60px_-36px_rgba(15,23,42,0.5)] sm:p-5"
                 >
                   <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(56,189,248,0.08),transparent_32%,rgba(245,158,11,0.1))] opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
 
                   <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2 text-xs">
-                        <Link
-                          href={`/problem/${problem.contestId}/${problem.index}`}
-                          className="font-mono font-medium text-muted-foreground transition hover:text-foreground"
-                        >
+                        <span className="font-mono font-medium text-muted-foreground">
                           {formatProblemId(problem.contestId, problem.index)}
-                        </Link>
+                        </span>
 
                         {reviewBadge(problem.reviewStatus)}
 
@@ -299,26 +280,21 @@ export default async function Home({
                       </div>
 
                       <h3 className="mt-3 text-lg font-semibold tracking-tight sm:text-xl">
-                        <Link
-                          href={`/problem/${problem.contestId}/${problem.index}`}
-                          className="inline-flex items-baseline gap-2 text-balance transition hover:text-foreground/80"
-                        >
+                        <span className="inline-flex items-baseline gap-2 text-balance">
                           <span>{problem.name}</span>
                           <ArrowRight className="size-4 shrink-0 translate-y-[0.02em] text-muted-foreground transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-foreground" />
-                        </Link>
+                        </span>
                       </h3>
 
                       {problem.tags.length > 0 && (
                         <div className="mt-4 flex flex-wrap gap-2">
                           {problem.tags.map((tag) => (
-                            <Link
+                            <span
                               key={tag}
-                              href={buildTagUrl(params, tag)}
-                              scroll={false}
-                              className="relative z-10 inline-flex items-center rounded-full border border-border/60 bg-background/70 px-2.5 py-1 text-xs text-muted-foreground transition hover:border-foreground/15 hover:text-foreground"
+                              className="inline-flex items-center rounded-full border border-border/60 bg-background/70 px-2.5 py-1 text-xs text-muted-foreground"
                             >
                               {tag}
-                            </Link>
+                            </span>
                           ))}
                         </div>
                       )}
@@ -332,7 +308,7 @@ export default async function Home({
                       </span>
                     </div>
                   </div>
-                </article>
+                </Link>
               ))}
             </div>
           )}

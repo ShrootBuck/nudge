@@ -8,6 +8,7 @@ import {
   Code2,
   Lightbulb,
   LoaderCircle,
+  RotateCw,
   ShieldAlert,
   ShieldCheck,
   X,
@@ -22,7 +23,7 @@ import { CodeBlock } from "@/components/code-block";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { setProblemReviewStatus } from "./actions";
+import { queueRegeneration, setProblemReviewStatus } from "./actions";
 
 type ReviewStatus = "UNREVIEWED" | "VERIFIED" | "SOLUTION_INCORRECT";
 type ReviewOutcome = Exclude<ReviewStatus, "UNREVIEWED">;
@@ -47,14 +48,6 @@ const HINT_LABELS = [
   "On the right track",
   "Almost there",
   "The key insight",
-];
-
-const HINT_NOTES = [
-  "Barely a spoiler. Keep your own solve alive.",
-  "A cleaner direction to test.",
-  "The structure should start snapping into place here.",
-  "You probably only need one more push after this.",
-  "This is the near-giveaway version.",
 ];
 
 function ratingTone(rating: number | null): string {
@@ -278,9 +271,6 @@ function HintCard({
           <div className="min-w-0">
             <p className="text-base font-semibold tracking-tight">
               {HINT_LABELS[index] ?? `Hint ${hint.order}`}
-            </p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {HINT_NOTES[index] ?? "A progressively less subtle hint."}
             </p>
           </div>
         </div>
@@ -566,7 +556,7 @@ export function ProblemContent({ problem }: { problem: Problem }) {
             className="inline-flex items-center gap-2 text-sm text-muted-foreground transition hover:text-foreground"
           >
             <ArrowUpRight className="size-4" />
-            View on Codeforces &rarr;
+            View on Codeforces
           </a>
           <Link
             href="/"
@@ -625,9 +615,9 @@ function ReviewSection({
   const [open, setOpen] = useState(false);
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [pendingStatus, setPendingStatus] = useState<ReviewOutcome | null>(
-    null,
-  );
+  const [pendingStatus, setPendingStatus] = useState<
+    ReviewOutcome | "REGENERATE" | null
+  >(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
   const review = reviewState(reviewStatus);
@@ -666,15 +656,40 @@ function ReviewSection({
     });
   }
 
+  function handleRegenerate() {
+    setError(null);
+    setPendingStatus("REGENERATE");
+
+    startTransition(() => {
+      void (async () => {
+        try {
+          const result = await queueRegeneration(problemId, password);
+
+          if (result.success) {
+            setPassword("");
+            setOpen(false);
+            router.refresh();
+          } else {
+            setError(result.error);
+          }
+        } catch {
+          setError("Regeneration request failed");
+        } finally {
+          setPendingStatus(null);
+        }
+      })();
+    });
+  }
+
   if (!open) {
     return (
       <div className="mt-14 text-center">
         <button
           type="button"
           onClick={() => setOpen(true)}
-          className="cursor-pointer text-[10px] text-muted-foreground/20 transition-colors hover:text-muted-foreground/50"
+          className="cursor-pointer text-xs text-muted-foreground/40 transition-colors hover:text-muted-foreground"
         >
-          review
+          Review this problem
         </button>
       </div>
     );
@@ -727,6 +742,22 @@ function ReviewSection({
                 {pendingStatus === "SOLUTION_INCORRECT"
                   ? "Marking..."
                   : "Mark solution incorrect"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isPending || !password}
+                className="h-10 rounded-xl px-4"
+                onClick={handleRegenerate}
+              >
+                <RotateCw
+                  className={cn(
+                    "mr-2 size-3.5",
+                    pendingStatus === "REGENERATE" && "animate-spin",
+                  )}
+                />
+                {pendingStatus === "REGENERATE" ? "Queuing..." : "Regenerate"}
               </Button>
               <button
                 type="button"
