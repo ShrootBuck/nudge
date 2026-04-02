@@ -1,4 +1,4 @@
-import { schedules, logger } from "@trigger.dev/sdk";
+import { logger, schedules } from "@trigger.dev/sdk";
 import { prisma } from "./db";
 
 interface CFProblem {
