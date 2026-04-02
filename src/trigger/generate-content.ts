@@ -225,38 +225,37 @@ export const generateBatchContent = task({
     }
 
     logger.info(
-      `Batch ${batch.id} submitted (${problems.length} problems), waiting 1 day`,
+      `Batch ${batch.id} submitted (${problems.length} problems), polling hourly`,
     );
 
-    // Checkpointed wait — zero compute cost while suspended
-    await wait.for({ days: 1 });
+    // Poll every hour up to 24 times — each wait is checkpointed (zero compute cost)
+    let batchEnded = false;
+    for (let attempt = 1; attempt <= 24; attempt++) {
+      await wait.for({ hours: 1 });
 
-    logger.info(`Wait complete, retrieving batch ${batch.id}`);
-
-    const completed = await anthropic.messages.batches.retrieve(batch.id);
-
-    if (completed.processing_status !== "ended") {
-      // Not done yet — wait another 12 hours and check again
-      logger.warn(
-        `Batch ${batch.id} still ${completed.processing_status}, waiting 12 more hours`,
+      const status = await anthropic.messages.batches.retrieve(batch.id);
+      logger.info(
+        `Batch ${batch.id} check ${attempt}/24: ${status.processing_status}`,
       );
-      await wait.for({ hours: 12 });
 
-      const retryCheck = await anthropic.messages.batches.retrieve(batch.id);
-      if (retryCheck.processing_status !== "ended") {
-        // Give up — mark all as FAILED so they can be retried later
-        logger.error(`Batch ${batch.id} still not done after 36 hours`);
-        await prisma.problem.updateMany({
-          where: {
-            id: { in: payload.problemIds },
-            generationStatus: "PROCESSING",
-          },
-          data: { generationStatus: "FAILED" },
-        });
-        throw new Error(
-          `Batch ${batch.id} still ${retryCheck.processing_status} after 36h`,
-        );
+      if (status.processing_status === "ended") {
+        batchEnded = true;
+        break;
       }
+    }
+
+    if (!batchEnded) {
+      logger.error(`Batch ${batch.id} still not done after 24 hours`);
+      await prisma.problem.updateMany({
+        where: {
+          id: { in: payload.problemIds },
+          generationStatus: "PROCESSING",
+        },
+        data: { generationStatus: "FAILED" },
+      });
+      throw new Error(
+        `Batch ${batch.id} not completed after 24 hourly checks`,
+      );
     }
 
     // Process results — handle each problem independently
