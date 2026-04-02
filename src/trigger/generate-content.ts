@@ -157,12 +157,12 @@ export const generateProblemContent = task({
         ],
       });
 
-      logger.info(
-        `Batch ${batch.id} submitted for ${problem.contestId}${problem.index}, waiting 1 day`,
-      );
+      logger.info(`Batch ${batch.id} submitted, waiting 1 day`);
 
       // Checkpointed wait — zero compute cost while suspended
       await wait.for({ days: 1 });
+
+      logger.info(`Wait complete, retrieving batch ${batch.id}`);
 
       // Retrieve batch status
       const completed = await anthropic.messages.batches.retrieve(batch.id);
@@ -191,6 +191,8 @@ export const generateProblemContent = task({
         throw new Error("No result returned from batch");
       }
 
+      logger.info("Batch result received, parsing structured output");
+
       // Extract structured output from tool_use block
       const toolUse = resultMessage.content.find(
         (block): block is Anthropic.Messages.ToolUseBlock =>
@@ -206,6 +208,8 @@ export const generateProblemContent = task({
       logger.info(
         `Batch ${batch.id} complete — ${parsed.hints.length} hints, editorial + solution`,
       );
+
+      logger.info(`Saving content: ${parsed.hints.length} hints, editorial, solution`);
 
       // Save all generated content in a transaction
       await prisma.$transaction([
@@ -254,6 +258,7 @@ export const generateProblemContent = task({
         batchId: batch.id,
       };
     } catch (error) {
+      logger.error(`Generation failed for ${problem.contestId}${problem.index}`, { error: String(error) });
       await prisma.problem.update({
         where: { id: problem.id },
         data: { generationStatus: "FAILED" },
@@ -283,7 +288,9 @@ export const generateContentScheduler = schedules.task({
       return { triggered: 0 };
     }
 
-    logger.info(`Triggering generation for ${problems.length} problems`);
+    logger.info(`Triggering generation for ${problems.length} problems`, {
+      problems: problems.map((p: { contestId: number; index: string; name: string }) => `${p.contestId}${p.index}: ${p.name}`),
+    });
 
     await generateProblemContent.batchTrigger(
       problems.map((p: { id: string }) => ({

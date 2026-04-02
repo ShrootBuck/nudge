@@ -24,6 +24,8 @@ export const backfill = task({
       limit = 100,
     } = payload;
 
+    logger.info("Starting backfill", { ratingMin, ratingMax, contestIdMin, contestIdMax, tags, limit });
+
     const where: Prisma.ProblemWhereInput = {
       generationStatus: "UNQUEUED",
     };
