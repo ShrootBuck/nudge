@@ -72,7 +72,6 @@ export const syncProblems = schedules.task({
             return "updated" as const;
           }
 
-          // New problem — mark as PENDING so generate-content picks it up
           await prisma.problem.create({
             data: {
               contestId: p.contestId,
@@ -80,7 +79,6 @@ export const syncProblems = schedules.task({
               name: p.name,
               rating: p.rating ?? null,
               tags: p.tags,
-              generationStatus: "PENDING",
             },
           });
           return "created" as const;
