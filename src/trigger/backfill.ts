@@ -1,5 +1,5 @@
-import { task, logger } from "@trigger.dev/sdk";
-import { Prisma } from "@prisma/client";
+import type { Prisma } from "@prisma/client";
+import { logger, task } from "@trigger.dev/sdk";
 import { prisma } from "./db";
 
 interface BackfillPayload {
@@ -9,6 +9,15 @@ interface BackfillPayload {
   contestIdMax?: number;
   tags?: string[];
   limit?: number; // max problems to queue, defaults to 100
+}
+
+function shuffleInPlace<T>(items: T[]) {
+  for (let i = items.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [items[i], items[j]] = [items[j], items[i]];
+  }
+
+  return items;
 }
 
 // Manually triggered — marks UNQUEUED problems as PENDING based on filters
@@ -55,10 +64,8 @@ export const backfill = task({
       where.tags = { hasSome: tags };
     }
 
-    const problems = await prisma.problem.findMany({
+    const candidates = await prisma.problem.findMany({
       where,
-      orderBy: { contestId: "asc" },
-      take: limit,
       select: {
         id: true,
         contestId: true,
@@ -68,10 +75,12 @@ export const backfill = task({
       },
     });
 
-    if (problems.length === 0) {
+    if (candidates.length === 0) {
       logger.info("No matching UNQUEUED problems found");
       return { queued: 0 };
     }
+
+    const problems = shuffleInPlace(candidates).slice(0, limit);
 
     // Mark them all as PENDING
     await prisma.problem.updateMany({

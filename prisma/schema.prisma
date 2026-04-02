@@ -14,6 +14,12 @@ enum GenerationStatus {
   FAILED
 }
 
+enum ReviewStatus {
+  UNREVIEWED
+  VERIFIED
+  SOLUTION_INCORRECT
+}
+
 model Problem {
   id        String   @id @default(cuid())
   contestId Int
@@ -23,7 +29,7 @@ model Problem {
   tags      String[] // e.g. ["dp", "greedy"]
 
   generationStatus GenerationStatus @default(UNQUEUED)
-  verified         Boolean          @default(false)
+  reviewStatus     ReviewStatus     @default(UNREVIEWED)
 
   hints     Hint[]
   editorial Editorial?

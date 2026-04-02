@@ -22,7 +22,10 @@ import { CodeBlock } from "@/components/code-block";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
-import { verifyProblem } from "./actions";
+import { setProblemReviewStatus } from "./actions";
+
+type ReviewStatus = "UNREVIEWED" | "VERIFIED" | "SOLUTION_INCORRECT";
+type ReviewOutcome = Exclude<ReviewStatus, "UNREVIEWED">;
 
 type Problem = {
   id: string;
@@ -31,7 +34,7 @@ type Problem = {
   name: string;
   rating: number | null;
   tags: string[];
-  verified: boolean;
+  reviewStatus: ReviewStatus;
   generationStatus: string;
   hints: { id: string; order: number; content: string }[];
   editorial: { id: string; content: string } | null;
@@ -107,6 +110,54 @@ function generationState(status: string) {
         className: "border-border/70 bg-background/80 text-muted-foreground",
         animate: false,
       };
+  }
+}
+
+function reviewState(status: ReviewStatus) {
+  switch (status) {
+    case "VERIFIED":
+      return {
+        icon: BadgeCheck,
+        label: "Verified",
+        badgeClassName:
+          "border-emerald-500/20 bg-emerald-500/10 text-emerald-300 dark:text-emerald-200",
+        panelClassName:
+          "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200",
+        summary: "Marked verified and safer to trust heavily.",
+      };
+    case "SOLUTION_INCORRECT":
+      return {
+        icon: X,
+        label: "Solution incorrect",
+        badgeClassName:
+          "border-rose-500/20 bg-rose-500/10 text-rose-300 dark:text-rose-200",
+        panelClassName:
+          "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-200",
+        summary:
+          "The generated solution was reviewed and does not currently pass. Treat the write-up as suspect until it is fixed.",
+      };
+    default:
+      return {
+        icon: ShieldAlert,
+        label: "Unreviewed",
+        badgeClassName:
+          "border-border/60 bg-background/80 text-muted-foreground shadow-sm",
+        panelClassName:
+          "border-border/60 bg-background/75 text-muted-foreground",
+        summary:
+          "AI-generated and still unreviewed. Double-check the details before internalizing them.",
+      };
+  }
+}
+
+function solutionSectionDescription(reviewStatus: ReviewStatus) {
+  switch (reviewStatus) {
+    case "VERIFIED":
+      return "This is the full implementation that was manually checked.";
+    case "SOLUTION_INCORRECT":
+      return "This implementation is currently marked incorrect. Open it if you want to inspect what went wrong.";
+    default:
+      return "This is the full implementation the model produced for the problem.";
   }
 }
 
@@ -261,6 +312,8 @@ export function ProblemContent({ problem }: { problem: Problem }) {
   const hasContent = problem.generationStatus === "COMPLETED";
   const state = generationState(problem.generationStatus);
   const StateIcon = state.icon;
+  const review = reviewState(problem.reviewStatus);
+  const ReviewIcon = review.icon;
 
   return (
     <main className="min-h-screen pb-20">
@@ -292,17 +345,12 @@ export function ProblemContent({ problem }: { problem: Problem }) {
                     {problem.index}
                   </a>
 
-                  {problem.verified ? (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-medium text-emerald-300 dark:text-emerald-200">
-                      <BadgeCheck className="size-3.5" />
-                      Verified
-                    </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/80 px-3 py-1.5 text-xs font-medium text-muted-foreground shadow-sm">
-                      <ShieldAlert className="size-3.5" />
-                      Unverified
-                    </span>
-                  )}
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium ${review.badgeClassName}`}
+                  >
+                    <ReviewIcon className="size-3.5" />
+                    {review.label}
+                  </span>
 
                   <span
                     className={`inline-flex items-center rounded-full border px-3 py-1.5 font-mono text-xs font-semibold ${ratingTone(problem.rating)}`}
@@ -346,10 +394,10 @@ export function ProblemContent({ problem }: { problem: Problem }) {
                   <ArrowUpRight className="size-4" />
                 </a>
 
-                <div className="rounded-[1.25rem] border border-border/60 bg-background/75 px-4 py-3 text-sm text-muted-foreground shadow-sm">
-                  {problem.verified
-                    ? "Marked verified and safer to trust heavily."
-                    : "AI-generated and still unverified. Double-check the details before internalizing them."}
+                <div
+                  className={`rounded-[1.25rem] border px-4 py-3 text-sm shadow-sm ${review.panelClassName}`}
+                >
+                  {review.summary}
                 </div>
               </div>
             </div>
@@ -386,6 +434,28 @@ export function ProblemContent({ problem }: { problem: Problem }) {
                 </h2>
                 <p className="mt-1 max-w-2xl text-sm/7 opacity-80">
                   {state.description}
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {hasContent && problem.reviewStatus === "SOLUTION_INCORRECT" && (
+          <section
+            className={`mt-8 rounded-[1.75rem] border px-6 py-6 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] ${review.panelClassName}`}
+          >
+            <div className="flex items-start gap-4">
+              <div className="rounded-2xl border border-current/15 bg-background/60 p-3">
+                <ReviewIcon className="size-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold tracking-tight">
+                  The current solution is marked incorrect
+                </h2>
+                <p className="mt-1 max-w-2xl text-sm/7 opacity-90">
+                  Someone reviewed this output and the generated solution did
+                  not pass. Use the hints, editorial, and code cautiously until
+                  the content is regenerated or fixed.
                 </p>
               </div>
             </div>
@@ -453,8 +523,8 @@ export function ProblemContent({ problem }: { problem: Problem }) {
               <section className="rounded-[1.75rem] border border-border/70 bg-card/75 p-5 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] sm:p-6">
                 <SectionIntro
                   eyebrow="Solution"
-                  title="Accepted C++"
-                  description="This is the full implementation, styled for reading instead of panic-copying."
+                  title="Generated C++"
+                  description={solutionSectionDescription(problem.reviewStatus)}
                   icon={Code2}
                 />
 
@@ -507,8 +577,11 @@ export function ProblemContent({ problem }: { problem: Problem }) {
           </Link>
         </div>
 
-        {!problem.verified && hasContent && (
-          <VerifySection problemId={problem.id} />
+        {hasContent && (
+          <ReviewSection
+            problemId={problem.id}
+            reviewStatus={problem.reviewStatus}
+          />
         )}
       </div>
     </main>
@@ -542,30 +615,54 @@ function SectionIntro({
   );
 }
 
-function VerifySection({ problemId }: { problemId: string }) {
+function ReviewSection({
+  problemId,
+  reviewStatus,
+}: {
+  problemId: string;
+  reviewStatus: ReviewStatus;
+}) {
   const [open, setOpen] = useState(false);
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [pendingStatus, setPendingStatus] = useState<ReviewOutcome | null>(
+    null,
+  );
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
+  const review = reviewState(reviewStatus);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError(null);
+    handleReview("VERIFIED");
+  }
 
-    startTransition(async () => {
-      try {
-        const result = await verifyProblem(problemId, password);
-        if (result.success) {
-          setPassword("");
-          setOpen(false);
-          router.refresh();
-        } else {
-          setError(result.error);
+  function handleReview(nextStatus: ReviewOutcome) {
+    setError(null);
+    setPendingStatus(nextStatus);
+
+    startTransition(() => {
+      void (async () => {
+        try {
+          const result = await setProblemReviewStatus(
+            problemId,
+            password,
+            nextStatus,
+          );
+
+          if (result.success) {
+            setPassword("");
+            setOpen(false);
+            router.refresh();
+          } else {
+            setError(result.error);
+          }
+        } catch {
+          setError("Review update failed");
+        } finally {
+          setPendingStatus(null);
         }
-      } catch {
-        setError("Verification failed");
-      }
+      })();
     });
   }
 
@@ -577,7 +674,7 @@ function VerifySection({ problemId }: { problemId: string }) {
           onClick={() => setOpen(true)}
           className="cursor-pointer text-[10px] text-muted-foreground/20 transition-colors hover:text-muted-foreground/50"
         >
-          verify
+          review
         </button>
       </div>
     );
@@ -592,44 +689,57 @@ function VerifySection({ problemId }: { problemId: string }) {
 
         <div className="min-w-0 flex-1">
           <h3 className="text-sm font-semibold tracking-tight">
-            Mark this problem as verified
+            Update review status
           </h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            This is intentionally low-friction. Enter the shared password and
-            the page will refresh in place.
+            Current status: {review.label}. Enter the shared password and pick
+            the outcome. The page will refresh in place.
           </p>
 
-          <form
-            onSubmit={handleSubmit}
-            className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center"
-          >
+          <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-3">
             <Input
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Verification password"
+              placeholder="Review password"
               className="h-10 w-full rounded-xl border-border/60 bg-background/80 sm:max-w-64"
               autoFocus
             />
-            <Button
-              type="submit"
-              size="sm"
-              disabled={isPending || !password}
-              className="h-10 rounded-xl px-4"
-            >
-              {isPending ? "Verifying..." : "Verify"}
-            </Button>
-            <button
-              type="button"
-              onClick={() => {
-                setOpen(false);
-                setError(null);
-              }}
-              className="inline-flex h-10 cursor-pointer items-center gap-2 text-sm text-muted-foreground transition hover:text-foreground"
-            >
-              <X className="size-4" />
-              Cancel
-            </button>
+            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+              <Button
+                type="submit"
+                size="sm"
+                disabled={isPending || !password}
+                className="h-10 rounded-xl px-4"
+              >
+                {pendingStatus === "VERIFIED"
+                  ? "Verifying..."
+                  : "Mark verified"}
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                disabled={isPending || !password}
+                className="h-10 rounded-xl px-4"
+                onClick={() => handleReview("SOLUTION_INCORRECT")}
+              >
+                {pendingStatus === "SOLUTION_INCORRECT"
+                  ? "Marking..."
+                  : "Mark solution incorrect"}
+              </Button>
+              <button
+                type="button"
+                onClick={() => {
+                  setOpen(false);
+                  setError(null);
+                }}
+                className="inline-flex h-10 cursor-pointer items-center gap-2 text-sm text-muted-foreground transition hover:text-foreground"
+              >
+                <X className="size-4" />
+                Cancel
+              </button>
+            </div>
           </form>
 
           {error && <p className="mt-3 text-sm text-rose-400">{error}</p>}

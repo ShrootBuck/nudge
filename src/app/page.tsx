@@ -5,6 +5,7 @@ import {
   ChevronRight,
   SearchX,
   Sparkles,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -92,6 +93,27 @@ function formatProblemId(contestId: number, index: string) {
   return `${contestId}${index}`;
 }
 
+function reviewBadge(status: string) {
+  switch (status) {
+    case "VERIFIED":
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-300 dark:text-emerald-200">
+          <BadgeCheck className="size-3" />
+          Verified
+        </span>
+      );
+    case "SOLUTION_INCORRECT":
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full border border-rose-500/20 bg-rose-500/10 px-2 py-0.5 text-[11px] font-medium text-rose-300 dark:text-rose-200">
+          <X className="size-3" />
+          Solution incorrect
+        </span>
+      );
+    default:
+      return null;
+  }
+}
+
 export default async function Home({
   searchParams,
 }: {
@@ -136,7 +158,7 @@ export default async function Home({
   const [totalCount, verifiedCount] = await Promise.all([
     prisma.problem.count({ where }),
     prisma.problem.count({
-      where: { ...COMPLETED_WHERE, verified: true },
+      where: { ...COMPLETED_WHERE, reviewStatus: "VERIFIED" },
     }),
   ]);
 
@@ -159,7 +181,7 @@ export default async function Home({
       name: true,
       rating: true,
       tags: true,
-      verified: true,
+      reviewStatus: true,
     },
   });
 
@@ -265,12 +287,7 @@ export default async function Home({
                           {formatProblemId(problem.contestId, problem.index)}
                         </Link>
 
-                        {problem.verified && (
-                          <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-300 dark:text-emerald-200">
-                            <BadgeCheck className="size-3" />
-                            Verified
-                          </span>
-                        )}
+                        {reviewBadge(problem.reviewStatus)}
 
                         {problem.rating && (
                           <span
