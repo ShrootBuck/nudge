@@ -150,7 +150,6 @@ export const generateProblemContent = task({
               },
               system: SYSTEM_PROMPT,
               messages: [{ role: "user", content: buildPrompt(problem) }],
-              tool_choice: { type: "any" },
               tools: [contentToolSchema],
             },
           },
