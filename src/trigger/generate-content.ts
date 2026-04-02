@@ -90,6 +90,8 @@ Formatting rules:
 - Hints and the editorial should be valid Markdown.
 - You may use inline math like $dp[i]$ and display math like $$\\sum_{i=1}^{n} a_i$$ when it helps.
 - Do not wrap the final C++ solution in Markdown fences and do not add explanation around it. Comments are fine.
+- You are writing single-file competitive programming C++ that isn't being maintained, not production C++.
+  - This obviously means don't be writing super safe code if it's not something tourist would write.
 
 For the C++ solution, use this template and work around it:
 \`\`\`cpp
