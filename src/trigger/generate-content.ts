@@ -5,6 +5,8 @@ import { prisma } from "./db";
 
 const anthropic = new Anthropic(); // uses ANTHROPIC_API_KEY env var
 
+const BATCH_SIZE = 10;
+
 const contentSchema = z.object({
   hints: z.array(
     z.object({
@@ -115,159 +117,200 @@ int main() { setIO(); }
 \`\`\``;
 }
 
-// Submit a batch request for a single problem, wait 1 day, then collect results
-export const generateProblemContent = task({
-  id: "generate-problem-content",
-  queue: {
-    concurrencyLimit: 10,
-  },
-  run: async (payload: { problemId: string }) => {
-    const problem = await prisma.problem.findUniqueOrThrow({
-      where: { id: payload.problemId },
+function saveProblemContent(
+  problemId: string,
+  parsed: z.infer<typeof contentSchema>,
+) {
+  return prisma.$transaction([
+    // Delete any existing content (in case of retry)
+    prisma.hint.deleteMany({ where: { problemId } }),
+    prisma.editorial.deleteMany({ where: { problemId } }),
+    prisma.solution.deleteMany({ where: { problemId } }),
+
+    // Create hints
+    ...parsed.hints.map((hint) =>
+      prisma.hint.create({
+        data: {
+          problemId,
+          order: hint.order,
+          content: hint.content,
+        },
+      }),
+    ),
+
+    // Create editorial
+    prisma.editorial.create({
+      data: { problemId, content: parsed.editorial },
+    }),
+
+    // Create solution
+    prisma.solution.create({
+      data: { problemId, content: parsed.solution },
+    }),
+
+    // Mark as completed
+    prisma.problem.update({
+      where: { id: problemId },
+      data: { generationStatus: "COMPLETED" },
+    }),
+  ]);
+}
+
+type ProblemForBatch = {
+  id: string;
+  contestId: number;
+  index: string;
+  name: string;
+  rating: number | null;
+  tags: string[];
+};
+
+// Process a batch of problems via one Anthropic Batch API call
+export const generateBatchContent = task({
+  id: "generate-batch-content",
+  queue: { concurrencyLimit: 5 },
+  retry: { maxAttempts: 2 },
+  run: async (payload: { problemIds: string[] }) => {
+    // Fetch full problem data for the batch
+    const problems = await prisma.problem.findMany({
+      where: { id: { in: payload.problemIds } },
     });
 
-    logger.info(
-      `Submitting batch for ${problem.contestId}${problem.index}: ${problem.name}`,
-    );
+    // Build a lookup so we can map custom_id -> problem later
+    const problemMap = new Map<string, ProblemForBatch>();
+    for (const p of problems) {
+      problemMap.set(p.id, p);
+    }
 
-    await prisma.problem.update({
-      where: { id: problem.id },
+    // Mark all as PROCESSING
+    await prisma.problem.updateMany({
+      where: { id: { in: payload.problemIds } },
       data: { generationStatus: "PROCESSING" },
     });
 
+    logger.info(`Creating batch with ${problems.length} requests`);
+
+    let batch: Anthropic.Messages.Batches.MessageBatch;
     try {
-      // Submit a single-item batch request (50% cost discount vs synchronous)
-      const batch = await anthropic.messages.batches.create({
-        requests: [
-          {
-            custom_id: problem.id,
-            params: {
-              model: "claude-opus-4-6",
-              max_tokens: 128000,
-              thinking: {
-                type: "enabled",
-                budget_tokens: 120000,
-              },
-              system: SYSTEM_PROMPT,
-              messages: [{ role: "user", content: buildPrompt(problem) }],
-              tools: [contentToolSchema],
+      batch = await anthropic.messages.batches.create({
+        requests: problems.map((problem) => ({
+          custom_id: problem.id,
+          params: {
+            model: "claude-opus-4-6",
+            max_tokens: 128000,
+            thinking: {
+              type: "enabled" as const,
+              budget_tokens: 120000,
             },
+            system: SYSTEM_PROMPT,
+            messages: [{ role: "user" as const, content: buildPrompt(problem) }],
+            tools: [contentToolSchema],
           },
-        ],
+        })),
       });
-
-      logger.info(`Batch ${batch.id} submitted, waiting 1 day`);
-
-      // Checkpointed wait — zero compute cost while suspended
-      await wait.for({ days: 1 });
-
-      logger.info(`Wait complete, retrieving batch ${batch.id}`);
-
-      // Retrieve batch status
-      const completed = await anthropic.messages.batches.retrieve(batch.id);
-
-      if (completed.processing_status !== "ended") {
-        throw new Error(
-          `Batch ${batch.id} still ${completed.processing_status} after 1 day`,
-        );
-      }
-
-      // Stream through results (we only submitted 1 request)
-      let resultMessage: Anthropic.Messages.Message | null = null;
-
-      const results = await anthropic.messages.batches.results(batch.id);
-      for await (const entry of results) {
-        if (entry.result.type === "succeeded") {
-          resultMessage = entry.result.message;
-        } else {
-          throw new Error(
-            `Batch request failed with type: ${entry.result.type}`,
-          );
-        }
-      }
-
-      if (!resultMessage) {
-        throw new Error("No result returned from batch");
-      }
-
-      logger.info("Batch result received, parsing structured output");
-
-      // Extract structured output from tool_use block
-      const toolUse = resultMessage.content.find(
-        (block): block is Anthropic.Messages.ToolUseBlock =>
-          block.type === "tool_use",
-      );
-
-      if (!toolUse) {
-        throw new Error("No tool_use block in response");
-      }
-
-      const parsed = contentSchema.parse(toolUse.input);
-
-      logger.info(
-        `Batch ${batch.id} complete — ${parsed.hints.length} hints, editorial + solution`,
-      );
-
-      logger.info(`Saving content: ${parsed.hints.length} hints, editorial, solution`);
-
-      // Save all generated content in a transaction
-      await prisma.$transaction([
-        // Delete any existing content (in case of retry)
-        prisma.hint.deleteMany({ where: { problemId: problem.id } }),
-        prisma.editorial.deleteMany({ where: { problemId: problem.id } }),
-        prisma.solution.deleteMany({ where: { problemId: problem.id } }),
-
-        // Create hints
-        ...parsed.hints.map((hint) =>
-          prisma.hint.create({
-            data: {
-              problemId: problem.id,
-              order: hint.order,
-              content: hint.content,
-            },
-          }),
-        ),
-
-        // Create editorial
-        prisma.editorial.create({
-          data: {
-            problemId: problem.id,
-            content: parsed.editorial,
-          },
-        }),
-
-        // Create solution
-        prisma.solution.create({
-          data: {
-            problemId: problem.id,
-            content: parsed.solution,
-          },
-        }),
-
-        // Mark as completed
-        prisma.problem.update({
-          where: { id: problem.id },
-          data: { generationStatus: "COMPLETED" },
-        }),
-      ]);
-
-      return {
-        problemId: problem.id,
-        problem: `${problem.contestId}${problem.index}`,
-        batchId: batch.id,
-      };
     } catch (error) {
-      logger.error(`Generation failed for ${problem.contestId}${problem.index}`, { error: String(error) });
-      await prisma.problem.update({
-        where: { id: problem.id },
-        data: { generationStatus: "FAILED" },
+      // Batch creation failed (e.g. insufficient credits) — revert all to PENDING
+      logger.error("Batch creation failed, reverting to PENDING", {
+        error: String(error),
+      });
+      await prisma.problem.updateMany({
+        where: { id: { in: payload.problemIds } },
+        data: { generationStatus: "PENDING" },
       });
       throw error;
     }
+
+    logger.info(`Batch ${batch.id} submitted (${problems.length} problems), waiting 1 day`);
+
+    // Checkpointed wait — zero compute cost while suspended
+    await wait.for({ days: 1 });
+
+    logger.info(`Wait complete, retrieving batch ${batch.id}`);
+
+    const completed = await anthropic.messages.batches.retrieve(batch.id);
+
+    if (completed.processing_status !== "ended") {
+      // Not done yet — wait another 12 hours and check again
+      logger.warn(`Batch ${batch.id} still ${completed.processing_status}, waiting 12 more hours`);
+      await wait.for({ hours: 12 });
+
+      const retryCheck = await anthropic.messages.batches.retrieve(batch.id);
+      if (retryCheck.processing_status !== "ended") {
+        // Give up — mark all as FAILED so they can be retried later
+        logger.error(`Batch ${batch.id} still not done after 36 hours`);
+        await prisma.problem.updateMany({
+          where: {
+            id: { in: payload.problemIds },
+            generationStatus: "PROCESSING",
+          },
+          data: { generationStatus: "FAILED" },
+        });
+        throw new Error(`Batch ${batch.id} still ${retryCheck.processing_status} after 36h`);
+      }
+    }
+
+    // Process results — handle each problem independently
+    let succeeded = 0;
+    let failed = 0;
+    const results = await anthropic.messages.batches.results(batch.id);
+
+    for await (const entry of results) {
+      const problemId = entry.custom_id;
+      const problem = problemMap.get(problemId);
+      const label = problem
+        ? `${problem.contestId}${problem.index}`
+        : problemId;
+
+      try {
+        if (entry.result.type !== "succeeded") {
+          throw new Error(`Request ${entry.result.type}`);
+        }
+
+        const toolUse = entry.result.message.content.find(
+          (block): block is Anthropic.Messages.ToolUseBlock =>
+            block.type === "tool_use",
+        );
+
+        if (!toolUse) {
+          throw new Error("No tool_use block in response");
+        }
+
+        const parsed = contentSchema.parse(toolUse.input);
+
+        await saveProblemContent(problemId, parsed);
+        succeeded++;
+        logger.info(`Saved content for ${label}`);
+      } catch (error) {
+        failed++;
+        logger.error(`Failed to process result for ${label}`, {
+          error: String(error),
+        });
+        await prisma.problem.update({
+          where: { id: problemId },
+          data: { generationStatus: "FAILED" },
+        });
+      }
+    }
+
+    // Check for problems that were in the batch but had no result entry
+    // (shouldn't happen, but just in case)
+    await prisma.problem.updateMany({
+      where: {
+        id: { in: payload.problemIds },
+        generationStatus: "PROCESSING", // still PROCESSING = never got a result
+      },
+      data: { generationStatus: "FAILED" },
+    });
+
+    logger.info(
+      `Batch ${batch.id} complete: ${succeeded} succeeded, ${failed} failed`,
+    );
+
+    return { batchId: batch.id, succeeded, failed };
   },
 });
 
-// Runs daily at midnight Phoenix time — picks up PENDING problems
+// Runs daily at midnight Phoenix time — picks up ALL pending problems
 export const generateContentScheduler = schedules.task({
   id: "generate-content-scheduler",
   cron: {
@@ -276,27 +319,34 @@ export const generateContentScheduler = schedules.task({
   },
   run: async () => {
     const problems = await prisma.problem.findMany({
-      where: { generationStatus: "PENDING" },
+      where: { generationStatus: { in: ["PENDING", "FAILED"] } },
       orderBy: { createdAt: "desc" },
-      take: 10,
       select: { id: true, contestId: true, index: true, name: true },
     });
 
     if (problems.length === 0) {
       logger.info("No pending problems to generate content for");
-      return { triggered: 0 };
+      return { triggered: 0, batches: 0 };
     }
 
-    logger.info(`Triggering generation for ${problems.length} problems`, {
-      problems: problems.map((p: { contestId: number; index: string; name: string }) => `${p.contestId}${p.index}: ${p.name}`),
-    });
+    // Chunk into batches of BATCH_SIZE
+    const chunks: string[][] = [];
+    for (let i = 0; i < problems.length; i += BATCH_SIZE) {
+      chunks.push(
+        problems.slice(i, i + BATCH_SIZE).map((p) => p.id),
+      );
+    }
 
-    await generateProblemContent.batchTrigger(
-      problems.map((p: { id: string }) => ({
-        payload: { problemId: p.id },
+    logger.info(
+      `${problems.length} pending problems -> ${chunks.length} batches of up to ${BATCH_SIZE}`,
+    );
+
+    await generateBatchContent.batchTrigger(
+      chunks.map((problemIds) => ({
+        payload: { problemIds },
       })),
     );
 
-    return { triggered: problems.length };
+    return { triggered: problems.length, batches: chunks.length };
   },
 });
