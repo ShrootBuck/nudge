@@ -1,3 +1,4 @@
+import type { Prisma } from "@prisma/client";
 import {
   ArrowRight,
   BadgeCheck,
@@ -111,7 +112,7 @@ export default async function Home({
   const ratingParam = typeof params.rating === "string" ? params.rating : "";
   const tagParam = typeof params.tag === "string" ? params.tag : "";
 
-  const where: Record<string, unknown> = {
+  const where: Prisma.ProblemWhereInput = {
     ...COMPLETED_WHERE,
   };
 
