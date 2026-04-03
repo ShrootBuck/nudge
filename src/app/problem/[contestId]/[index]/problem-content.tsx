@@ -22,6 +22,7 @@ import remarkMath from "remark-math";
 import { CodeBlock } from "@/components/code-block";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { parseSolutionContent } from "@/lib/problem-solution";
 import { cn } from "@/lib/utils";
 import { queueRegeneration, setProblemReviewStatus } from "./actions";
 
@@ -39,7 +40,11 @@ type Problem = {
   generationStatus: string;
   hints: { id: string; order: number; content: string }[];
   editorial: { id: string; content: string } | null;
-  solution: { id: string; content: string } | null;
+  solution: {
+    id: string;
+    content: string;
+    preHighlightedHtml?: { light: string; dark: string } | null;
+  } | null;
 };
 
 const HINT_LABELS = [
@@ -287,12 +292,30 @@ function HintCard({
   );
 }
 
-function SolutionCode({ code }: { code: string }) {
-  if (code.trimStart().startsWith("```")) {
-    return <Markdown content={code} />;
+function SolutionCode({
+  code,
+  downloadFileName,
+  preHighlightedHtml,
+}: {
+  code: string;
+  downloadFileName: string;
+  preHighlightedHtml?: { light: string; dark: string } | null;
+}) {
+  const parsedSolution = parseSolutionContent(code);
+
+  if (parsedSolution.kind === "markdown") {
+    return <Markdown content={parsedSolution.content} />;
   }
 
-  return <CodeBlock code={code} language="cpp" />;
+  return (
+    <CodeBlock
+      code={parsedSolution.code}
+      language={parsedSolution.language}
+      showActions
+      downloadFileName={downloadFileName}
+      preHighlightedHtml={preHighlightedHtml ?? undefined}
+    />
+  );
 }
 
 export function ProblemContent({ problem }: { problem: Problem }) {
@@ -322,8 +345,8 @@ export function ProblemContent({ problem }: { problem: Problem }) {
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.12),transparent_30%),radial-gradient(circle_at_90%_18%,rgba(245,158,11,0.14),transparent_28%)]" />
 
           <div className="relative">
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
-              <div className="min-w-0 flex-1">
+            <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,22rem)] lg:gap-8 xl:grid-cols-[minmax(0,1fr)_24rem]">
+              <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <a
                     href={cfUrl}
@@ -371,40 +394,52 @@ export function ProblemContent({ problem }: { problem: Problem }) {
                   Progressive hints first, then the full explanation and
                   implementation when you&apos;re ready to cash out.
                 </p>
+
+                {problem.tags.length > 0 && (
+                  <div className="mt-6 flex flex-wrap gap-2">
+                    {problem.tags.map((tag) => (
+                      <Link
+                        key={tag}
+                        href={`/?tag=${encodeURIComponent(tag)}`}
+                        className="inline-flex items-center rounded-full border border-border/60 bg-background/70 px-3 py-1.5 text-xs text-muted-foreground transition hover:border-foreground/15 hover:text-foreground"
+                      >
+                        {tag}
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </div>
 
-              <div className="flex shrink-0 flex-col gap-3 sm:flex-row lg:flex-col">
+              <div className="flex flex-col gap-3 lg:pt-1">
                 <a
                   href={cfUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center justify-center gap-2 rounded-full border border-foreground/10 bg-foreground px-4 py-2.5 text-sm font-medium text-background shadow-sm transition hover:bg-foreground/90"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-foreground/10 bg-foreground px-4 py-2.5 text-sm font-medium text-background shadow-sm transition hover:bg-foreground/90"
                 >
                   Original problem
                   <ArrowUpRight className="size-4" />
                 </a>
 
                 <div
-                  className={`rounded-[1.25rem] border px-4 py-3 text-sm shadow-sm ${review.panelClassName}`}
+                  className={`rounded-[1.25rem] border px-4 py-4 text-sm shadow-sm ${review.panelClassName}`}
                 >
-                  {review.summary}
+                  <div className="flex items-start gap-3">
+                    <div className="rounded-xl border border-current/15 bg-background/60 p-2">
+                      <ReviewIcon className="size-4" />
+                    </div>
+                    <div>
+                      <p className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] opacity-65">
+                        Review status
+                      </p>
+                      <p className="mt-2 text-sm/6 opacity-90">
+                        {review.summary}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-
-            {problem.tags.length > 0 && (
-              <div className="mt-6 flex flex-wrap gap-2">
-                {problem.tags.map((tag) => (
-                  <Link
-                    key={tag}
-                    href={`/?tag=${encodeURIComponent(tag)}`}
-                    className="inline-flex items-center rounded-full border border-border/60 bg-background/70 px-3 py-1.5 text-xs text-muted-foreground transition hover:border-foreground/15 hover:text-foreground"
-                  >
-                    {tag}
-                  </Link>
-                ))}
-              </div>
-            )}
           </div>
         </section>
 
@@ -533,7 +568,11 @@ export function ProblemContent({ problem }: { problem: Problem }) {
                   </button>
                 ) : (
                   <div className="rounded-[1.4rem] border border-border/70 bg-background/75 px-5 py-5 shadow-sm sm:px-6">
-                    <SolutionCode code={problem.solution.content} />
+                    <SolutionCode
+                      code={problem.solution.content}
+                      downloadFileName={`codeforces-${problem.contestId}-${problem.index}.cpp`}
+                      preHighlightedHtml={problem.solution.preHighlightedHtml}
+                    />
                     <button
                       type="button"
                       onClick={() => setShowSolution(false)}
@@ -696,85 +735,112 @@ function ReviewSection({
   }
 
   return (
-    <div className="mt-12 rounded-[1.5rem] border border-dashed border-border/60 bg-card/70 p-4 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] sm:p-5">
-      <div className="flex items-start gap-3">
-        <div className="rounded-2xl border border-border/60 bg-background/80 p-3 text-muted-foreground shadow-sm">
-          <ShieldCheck className="size-5" />
+    <div className="mt-12 rounded-[1.75rem] border border-border/55 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))] p-5 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] sm:p-6">
+      <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+          <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-background/75 text-muted-foreground shadow-sm sm:size-16">
+            <ShieldCheck className="size-5" />
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-lg font-semibold tracking-tight">
+                Update review status
+              </h3>
+              <span
+                className={cn(
+                  "inline-flex items-center rounded-full border px-2.5 py-1 text-[0.7rem] font-semibold uppercase tracking-[0.16em]",
+                  review.badgeClassName,
+                )}
+              >
+                {review.label}
+              </span>
+            </div>
+            <p className="mt-2 max-w-2xl text-sm/7 text-muted-foreground">
+              Enter the shared password and choose what should happen next. The
+              page will refresh in place after the action finishes.
+            </p>
+          </div>
         </div>
 
-        <div className="min-w-0 flex-1">
-          <h3 className="text-sm font-semibold tracking-tight">
-            Update review status
-          </h3>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Current status: {review.label}. Enter the shared password and pick
-            the outcome. The page will refresh in place.
-          </p>
-
-          <form onSubmit={handleSubmit} className="mt-4 flex flex-col gap-3">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="w-full sm:max-w-md">
+            <label
+              htmlFor="review-password"
+              className="mb-2 block text-xs font-semibold tracking-[0.18em] text-muted-foreground uppercase"
+            >
+              Shared password
+            </label>
             <Input
+              id="review-password"
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Review password"
-              className="h-10 w-full rounded-xl border-border/60 bg-background/80 sm:max-w-64"
+              className="h-12 rounded-2xl border-border/50 bg-background/65 px-4 text-base shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] placeholder:text-muted-foreground/70 focus-visible:border-sky-400/35 focus-visible:ring-4 focus-visible:ring-sky-400/10 sm:text-sm"
               autoFocus
             />
-            <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-              <Button
-                type="submit"
-                size="sm"
-                disabled={isPending || !password}
-                className="h-10 rounded-xl px-4"
-              >
-                {pendingStatus === "VERIFIED"
-                  ? "Verifying..."
-                  : "Mark verified"}
-              </Button>
-              <Button
-                type="button"
-                variant="destructive"
-                size="sm"
-                disabled={isPending || !password}
-                className="h-10 rounded-xl px-4"
-                onClick={() => handleReview("SOLUTION_INCORRECT")}
-              >
-                {pendingStatus === "SOLUTION_INCORRECT"
-                  ? "Marking..."
-                  : "Mark solution incorrect"}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={isPending || !password}
-                className="h-10 rounded-xl px-4"
-                onClick={handleRegenerate}
-              >
-                <RotateCw
-                  className={cn(
-                    "mr-2 size-3.5",
-                    pendingStatus === "REGENERATE" && "animate-spin",
-                  )}
-                />
-                {pendingStatus === "REGENERATE" ? "Queuing..." : "Regenerate"}
-              </Button>
-              <button
-                type="button"
-                onClick={() => {
-                  setOpen(false);
-                  setError(null);
-                }}
-                className="inline-flex h-10 cursor-pointer items-center gap-2 text-sm text-muted-foreground transition hover:text-foreground"
-              >
-                <X className="size-4" />
-                Cancel
-              </button>
-            </div>
-          </form>
+          </div>
 
-          {error && <p className="mt-3 text-sm text-rose-400">{error}</p>}
-        </div>
+          <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center">
+            <Button
+              type="submit"
+              size="sm"
+              variant="outline"
+              disabled={isPending || !password}
+              className="h-11 w-full rounded-xl border-emerald-500/20 bg-emerald-500/10 px-4 text-emerald-200 shadow-sm hover:bg-emerald-500/15 hover:text-emerald-100 disabled:border-emerald-500/10 disabled:bg-emerald-500/10 disabled:text-emerald-200/55 sm:w-auto"
+            >
+              {pendingStatus === "VERIFIED" ? "Verifying..." : "Mark verified"}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={isPending || !password}
+              className="h-11 w-full rounded-xl border-rose-500/20 bg-rose-500/10 px-4 text-rose-200 shadow-sm hover:bg-rose-500/15 hover:text-rose-100 disabled:border-rose-500/10 disabled:bg-rose-500/10 disabled:text-rose-200/55 sm:w-auto"
+              onClick={() => handleReview("SOLUTION_INCORRECT")}
+            >
+              {pendingStatus === "SOLUTION_INCORRECT"
+                ? "Marking..."
+                : "Mark solution incorrect"}
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={isPending || !password}
+              className="h-11 w-full rounded-xl border-border/60 bg-background/55 px-4 text-foreground/80 shadow-sm hover:bg-background/75 hover:text-foreground disabled:bg-background/40 sm:w-auto"
+              onClick={handleRegenerate}
+            >
+              <RotateCw
+                className={cn(
+                  "mr-2 size-3.5",
+                  pendingStatus === "REGENERATE" && "animate-spin",
+                )}
+              />
+              {pendingStatus === "REGENERATE" ? "Queuing..." : "Regenerate"}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-11 w-full rounded-xl text-muted-foreground hover:bg-background/55 hover:text-foreground sm:w-auto"
+              onClick={() => {
+                setOpen(false);
+                setError(null);
+              }}
+            >
+              <X className="mr-2 size-4" />
+              Cancel
+            </Button>
+          </div>
+        </form>
+
+        {error && (
+          <p className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
+            {error}
+          </p>
+        )}
       </div>
     </div>
   );

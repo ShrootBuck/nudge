@@ -31,7 +31,7 @@ export function Navbar() {
             href="/"
             className="flex items-center gap-2 text-lg font-semibold tracking-tight transition hover:opacity-80"
           >
-            <span className="inline-flex size-7 items-center justify-center rounded-lg bg-foreground text-background text-xs font-bold">
+            <span className="inline-flex size-7 items-center justify-center rounded-sm bg-foreground text-background text-xs font-bold">
               N
             </span>
             Nudge

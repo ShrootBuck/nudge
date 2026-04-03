@@ -1,6 +1,12 @@
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { parseSolutionContent } from "@/lib/problem-solution";
+import {
+  highlightCodeHtml,
+  SHIKI_DARK_THEME,
+  SHIKI_LIGHT_THEME,
+} from "@/lib/shiki";
 import { ProblemContent } from "./problem-content";
 
 export default async function ProblemPage({
@@ -28,5 +34,43 @@ export default async function ProblemPage({
 
   if (!problem) notFound();
 
-  return <ProblemContent problem={problem} />;
+  let preHighlightedSolutionHtml: { light: string; dark: string } | null = null;
+
+  if (problem.solution) {
+    const parsedSolution = parseSolutionContent(problem.solution.content);
+
+    if (parsedSolution.kind === "code") {
+      try {
+        const [light, dark] = await Promise.all([
+          highlightCodeHtml(
+            parsedSolution.code,
+            parsedSolution.language,
+            SHIKI_LIGHT_THEME,
+          ),
+          highlightCodeHtml(
+            parsedSolution.code,
+            parsedSolution.language,
+            SHIKI_DARK_THEME,
+          ),
+        ]);
+        preHighlightedSolutionHtml = { light, dark };
+      } catch {
+        preHighlightedSolutionHtml = null;
+      }
+    }
+  }
+
+  return (
+    <ProblemContent
+      problem={{
+        ...problem,
+        solution: problem.solution
+          ? {
+              ...problem.solution,
+              preHighlightedHtml: preHighlightedSolutionHtml,
+            }
+          : null,
+      }}
+    />
+  );
 }
