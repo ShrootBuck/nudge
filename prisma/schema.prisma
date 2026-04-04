@@ -95,6 +95,7 @@ model ModelConfig {
   provider    String // e.g. "anthropic", "openai"
   modelId     String // e.g. "claude-opus-4-6", "gpt-5-4"
   displayName String // e.g. "Claude Opus 4.6"
+  effort      String? // e.g. "low", "medium", "high" — provider-native reasoning effort
   isActive    Boolean @default(false)
 
   createdAt DateTime @default(now())

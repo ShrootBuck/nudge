@@ -196,6 +196,11 @@ function ConfigCard({
             </p>
             <p className="mt-0.5 font-mono text-xs text-muted-foreground">
               {config.provider}/{config.modelId}
+              {config.effort && (
+                <span className="ml-2 rounded-md border border-border/50 bg-background/60 px-1.5 py-0.5 font-sans text-[10px] tracking-wide text-muted-foreground/80">
+                  effort: {config.effort}
+                </span>
+              )}
             </p>
           </div>
         </div>
@@ -255,6 +260,7 @@ function AddConfigForm({
   const [provider, setProvider] = useState("");
   const [modelId, setModelId] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [effort, setEffort] = useState("");
   const [isPending, startTransition] = useTransition();
 
   function handleSubmit(e: React.FormEvent) {
@@ -271,6 +277,7 @@ function AddConfigForm({
           provider,
           modelId,
           displayName,
+          effort: effort || undefined,
         });
 
         if (result.success) {
@@ -282,11 +289,13 @@ function AddConfigForm({
             provider: provider.trim().toLowerCase(),
             modelId: modelId.trim(),
             displayName: displayName.trim(),
+            effort: effort.trim() || null,
             isActive: false,
           });
           setProvider("");
           setModelId("");
           setDisplayName("");
+          setEffort("");
           setOpen(false);
         } else {
           onError(result.error);
@@ -320,7 +329,7 @@ function AddConfigForm({
         New model configuration
       </p>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label
             htmlFor="new-provider"
@@ -365,6 +374,22 @@ function AddConfigForm({
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
             placeholder="Claude Opus 4.6"
+            className={inputClass}
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor="new-effort"
+            className="mb-1.5 block text-xs font-semibold tracking-[0.18em] text-muted-foreground uppercase"
+          >
+            Effort <span className="normal-case tracking-normal text-muted-foreground/60">(optional)</span>
+          </label>
+          <Input
+            id="new-effort"
+            value={effort}
+            onChange={(e) => setEffort(e.target.value)}
+            placeholder="high"
             className={inputClass}
           />
         </div>

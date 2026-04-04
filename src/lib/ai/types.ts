@@ -49,9 +49,14 @@ export interface AIProvider {
 
   /**
    * Submit a batch of requests for processing.
+   * @param effort Optional reasoning-effort level (provider-native string, e.g. "low" | "medium" | "high").
    * @returns An opaque batch ID for polling and result retrieval.
    */
-  createBatch(modelId: string, requests: BatchRequest[]): Promise<string>;
+  createBatch(
+    modelId: string,
+    requests: BatchRequest[],
+    effort?: string,
+  ): Promise<string>;
 
   /**
    * Check the current status of a previously submitted batch.

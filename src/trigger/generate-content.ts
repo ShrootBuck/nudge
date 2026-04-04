@@ -209,7 +209,8 @@ export const generateBatchContent = task({
     const provider = getProvider(modelConfig.provider);
 
     logger.info(
-      `Using provider "${modelConfig.provider}" / model "${modelConfig.modelId}" (${modelConfig.displayName})`,
+      `Using provider "${modelConfig.provider}" / model "${modelConfig.modelId}" (${modelConfig.displayName})` +
+        (modelConfig.effort ? ` [effort=${modelConfig.effort}]` : ""),
     );
 
     // Fetch full problem data for the batch
@@ -244,7 +245,11 @@ export const generateBatchContent = task({
 
     let batchId: string;
     try {
-      batchId = await provider.createBatch(modelConfig.modelId, requests);
+      batchId = await provider.createBatch(
+        modelConfig.modelId,
+        requests,
+        modelConfig.effort ?? undefined,
+      );
     } catch (error) {
       // Batch creation failed — revert all to PENDING
       logger.error("Batch creation failed, reverting to PENDING", {

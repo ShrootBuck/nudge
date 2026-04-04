@@ -11,6 +11,7 @@ export type ModelConfig = {
   provider: string;
   modelId: string;
   displayName: string;
+  effort: string | null;
   isActive: boolean;
 };
 
@@ -28,6 +29,7 @@ export async function listModelConfigs(): Promise<ModelConfig[]> {
     provider: c.provider,
     modelId: c.modelId,
     displayName: c.displayName,
+    effort: c.effort,
     isActive: c.isActive,
   }));
 }
@@ -70,7 +72,12 @@ export async function setActiveModel(password: string, configId: string) {
  */
 export async function addModelConfig(
   password: string,
-  data: { provider: string; modelId: string; displayName: string },
+  data: {
+    provider: string;
+    modelId: string;
+    displayName: string;
+    effort?: string;
+  },
 ) {
   const denied = auth(password);
   if (denied) return denied;
@@ -78,6 +85,7 @@ export async function addModelConfig(
   const provider = data.provider.trim().toLowerCase();
   const modelId = data.modelId.trim();
   const displayName = data.displayName.trim();
+  const effort = data.effort?.trim() || null;
 
   if (!provider || !modelId || !displayName) {
     return { success: false, error: "All fields are required" } as const;
@@ -95,7 +103,7 @@ export async function addModelConfig(
   }
 
   await prisma.modelConfig.create({
-    data: { provider, modelId, displayName, isActive: false },
+    data: { provider, modelId, displayName, effort, isActive: false },
   });
 
   return { success: true } as const;

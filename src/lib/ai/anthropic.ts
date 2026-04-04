@@ -22,25 +22,31 @@ function toAnthropicTool(tool: ToolDefinition) {
 
 export class AnthropicProvider implements AIProvider {
   readonly id = "anthropic";
-  private client: Anthropic;
+  private client: Anthropic | null = null;
 
-  constructor() {
-    this.client = new Anthropic(); // uses ANTHROPIC_API_KEY env var
+  private getClient(): Anthropic {
+    if (!this.client) {
+      this.client = new Anthropic(); // uses ANTHROPIC_API_KEY env var
+    }
+    return this.client;
   }
 
   async createBatch(
     modelId: string,
     requests: BatchRequest[],
+    effort?: string,
   ): Promise<string> {
-    const batch = await this.client.messages.batches.create({
+    const batch = await this.getClient().messages.batches.create({
       requests: requests.map((req) => ({
         custom_id: req.customId,
         params: {
           model: modelId,
           max_tokens: 128000,
           thinking: {
-            type: "enabled" as const,
-            budget_tokens: 120000,
+            type: "adaptive" as const,
+            ...(effort && {
+              effort: effort as "low" | "medium" | "high",
+            }),
           },
           system: req.systemPrompt,
           messages: [{ role: "user" as const, content: req.userPrompt }],
@@ -53,7 +59,7 @@ export class AnthropicProvider implements AIProvider {
   }
 
   async checkBatchStatus(batchId: string): Promise<BatchStatus> {
-    const batch = await this.client.messages.batches.retrieve(batchId);
+    const batch = await this.getClient().messages.batches.retrieve(batchId);
 
     switch (batch.processing_status) {
       case "ended":
@@ -67,7 +73,7 @@ export class AnthropicProvider implements AIProvider {
   }
 
   async *getBatchResults(batchId: string): AsyncIterable<BatchResult> {
-    const results = await this.client.messages.batches.results(batchId);
+    const results = await this.getClient().messages.batches.results(batchId);
 
     for await (const entry of results) {
       if (entry.result.type !== "succeeded") {

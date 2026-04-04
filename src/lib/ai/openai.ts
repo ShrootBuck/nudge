@@ -1,56 +1,168 @@
+import OpenAI from "openai";
 import type {
   AIProvider,
   BatchRequest,
   BatchResult,
   BatchStatus,
+  ToolDefinition,
 } from "./types";
 
-/**
- * OpenAI Batch API provider (stub).
- *
- * To implement:
- * 1. `bun add openai`
- * 2. Fill in the three methods below using OpenAI's Batch API:
- *    - Upload a JSONL file of chat completion requests
- *    - Create a batch referencing that file
- *    - Poll for completion
- *    - Download and parse the result JSONL
- *
- * Tool calls map to OpenAI's function calling — convert ToolDefinition into
- * the `tools` array format with `{ type: "function", function: { ... } }`.
- *
- * @see https://platform.openai.com/docs/guides/batch
- */
+/** Convert a generic tool definition into OpenAI's function format. */
+function toOpenAIFunction(tool: ToolDefinition) {
+  return {
+    type: "function" as const,
+    function: {
+      name: tool.name,
+      description: tool.description,
+      parameters: {
+        type: "object" as const,
+        properties: tool.parameters.properties,
+        required: tool.parameters.required,
+      },
+    },
+  };
+}
+
 export class OpenAIProvider implements AIProvider {
   readonly id = "openai";
+  private client: OpenAI | null = null;
+
+  private getClient(): OpenAI {
+    if (!this.client) {
+      this.client = new OpenAI(); // uses OPENAI_API_KEY env var
+    }
+    return this.client;
+  }
 
   async createBatch(
-    _modelId: string,
-    _requests: BatchRequest[],
+    modelId: string,
+    requests: BatchRequest[],
+    effort?: string,
   ): Promise<string> {
-    // TODO: implement
-    // 1. Convert requests to OpenAI chat completion format
-    // 2. Upload JSONL via files.create()
-    // 3. Create batch via batches.create()
-    // 4. Return batch.id
-    throw new Error(
-      'OpenAI provider not yet implemented. Install "openai" and fill in the batch methods.',
-    );
+    // Convert requests to OpenAI batch format (JSONL)
+    const jsonlLines = requests.map((req) => {
+      const batchItem = {
+        custom_id: req.customId,
+        method: "POST" as const,
+        url: "/v1/chat/completions",
+        body: {
+          model: modelId,
+          messages: [
+            {
+              role: "system" as const,
+              content: req.systemPrompt,
+            },
+            {
+              role: "user" as const,
+              content: req.userPrompt,
+            },
+          ],
+          tools: req.tools.map(toOpenAIFunction),
+          tool_choice: "required" as const,
+          ...(effort && { reasoning_effort: effort }),
+        },
+      };
+      return JSON.stringify(batchItem);
+    });
+
+    const jsonlContent = jsonlLines.join("\n");
+
+    // Upload the JSONL file
+    const file = await this.getClient().files.create({
+      file: new File([jsonlContent], "batch.jsonl", {
+        type: "application/jsonl",
+      }),
+      purpose: "batch",
+    });
+
+    // Create the batch
+    const batch = await this.getClient().batches.create({
+      input_file_id: file.id,
+      endpoint: "/v1/chat/completions",
+      completion_window: "24h",
+    });
+
+    return batch.id;
   }
 
-  async checkBatchStatus(_batchId: string): Promise<BatchStatus> {
-    // TODO: implement
-    // Map OpenAI statuses: "completed" → "ended", "failed"/"expired" → "failed", else "processing"
-    throw new Error("OpenAI provider not yet implemented.");
+  async checkBatchStatus(batchId: string): Promise<BatchStatus> {
+    const batch = await this.getClient().batches.retrieve(batchId);
+
+    switch (batch.status) {
+      case "completed":
+        return "ended";
+      case "failed":
+      case "expired":
+        return "failed";
+      default:
+        // "validating", "in_progress", "cancelling"
+        return "processing";
+    }
   }
 
-  // biome-ignore lint/correctness/useYield: stub — will yield once implemented
-  async *getBatchResults(_batchId: string): AsyncIterable<BatchResult> {
-    // TODO: implement
-    // 1. Download output file via files.content()
-    // 2. Parse JSONL lines
-    // 3. Extract tool_calls[0].function.arguments from each response
-    // 4. Yield BatchResult for each entry
-    throw new Error("OpenAI provider not yet implemented.");
+  async *getBatchResults(batchId: string): AsyncIterable<BatchResult> {
+    const batch = await this.getClient().batches.retrieve(batchId);
+
+    if (!batch.output_file_id) {
+      throw new Error("Batch has no output file");
+    }
+
+    // Download the output file
+    const fileContent = await this.getClient().files.content(batch.output_file_id);
+
+    // Parse JSONL response
+    const text = await fileContent.text();
+    const lines = text.trim().split("\n");
+
+    for (const line of lines) {
+      if (!line) continue;
+
+      const result = JSON.parse(line);
+
+      if (result.error) {
+        yield {
+          customId: result.custom_id,
+          status: "failed",
+          error: result.error.message || "Unknown error",
+        };
+        continue;
+      }
+
+      const response = result.response.body;
+      if (response.error) {
+        yield {
+          customId: result.custom_id,
+          status: "failed",
+          error: response.error.message || "Unknown error",
+        };
+        continue;
+      }
+
+      const choice = response.choices?.[0];
+      if (!choice) {
+        yield {
+          customId: result.custom_id,
+          status: "failed",
+          error: "No choice in response",
+        };
+        continue;
+      }
+
+      const toolCall = choice.message.tool_calls?.[0];
+      if (!toolCall) {
+        yield {
+          customId: result.custom_id,
+          status: "failed",
+          error: "No tool call in response",
+        };
+        continue;
+      }
+
+      yield {
+        customId: result.custom_id,
+        status: "succeeded",
+        toolCallInput: JSON.parse(toolCall.function.arguments),
+      };
+    }
   }
 }
