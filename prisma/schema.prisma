@@ -35,6 +35,7 @@ model Problem {
   hints     Hint[]
   editorial Editorial?
   solution  Solution?
+  reports   Report[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -70,6 +71,16 @@ model Solution {
   content String @db.Text // C++ code
 
   problemId String  @unique
+  problem   Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+}
+
+model Report {
+  id     String  @id @default(cuid())
+  reason String? @db.Text
+
+  problemId String
   problem   Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())

@@ -1,0 +1,63 @@
+import { logger, schedules } from "@trigger.dev/sdk";
+import { prisma } from "./db";
+
+const DISCORD_WEBHOOK_URL =
+  "https://discord.com/api/webhooks/1484994452031410338/XPoXAh1ggesiKZDsGxvvaAT-p5LtcRlsAa8PD0s1yMiSmBnI-34AO-BiLA_ClkeMfT0S";
+
+export const reportDigest = schedules.task({
+  id: "report-digest",
+  cron: {
+    pattern: "0 0 * * *", // midnight every day
+    timezone: "America/Phoenix",
+  },
+  run: async () => {
+    const since = new Date();
+    since.setHours(since.getHours() - 24);
+
+    const reports = await prisma.report.findMany({
+      where: { createdAt: { gte: since } },
+      include: {
+        problem: { select: { contestId: true, index: true, name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (reports.length === 0) {
+      logger.info("No reports in the last 24 hours");
+      return { sent: false, count: 0 };
+    }
+
+    const lines = reports.map((r) => {
+      const tag = `${r.problem.contestId}${r.problem.index}`;
+      const link = `https://codeforces.com/contest/${r.problem.contestId}/problem/${r.problem.index}`;
+      const reason = r.reason ?? "_No reason given_";
+      const time = `<t:${Math.floor(r.createdAt.getTime() / 1000)}:R>`;
+      return `**[${tag} — ${r.problem.name}](${link})**\n${reason}\n${time}`;
+    });
+
+    const body = {
+      embeds: [
+        {
+          title: `🚩 ${reports.length} new report${reports.length === 1 ? "" : "s"} today`,
+          description: lines.join("\n\n"),
+          color: 0xf59e0b, // amber
+          timestamp: new Date().toISOString(),
+        },
+      ],
+    };
+
+    const res = await fetch(DISCORD_WEBHOOK_URL, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Discord webhook failed (${res.status}): ${text}`);
+    }
+
+    logger.info(`Sent digest with ${reports.length} report(s)`);
+    return { sent: true, count: reports.length };
+  },
+});

@@ -5,7 +5,9 @@ import {
   ArrowUpRight,
   BadgeCheck,
   BookOpenText,
+  Check,
   Code2,
+  Flag,
   Lightbulb,
   LoaderCircle,
   RotateCw,
@@ -24,7 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { parseSolutionContent } from "@/lib/problem-solution";
 import { cn } from "@/lib/utils";
-import { queueRegeneration, setProblemReviewStatus } from "./actions";
+import { queueRegeneration, reportProblem, setProblemReviewStatus } from "./actions";
 
 type ReviewStatus = "UNREVIEWED" | "VERIFIED" | "SOLUTION_INCORRECT";
 type ReviewOutcome = Exclude<ReviewStatus, "UNREVIEWED">;
@@ -557,12 +559,18 @@ export function ProblemContent({ problem }: { problem: Problem }) {
           </Link>
         </div>
 
-        {hasContent && (
-          <ReviewSection
-            problemId={problem.id}
-            reviewStatus={problem.reviewStatus}
-          />
-        )}
+        <div className="mt-8 space-y-3">
+          {hasContent && problem.reviewStatus !== "VERIFIED" && (
+            <ReportSection problemId={problem.id} />
+          )}
+
+          {hasContent && (
+            <ReviewSection
+              problemId={problem.id}
+              reviewStatus={problem.reviewStatus}
+            />
+          )}
+        </div>
       </div>
     </main>
   );
@@ -650,6 +658,119 @@ function CollapsibleSection({
   );
 }
 
+function ReportSection({ problemId }: { problemId: string }) {
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+  const [isPending, startTransition] = useTransition();
+
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+
+    startTransition(() => {
+      void (async () => {
+        try {
+          const result = await reportProblem(problemId, reason);
+          if (result.success) {
+            setReason("");
+            setSubmitted(true);
+          } else {
+            setError(result.error);
+          }
+        } catch {
+          setError("Failed to submit report");
+        }
+      })();
+    });
+  }
+
+  return (
+    <div
+      className={cn(
+        "overflow-hidden rounded-[1.75rem] border bg-card/75 shadow-sm transition duration-200",
+        open
+          ? "border-amber-500/20"
+          : "border-border/60 hover:border-foreground/10",
+      )}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex w-full cursor-pointer items-center justify-between gap-4 px-5 py-4 text-left sm:px-6"
+      >
+        <div className="flex min-w-0 items-center gap-4">
+          <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-2xl border border-border/70 bg-background/80 text-muted-foreground shadow-sm">
+            <Flag className="size-4" />
+          </span>
+
+          <div className="min-w-0">
+            <p className="text-base font-semibold tracking-tight">
+              Report an issue
+            </p>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              Something wrong with the hints, editorial, or solution? Let us
+              know.
+            </p>
+          </div>
+        </div>
+
+        <ChevronIcon open={open} />
+      </button>
+
+      <AnimatedCollapse open={open}>
+        <div className="border-t border-border/60 px-5 pb-5 pt-4 sm:px-6">
+          {submitted ? (
+            <div className="flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+              <Check className="size-4 shrink-0" />
+              Thanks for the report — we&apos;ll take a look.
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+              <div>
+                <label
+                  htmlFor="report-reason"
+                  className="mb-2 block text-xs font-semibold tracking-[0.18em] text-muted-foreground uppercase"
+                >
+                  What&apos;s wrong?
+                </label>
+                <textarea
+                  id="report-reason"
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  placeholder="e.g. The solution gives WA on test 3, hint 2 spoils the full approach..."
+                  rows={3}
+                  maxLength={1000}
+                  className="w-full resize-none rounded-xl border border-border/50 bg-background/65 px-4 py-3 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] placeholder:text-muted-foreground/70 focus-visible:border-foreground/15 focus-visible:ring-0 focus-visible:outline-none"
+                />
+              </div>
+
+              <div className="flex items-center gap-3">
+                <Button
+                  type="submit"
+                  size="sm"
+                  variant="outline"
+                  disabled={isPending || !reason.trim()}
+                  className="h-10 rounded-xl border-amber-500/20 bg-amber-500/10 px-4 text-amber-200 shadow-sm hover:bg-amber-500/15 hover:text-amber-100 disabled:border-amber-500/10 disabled:bg-amber-500/10 disabled:text-amber-200/55"
+                >
+                  {isPending ? "Submitting..." : "Submit report"}
+                </Button>
+              </div>
+
+              {error && (
+                <p className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
+                  {error}
+                </p>
+              )}
+            </form>
+          )}
+        </div>
+      </AnimatedCollapse>
+    </div>
+  );
+}
+
 function ReviewSection({
   problemId,
   reviewStatus,
@@ -729,7 +850,7 @@ function ReviewSection({
   return (
     <div
       className={cn(
-        "mt-12 overflow-hidden rounded-[1.75rem] border bg-card/75 shadow-sm transition duration-200",
+        "overflow-hidden rounded-[1.75rem] border bg-card/75 shadow-sm transition duration-200",
         open
           ? "border-foreground/15"
           : "border-border/60 hover:border-foreground/10",
