@@ -1,8 +1,7 @@
 import { logger, schedules } from "@trigger.dev/sdk";
 import { prisma } from "./db";
 
-const DISCORD_WEBHOOK_URL =
-  "https://discord.com/api/webhooks/1484994452031410338/XPoXAh1ggesiKZDsGxvvaAT-p5LtcRlsAa8PD0s1yMiSmBnI-34AO-BiLA_ClkeMfT0S";
+const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL!;
 
 export const reportDigest = schedules.task({
   id: "report-digest",
@@ -29,7 +28,7 @@ export const reportDigest = schedules.task({
 
     const lines = reports.map((r) => {
       const tag = `${r.problem.contestId}${r.problem.index}`;
-      const link = `https://codeforces.com/contest/${r.problem.contestId}/problem/${r.problem.index}`;
+      const link = `https://nudge.zaydkrunz.com/problem/${r.problem.contestId}/${r.problem.index}`;
       const reason = r.reason ?? "_No reason given_";
       const time = `<t:${Math.floor(r.createdAt.getTime() / 1000)}:R>`;
       return `**[${tag} — ${r.problem.name}](${link})**\n${reason}\n${time}`;
