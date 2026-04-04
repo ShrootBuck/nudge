@@ -11,15 +11,6 @@ interface BackfillPayload {
   limit?: number; // max problems to queue, defaults to 100
 }
 
-function shuffleInPlace<T>(items: T[]) {
-  for (let i = items.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [items[i], items[j]] = [items[j], items[i]];
-  }
-
-  return items;
-}
-
 // Manually triggered — marks UNQUEUED problems as PENDING based on filters
 export const backfill = task({
   id: "backfill",
@@ -67,6 +58,8 @@ export const backfill = task({
     const candidates = await prisma.problem.findMany({
       where,
       select: { id: true },
+      orderBy: { contestId: "desc" },
+      take: limit,
     });
 
     if (candidates.length === 0) {
@@ -74,8 +67,7 @@ export const backfill = task({
       return { queued: 0 };
     }
 
-    const allIds = candidates.map((c: { id: string }) => c.id);
-    const selectedIds = shuffleInPlace(allIds).slice(0, limit);
+    const selectedIds = candidates.map((c: { id: string }) => c.id);
 
     // Mark them all as PENDING
     await prisma.problem.updateMany({
