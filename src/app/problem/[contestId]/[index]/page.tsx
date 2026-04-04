@@ -1,5 +1,6 @@
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
+import { getModelDisplayName } from "@/lib/ai";
 import { prisma } from "@/lib/prisma";
 import { parseSolutionContent } from "@/lib/problem-solution";
 import {
@@ -34,6 +35,22 @@ export default async function ProblemPage({
 
   if (!problem) notFound();
 
+  // Resolve the human-readable model name for display
+  let modelDisplayName: string | null = null;
+  if (problem.generatedByProvider && problem.generatedByModel) {
+    const config = await prisma.modelConfig.findUnique({
+      where: {
+        provider_modelId: {
+          provider: problem.generatedByProvider,
+          modelId: problem.generatedByModel,
+        },
+      },
+      select: { displayName: true },
+    });
+    modelDisplayName =
+      config?.displayName ?? getModelDisplayName(problem.generatedByModel);
+  }
+
   let preHighlightedSolutionHtml: { light: string; dark: string } | null = null;
 
   if (problem.solution) {
@@ -64,6 +81,7 @@ export default async function ProblemPage({
     <ProblemContent
       problem={{
         ...problem,
+        modelDisplayName,
         solution: problem.solution
           ? {
               ...problem.solution,

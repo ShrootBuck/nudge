@@ -13,6 +13,7 @@ import {
   RotateCw,
   ShieldAlert,
   ShieldCheck,
+  Sparkles,
   X,
 } from "lucide-react";
 import Link from "next/link";
@@ -26,7 +27,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { parseSolutionContent } from "@/lib/problem-solution";
 import { cn } from "@/lib/utils";
-import { queueRegeneration, reportProblem, setProblemReviewStatus } from "./actions";
+import {
+  queueRegeneration,
+  reportProblem,
+  setProblemReviewStatus,
+} from "./actions";
 
 type ReviewStatus = "UNREVIEWED" | "VERIFIED" | "SOLUTION_INCORRECT";
 type ReviewOutcome = Exclude<ReviewStatus, "UNREVIEWED">;
@@ -40,6 +45,7 @@ type Problem = {
   tags: string[];
   reviewStatus: ReviewStatus;
   generationStatus: string;
+  modelDisplayName: string | null;
   hints: { id: string; order: number; content: string }[];
   editorial: { id: string; content: string } | null;
   solution: {
@@ -384,6 +390,13 @@ export function ProblemContent({ problem }: { problem: Problem }) {
                         )}
                       />
                       {state.label}
+                    </span>
+                  )}
+
+                  {hasContent && problem.modelDisplayName && (
+                    <span className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/70 px-3 py-1.5 text-xs text-muted-foreground">
+                      <Sparkles className="size-3" />
+                      {problem.modelDisplayName}
                     </span>
                   )}
                 </div>
@@ -891,7 +904,10 @@ function ReviewSection({
 
       <AnimatedCollapse open={open}>
         <div className="border-t border-border/60 px-5 pb-5 pt-4 sm:px-6">
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4 sm:flex-row sm:items-end sm:flex-wrap">
+          <form
+            onSubmit={handleSubmit}
+            className="flex flex-col gap-4 sm:flex-row sm:items-end sm:flex-wrap"
+          >
             <div className="w-full sm:w-56">
               <label
                 htmlFor="review-password"

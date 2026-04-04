@@ -40,7 +40,10 @@ export async function reportProblem(problemId: string, reason: string) {
   }
 
   if (problem.reviewStatus === "VERIFIED") {
-    return { success: false, error: "Verified solutions cannot be reported" } as const;
+    return {
+      success: false,
+      error: "Verified solutions cannot be reported",
+    } as const;
   }
 
   const trimmed = reason.trim().slice(0, MAX_REASON_LENGTH) || null;

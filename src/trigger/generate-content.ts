@@ -1,9 +1,8 @@
-import Anthropic from "@anthropic-ai/sdk";
 import { logger, schedules, task, wait } from "@trigger.dev/sdk";
 import { z } from "zod";
+import { getProvider } from "../lib/ai";
+import type { BatchRequest, ToolDefinition } from "../lib/ai/types";
 import { prisma } from "./db";
-
-const anthropic = new Anthropic(); // uses ANTHROPIC_API_KEY env var
 
 const BATCH_SIZE = 10;
 const MAX_GENERATION_ATTEMPTS = 3;
@@ -19,13 +18,13 @@ const contentSchema = z.object({
   solution: z.string(),
 });
 
-// JSON Schema for the tool_use structured output
-const contentToolSchema = {
+// Provider-agnostic tool definition for structured output
+const contentTool: ToolDefinition = {
   name: "submit_content",
   description:
     "Submit the generated hints, editorial, and solution for this problem.",
-  input_schema: {
-    type: "object" as const,
+  parameters: {
+    type: "object",
     properties: {
       hints: {
         type: "array",
@@ -125,9 +124,31 @@ int main() { setIO(); }
 \`\`\``;
 }
 
+/**
+ * Read the active model configuration from the DB.
+ * Throws if no row has `isActive = true`.
+ */
+async function getActiveModelConfig() {
+  const config = await prisma.modelConfig.findFirst({
+    where: { isActive: true },
+  });
+
+  if (!config) {
+    throw new Error(
+      "No active model configuration found. " +
+        "Insert a row into ModelConfig with isActive = true.",
+    );
+  }
+
+  return config;
+}
+
+type ModelInfo = { provider: string; modelId: string };
+
 function saveProblemContent(
   problemId: string,
   parsed: z.infer<typeof contentSchema>,
+  model: ModelInfo,
 ) {
   return prisma.$transaction([
     // Delete any existing content (in case of retry)
@@ -156,10 +177,14 @@ function saveProblemContent(
       data: { problemId, content: parsed.solution },
     }),
 
-    // Mark as completed
+    // Mark as completed and record which model generated it
     prisma.problem.update({
       where: { id: problemId },
-      data: { generationStatus: "COMPLETED" },
+      data: {
+        generationStatus: "COMPLETED",
+        generatedByProvider: model.provider,
+        generatedByModel: model.modelId,
+      },
     }),
   ]);
 }
@@ -173,12 +198,20 @@ type ProblemForBatch = {
   tags: string[];
 };
 
-// Process a batch of problems via one Anthropic Batch API call
+// Process a batch of problems via the active AI provider
 export const generateBatchContent = task({
   id: "generate-batch-content",
   queue: { concurrencyLimit: 5 },
   retry: { maxAttempts: 2 },
   run: async (payload: { problemIds: string[] }) => {
+    // Resolve the active provider + model from the DB
+    const modelConfig = await getActiveModelConfig();
+    const provider = getProvider(modelConfig.provider);
+
+    logger.info(
+      `Using provider "${modelConfig.provider}" / model "${modelConfig.modelId}" (${modelConfig.displayName})`,
+    );
+
     // Fetch full problem data for the batch
     const problems = await prisma.problem.findMany({
       where: { id: { in: payload.problemIds } },
@@ -199,30 +232,21 @@ export const generateBatchContent = task({
       },
     });
 
+    // Build provider-agnostic batch requests
+    const requests: BatchRequest[] = problems.map((problem) => ({
+      customId: problem.id,
+      systemPrompt: SYSTEM_PROMPT,
+      userPrompt: buildPrompt(problem),
+      tools: [contentTool],
+    }));
+
     logger.info(`Creating batch with ${problems.length} requests`);
 
-    let batch: Anthropic.Messages.Batches.MessageBatch;
+    let batchId: string;
     try {
-      batch = await anthropic.messages.batches.create({
-        requests: problems.map((problem) => ({
-          custom_id: problem.id,
-          params: {
-            model: "claude-opus-4-6",
-            max_tokens: 128000,
-            thinking: {
-              type: "enabled" as const,
-              budget_tokens: 120000,
-            },
-            system: SYSTEM_PROMPT,
-            messages: [
-              { role: "user" as const, content: buildPrompt(problem) },
-            ],
-            tools: [contentToolSchema],
-          },
-        })),
-      });
+      batchId = await provider.createBatch(modelConfig.modelId, requests);
     } catch (error) {
-      // Batch creation failed (e.g. insufficient credits) — revert all to PENDING
+      // Batch creation failed — revert all to PENDING
       logger.error("Batch creation failed, reverting to PENDING", {
         error: String(error),
       });
@@ -234,7 +258,7 @@ export const generateBatchContent = task({
     }
 
     logger.info(
-      `Batch ${batch.id} submitted (${problems.length} problems), polling hourly`,
+      `Batch ${batchId} submitted (${problems.length} problems), polling hourly`,
     );
 
     // Poll every hour up to 24 times — each wait is checkpointed (zero compute cost)
@@ -242,19 +266,22 @@ export const generateBatchContent = task({
     for (let attempt = 1; attempt <= 24; attempt++) {
       await wait.for({ hours: 1 });
 
-      const status = await anthropic.messages.batches.retrieve(batch.id);
-      logger.info(
-        `Batch ${batch.id} check ${attempt}/24: ${status.processing_status}`,
-      );
+      const status = await provider.checkBatchStatus(batchId);
+      logger.info(`Batch ${batchId} check ${attempt}/24: ${status}`);
 
-      if (status.processing_status === "ended") {
+      if (status === "ended") {
         batchEnded = true;
+        break;
+      }
+
+      if (status === "failed") {
+        logger.error(`Batch ${batchId} reported failure`);
         break;
       }
     }
 
     if (!batchEnded) {
-      logger.error(`Batch ${batch.id} still not done after 24 hours`);
+      logger.error(`Batch ${batchId} still not done after 24 hours`);
       await prisma.problem.updateMany({
         where: {
           id: { in: payload.problemIds },
@@ -262,45 +289,39 @@ export const generateBatchContent = task({
         },
         data: { generationStatus: "FAILED" },
       });
-      throw new Error(`Batch ${batch.id} not completed after 24 hourly checks`);
+      throw new Error(`Batch ${batchId} not completed after 24 hourly checks`);
     }
 
     // Process results — handle each problem independently
+    const modelInfo: ModelInfo = {
+      provider: modelConfig.provider,
+      modelId: modelConfig.modelId,
+    };
+
     let succeeded = 0;
     let failed = 0;
-    const results = await anthropic.messages.batches.results(batch.id);
 
-    for await (const entry of results) {
-      const problemId = entry.custom_id;
-      const problem = problemMap.get(problemId);
+    for await (const result of provider.getBatchResults(batchId)) {
+      const problem = problemMap.get(result.customId);
       const label = problem
         ? `${problem.contestId}${problem.index}`
-        : problemId;
+        : result.customId;
 
       try {
-        if (entry.result.type !== "succeeded") {
-          throw new Error(`Request ${entry.result.type}`);
+        if (result.status !== "succeeded" || !result.toolCallInput) {
+          throw new Error(result.error ?? "Unknown error");
         }
 
-        const toolUse = entry.result.message.content.find(
-          (block): block is Anthropic.Messages.ToolUseBlock =>
-            block.type === "tool_use",
-        );
+        const parsed = contentSchema.parse(result.toolCallInput);
 
-        if (!toolUse) {
-          throw new Error("No tool_use block in response");
-        }
-
-        const parsed = contentSchema.parse(toolUse.input);
-
-        // Trim whitespace from solution (model sometimes adds leading newlines)
+        // Trim whitespace (model sometimes adds leading newlines)
         parsed.solution = parsed.solution.trim();
         parsed.editorial = parsed.editorial.trim();
         for (const hint of parsed.hints) {
           hint.content = hint.content.trim();
         }
 
-        await saveProblemContent(problemId, parsed);
+        await saveProblemContent(result.customId, parsed, modelInfo);
         succeeded++;
         logger.info(`Saved content for ${label}`);
       } catch (error) {
@@ -309,14 +330,13 @@ export const generateBatchContent = task({
           error: String(error),
         });
         await prisma.problem.update({
-          where: { id: problemId },
+          where: { id: result.customId },
           data: { generationStatus: "FAILED" },
         });
       }
     }
 
     // Check for problems that were in the batch but had no result entry
-    // (shouldn't happen, but just in case)
     await prisma.problem.updateMany({
       where: {
         id: { in: payload.problemIds },
@@ -326,10 +346,10 @@ export const generateBatchContent = task({
     });
 
     logger.info(
-      `Batch ${batch.id} complete: ${succeeded} succeeded, ${failed} failed`,
+      `Batch ${batchId} complete: ${succeeded} succeeded, ${failed} failed`,
     );
 
-    return { batchId: batch.id, succeeded, failed };
+    return { batchId, succeeded, failed };
   },
 });
 

@@ -32,6 +32,10 @@ model Problem {
   generationAttempts Int              @default(0)
   reviewStatus       ReviewStatus     @default(UNREVIEWED)
 
+  // Tracks which provider/model generated this problem's content
+  generatedByProvider String? // e.g. "anthropic", "openai"
+  generatedByModel    String? // e.g. "claude-opus-4-6", "gpt-5-4"
+
   hints     Hint[]
   editorial Editorial?
   solution  Solution?
@@ -84,4 +88,17 @@ model Report {
   problem   Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
+}
+
+model ModelConfig {
+  id          String  @id @default(cuid())
+  provider    String // e.g. "anthropic", "openai"
+  modelId     String // e.g. "claude-opus-4-6", "gpt-5-4"
+  displayName String // e.g. "Claude Opus 4.6"
+  isActive    Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([provider, modelId])
 }
