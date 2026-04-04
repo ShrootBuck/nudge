@@ -102,11 +102,11 @@ export async function addModelConfig(
     } as const;
   }
 
-  await prisma.modelConfig.create({
+  const created = await prisma.modelConfig.create({
     data: { provider, modelId, displayName, effort, isActive: false },
   });
 
-  return { success: true } as const;
+  return { success: true, id: created.id } as const;
 }
 
 /**

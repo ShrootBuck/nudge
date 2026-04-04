@@ -31,7 +31,6 @@ export function ProviderPanel({ initial }: { initial: ModelConfig[] }) {
 
   function flash(msg: string) {
     setSuccess(msg);
-    setTimeout(() => setSuccess(null), 2500);
   }
 
   return (
@@ -282,10 +281,7 @@ function AddConfigForm({
 
         if (result.success) {
           onAdded({
-            // We don't get the id back from the action, so use a temp one.
-            // It'll get a real id on next page load. For now it just needs
-            // to be unique so React keys work.
-            id: `temp-${Date.now()}`,
+            id: result.id,
             provider: provider.trim().toLowerCase(),
             modelId: modelId.trim(),
             displayName: displayName.trim(),
@@ -383,7 +379,10 @@ function AddConfigForm({
             htmlFor="new-effort"
             className="mb-1.5 block text-xs font-semibold tracking-[0.18em] text-muted-foreground uppercase"
           >
-            Effort <span className="normal-case tracking-normal text-muted-foreground/60">(optional)</span>
+            Effort{" "}
+            <span className="normal-case tracking-normal text-muted-foreground/60">
+              (optional)
+            </span>
           </label>
           <Input
             id="new-effort"

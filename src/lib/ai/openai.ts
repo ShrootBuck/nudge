@@ -108,7 +108,9 @@ export class OpenAIProvider implements AIProvider {
     }
 
     // Download the output file
-    const fileContent = await this.getClient().files.content(batch.output_file_id);
+    const fileContent = await this.getClient().files.content(
+      batch.output_file_id,
+    );
 
     // Parse JSONL response
     const text = await fileContent.text();
