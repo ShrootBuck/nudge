@@ -24,3 +24,4 @@ Nudge is a read-only platform for Codeforces competitive programming problems. I
 ## Future Ideas
 
 - **Multi-language solutions**: Currently C++ only. Could support Python, Java, etc. Would need schema changes (multiple solutions per problem, each with a `language` field) and UI for language switching.
+- **Interview Mode**: A toggle to strip away the lore and "flavor text" of standard Codeforces problems, reformatting them into the sterile, highly dense math/algorithmic questions you'd see in a Citadel or big tech interview. It would also feature AI-generated follow-up constraints (e.g., "optimize to $O(1)$ space") and a high-pressure visual timer to simulate a real interview environment.
