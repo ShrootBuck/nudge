@@ -507,82 +507,33 @@ export function ProblemContent({ problem }: { problem: Problem }) {
             )}
 
             {problem.editorial && (
-              <section className="rounded-[1.75rem] border border-border/70 bg-card/75 p-5 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] sm:p-6">
-                <SectionIntro
-                  eyebrow="Editorial"
-                  title="Full explanation"
-                  description="Open this when you want the whole argument, complexity included."
-                  icon={BookOpenText}
-                />
-
-                {!showEditorial ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowEditorial(true)}
-                    className="flex w-full cursor-pointer flex-col items-start rounded-[1.4rem] border border-dashed border-border/60 bg-background/70 px-5 py-6 text-left transition hover:border-foreground/15 hover:bg-background/85"
-                  >
-                    <span className="text-base font-semibold tracking-tight">
-                      Reveal editorial
-                    </span>
-                    <span className="mt-1 text-sm text-muted-foreground">
-                      You&apos;ve probably squeezed enough value out of the
-                      hints.
-                    </span>
-                  </button>
-                ) : (
-                  <div className="rounded-[1.4rem] border border-border/70 bg-background/75 px-5 py-5 shadow-sm sm:px-6">
-                    <Markdown content={problem.editorial.content} />
-                    <button
-                      type="button"
-                      onClick={() => setShowEditorial(false)}
-                      className="mt-6 cursor-pointer text-sm font-medium text-muted-foreground transition hover:text-foreground"
-                    >
-                      Hide editorial
-                    </button>
-                  </div>
-                )}
-              </section>
+              <CollapsibleSection
+                open={showEditorial}
+                onToggle={() => setShowEditorial(!showEditorial)}
+                eyebrow="Editorial"
+                title="Full explanation"
+                description="Open this when you want the whole argument, complexity included."
+                icon={BookOpenText}
+              >
+                <Markdown content={problem.editorial.content} />
+              </CollapsibleSection>
             )}
 
             {problem.solution && (
-              <section className="rounded-[1.75rem] border border-border/70 bg-card/75 p-5 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] sm:p-6">
-                <SectionIntro
-                  eyebrow="Solution"
-                  title="Generated C++"
-                  description={solutionSectionDescription(problem.reviewStatus)}
-                  icon={Code2}
+              <CollapsibleSection
+                open={showSolution}
+                onToggle={() => setShowSolution(!showSolution)}
+                eyebrow="Solution"
+                title="Generated C++"
+                description={solutionSectionDescription(problem.reviewStatus)}
+                icon={Code2}
+              >
+                <SolutionCode
+                  code={problem.solution.content}
+                  downloadFileName={`codeforces-${problem.contestId}-${problem.index}.cpp`}
+                  preHighlightedHtml={problem.solution.preHighlightedHtml}
                 />
-
-                {!showSolution ? (
-                  <button
-                    type="button"
-                    onClick={() => setShowSolution(true)}
-                    className="flex w-full cursor-pointer flex-col items-start rounded-[1.4rem] border border-dashed border-border/60 bg-background/70 px-5 py-6 text-left transition hover:border-foreground/15 hover:bg-background/85"
-                  >
-                    <span className="text-base font-semibold tracking-tight">
-                      Reveal solution
-                    </span>
-                    <span className="mt-1 text-sm text-muted-foreground">
-                      Open the full code only when you&apos;re done reasoning.
-                    </span>
-                  </button>
-                ) : (
-                  <div className="rounded-[1.4rem] border border-border/70 bg-background/75 px-5 py-5 shadow-sm sm:px-6">
-                    <SolutionCode
-                      code={problem.solution.content}
-                      downloadFileName={`codeforces-${problem.contestId}-${problem.index}.cpp`}
-                      preHighlightedHtml={problem.solution.preHighlightedHtml}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowSolution(false)}
-                      className="mt-6 cursor-pointer text-sm font-medium text-muted-foreground transition hover:text-foreground"
-                    >
-                      Hide solution
-                    </button>
-                  </div>
-                )}
-              </section>
+              </CollapsibleSection>
             )}
           </div>
         )}
@@ -641,6 +592,61 @@ function SectionIntro({
         <p className="mt-1 text-sm text-muted-foreground">{description}</p>
       </div>
     </div>
+  );
+}
+
+function CollapsibleSection({
+  open,
+  onToggle,
+  eyebrow,
+  title,
+  description,
+  icon: Icon,
+  children,
+}: {
+  open: boolean;
+  onToggle: () => void;
+  eyebrow: string;
+  title: string;
+  description: string;
+  icon: ComponentType<{ className?: string }>;
+  children: React.ReactNode;
+}) {
+  return (
+    <section
+      className={cn(
+        "overflow-hidden rounded-[1.75rem] border bg-card/75 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] transition duration-200",
+        open ? "border-foreground/15" : "border-border/70",
+      )}
+    >
+      <button
+        type="button"
+        onClick={onToggle}
+        className="flex w-full cursor-pointer items-center justify-between gap-4 p-5 text-left sm:p-6"
+      >
+        <div className="flex items-start gap-4">
+          <div className="rounded-2xl border border-border/60 bg-background/80 p-3 text-muted-foreground shadow-sm">
+            <Icon className="size-5" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold tracking-[0.24em] text-muted-foreground uppercase">
+              {eyebrow}
+            </p>
+            <h2 className="mt-2 text-xl font-semibold tracking-tight">
+              {title}
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+          </div>
+        </div>
+        <ChevronIcon open={open} />
+      </button>
+
+      <AnimatedCollapse open={open}>
+        <div className="border-t border-border/60 px-5 pb-5 pt-4 sm:px-6">
+          {children}
+        </div>
+      </AnimatedCollapse>
+    </section>
   );
 }
 
@@ -720,128 +726,118 @@ function ReviewSection({
     });
   }
 
-  if (!open) {
-    return (
-      <div className="mt-14 text-center">
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="cursor-pointer text-xs text-muted-foreground/40 transition-colors hover:text-muted-foreground"
-        >
-          Review this problem
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div className="mt-12 rounded-[1.75rem] border border-border/55 bg-[linear-gradient(180deg,rgba(255,255,255,0.04),rgba(255,255,255,0.015))] p-5 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] sm:p-6">
-      <div className="flex flex-col gap-5">
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
-          <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl border border-border/60 bg-background/75 text-muted-foreground shadow-sm sm:size-16">
-            <ShieldCheck className="size-5" />
-          </div>
+    <div
+      className={cn(
+        "mt-12 overflow-hidden rounded-[1.75rem] border bg-card/75 shadow-sm transition duration-200",
+        open
+          ? "border-foreground/15"
+          : "border-border/60 hover:border-foreground/10",
+      )}
+    >
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex w-full cursor-pointer items-center justify-between gap-4 px-5 py-4 text-left sm:px-6"
+      >
+        <div className="flex min-w-0 items-center gap-4">
+          <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-2xl border border-border/70 bg-background/80 text-muted-foreground shadow-sm">
+            <ShieldCheck className="size-4" />
+          </span>
 
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h3 className="text-lg font-semibold tracking-tight">
-                Update review status
-              </h3>
-              <span
-                className={cn(
-                  "inline-flex items-center rounded-full border px-2.5 py-1 text-[0.7rem] font-semibold uppercase tracking-[0.16em]",
-                  review.badgeClassName,
-                )}
-              >
-                {review.label}
-              </span>
-            </div>
-            <p className="mt-2 max-w-2xl text-sm/7 text-muted-foreground">
-              Enter the shared password and choose what should happen next. The
-              page will refresh in place after the action finishes.
+          <div className="min-w-0">
+            <p className="text-base font-semibold tracking-tight">
+              Review this problem
+            </p>
+            <p className="mt-0.5 text-sm text-muted-foreground">
+              Update the review status for this problem
             </p>
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="w-full sm:max-w-md">
-            <label
-              htmlFor="review-password"
-              className="mb-2 block text-xs font-semibold tracking-[0.18em] text-muted-foreground uppercase"
-            >
-              Shared password
-            </label>
-            <Input
-              id="review-password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="Review password"
-              className="h-12 rounded-2xl border-border/50 bg-background/65 px-4 text-base shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] placeholder:text-muted-foreground/70 focus-visible:border-sky-400/35 focus-visible:ring-4 focus-visible:ring-sky-400/10 sm:text-sm"
-              autoFocus
-            />
-          </div>
+        <div className="flex items-center gap-3">
+          <span
+            className={cn(
+              "hidden items-center rounded-full border px-2.5 py-1 text-[0.7rem] font-semibold uppercase tracking-[0.16em] sm:inline-flex",
+              review.badgeClassName,
+            )}
+          >
+            {review.label}
+          </span>
+          <ChevronIcon open={open} />
+        </div>
+      </button>
 
-          <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center">
-            <Button
-              type="submit"
-              size="sm"
-              variant="outline"
-              disabled={isPending || !password}
-              className="h-11 w-full rounded-xl border-emerald-500/20 bg-emerald-500/10 px-4 text-emerald-200 shadow-sm hover:bg-emerald-500/15 hover:text-emerald-100 disabled:border-emerald-500/10 disabled:bg-emerald-500/10 disabled:text-emerald-200/55 sm:w-auto"
-            >
-              {pendingStatus === "VERIFIED" ? "Verifying..." : "Mark verified"}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              disabled={isPending || !password}
-              className="h-11 w-full rounded-xl border-rose-500/20 bg-rose-500/10 px-4 text-rose-200 shadow-sm hover:bg-rose-500/15 hover:text-rose-100 disabled:border-rose-500/10 disabled:bg-rose-500/10 disabled:text-rose-200/55 sm:w-auto"
-              onClick={() => handleReview("SOLUTION_INCORRECT")}
-            >
-              {pendingStatus === "SOLUTION_INCORRECT"
-                ? "Marking..."
-                : "Mark solution incorrect"}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={isPending || !password}
-              className="h-11 w-full rounded-xl border-border/60 bg-background/55 px-4 text-foreground/80 shadow-sm hover:bg-background/75 hover:text-foreground disabled:bg-background/40 sm:w-auto"
-              onClick={handleRegenerate}
-            >
-              <RotateCw
-                className={cn(
-                  "mr-2 size-3.5",
-                  pendingStatus === "REGENERATE" && "animate-spin",
-                )}
+      <AnimatedCollapse open={open}>
+        <div className="border-t border-border/60 px-5 pb-5 pt-4 sm:px-6">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4 sm:flex-row sm:items-end sm:flex-wrap">
+            <div className="w-full sm:w-56">
+              <label
+                htmlFor="review-password"
+                className="mb-2 block text-xs font-semibold tracking-[0.18em] text-muted-foreground uppercase"
+              >
+                Shared password
+              </label>
+              <Input
+                id="review-password"
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Review password"
+                className="h-10 rounded-xl border-border/50 bg-background/65 px-4 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] placeholder:text-muted-foreground/70 focus-visible:border-foreground/15 focus-visible:ring-0 focus-visible:outline-none"
               />
-              {pendingStatus === "REGENERATE" ? "Queuing..." : "Regenerate"}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="h-11 w-full rounded-xl text-muted-foreground hover:bg-background/55 hover:text-foreground sm:w-auto"
-              onClick={() => {
-                setOpen(false);
-                setError(null);
-              }}
-            >
-              <X className="mr-2 size-4" />
-              Cancel
-            </Button>
-          </div>
-        </form>
+            </div>
 
-        {error && (
-          <p className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
-            {error}
-          </p>
-        )}
-      </div>
+            <div className="flex flex-col gap-2.5 sm:flex-row sm:flex-wrap sm:items-center">
+              <Button
+                type="submit"
+                size="sm"
+                variant="outline"
+                disabled={isPending || !password}
+                className="h-10 w-full rounded-xl border-emerald-500/20 bg-emerald-500/10 px-4 text-emerald-200 shadow-sm hover:bg-emerald-500/15 hover:text-emerald-100 disabled:border-emerald-500/10 disabled:bg-emerald-500/10 disabled:text-emerald-200/55 sm:w-auto"
+              >
+                {pendingStatus === "VERIFIED"
+                  ? "Verifying..."
+                  : "Mark verified"}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={isPending || !password}
+                className="h-10 w-full rounded-xl border-rose-500/20 bg-rose-500/10 px-4 text-rose-200 shadow-sm hover:bg-rose-500/15 hover:text-rose-100 disabled:border-rose-500/10 disabled:bg-rose-500/10 disabled:text-rose-200/55 sm:w-auto"
+                onClick={() => handleReview("SOLUTION_INCORRECT")}
+              >
+                {pendingStatus === "SOLUTION_INCORRECT"
+                  ? "Marking..."
+                  : "Mark incorrect"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={isPending || !password}
+                className="h-10 w-full rounded-xl border-border/60 bg-background/55 px-4 text-foreground/80 shadow-sm hover:bg-background/75 hover:text-foreground disabled:bg-background/40 sm:w-auto"
+                onClick={handleRegenerate}
+              >
+                <RotateCw
+                  className={cn(
+                    "mr-2 size-3.5",
+                    pendingStatus === "REGENERATE" && "animate-spin",
+                  )}
+                />
+                {pendingStatus === "REGENERATE" ? "Queuing..." : "Regenerate"}
+              </Button>
+            </div>
+          </form>
+
+          {error && (
+            <p className="mt-4 rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
+              {error}
+            </p>
+          )}
+        </div>
+      </AnimatedCollapse>
     </div>
   );
 }

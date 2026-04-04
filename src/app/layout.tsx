@@ -14,6 +14,9 @@ export const metadata: Metadata = {
   title: "Nudge",
   description:
     "AI-powered hints, editorials, and solutions for Codeforces problems",
+  icons: {
+    icon: "https://fav.farm/💻",
+  },
 };
 
 export default function RootLayout({
