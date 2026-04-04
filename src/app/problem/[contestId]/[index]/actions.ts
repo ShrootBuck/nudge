@@ -1,5 +1,6 @@
 "use server";
 
+import { sendAdminLog } from "@/lib/discord";
 import { prisma } from "@/lib/prisma";
 
 const REVIEW_STATUSES = ["VERIFIED", "SOLUTION_INCORRECT"] as const;
@@ -21,10 +22,26 @@ export async function setProblemReviewStatus(
     return { success: false, error: "Invalid review status" } as const;
   }
 
+  const problem = await prisma.problem.findUnique({
+    where: { id: problemId },
+    select: { contestId: true, index: true, name: true },
+  });
+
   await prisma.problem.update({
     where: { id: problemId },
     data: { reviewStatus },
   });
+
+  if (problem) {
+    const tag = `${problem.contestId}${problem.index}`;
+    const link = `https://nudge.zaydkrunz.com/problem/${problem.contestId}/${problem.index}`;
+    const isVerified = reviewStatus === "VERIFIED";
+    await sendAdminLog({
+      title: isVerified ? "✅ Problem Verified" : "⚠️ Marked Incorrect",
+      description: `**[${tag} — ${problem.name}](${link})**`,
+      color: isVerified ? 0x10b981 : 0xf59e0b, // emerald / amber
+    });
+  }
 
   return { success: true } as const;
 }
@@ -63,6 +80,11 @@ export async function queueRegeneration(problemId: string, password: string) {
     return { success: false, error: "Wrong password" } as const;
   }
 
+  const problem = await prisma.problem.findUnique({
+    where: { id: problemId },
+    select: { contestId: true, index: true, name: true },
+  });
+
   await prisma.problem.update({
     where: { id: problemId },
     data: {
@@ -71,6 +93,16 @@ export async function queueRegeneration(problemId: string, password: string) {
       reviewStatus: "UNREVIEWED",
     },
   });
+
+  if (problem) {
+    const tag = `${problem.contestId}${problem.index}`;
+    const link = `https://nudge.zaydkrunz.com/problem/${problem.contestId}/${problem.index}`;
+    await sendAdminLog({
+      title: "🔁 Regeneration Queued",
+      description: `**[${tag} — ${problem.name}](${link})**\nAttempt counter reset, will be picked up by next generation run.`,
+      color: 0x8b5cf6, // violet
+    });
+  }
 
   return { success: true } as const;
 }

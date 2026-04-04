@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { sendAdminLog } from "@/lib/discord";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -53,6 +54,10 @@ export async function setActiveModel(password: string, configId: string) {
   const denied = auth(password);
   if (denied) return denied;
 
+  const config = await prisma.modelConfig.findUnique({
+    where: { id: configId },
+  });
+
   await prisma.$transaction([
     prisma.modelConfig.updateMany({
       where: { isActive: true },
@@ -63,6 +68,12 @@ export async function setActiveModel(password: string, configId: string) {
       data: { isActive: true },
     }),
   ]);
+
+  await sendAdminLog({
+    title: "🔄 Model Switched",
+    description: `**${config?.displayName}** (${config?.provider}/${config?.modelId}) is now active`,
+    color: 0x10b981, // emerald
+  });
 
   return { success: true } as const;
 }
@@ -106,6 +117,13 @@ export async function addModelConfig(
     data: { provider, modelId, displayName, effort, isActive: false },
   });
 
+  const effortText = effort ? ` (effort: ${effort})` : "";
+  await sendAdminLog({
+    title: "➕ Model Added",
+    description: `**${displayName}**\n${provider}/${modelId}${effortText}`,
+    color: 0x8b5cf6, // violet
+  });
+
   return { success: true, id: created.id } as const;
 }
 
@@ -134,6 +152,12 @@ export async function deleteModelConfig(password: string, configId: string) {
   }
 
   await prisma.modelConfig.delete({ where: { id: configId } });
+
+  await sendAdminLog({
+    title: "🗑️ Model Deleted",
+    description: `**${config.displayName}** (${config.provider}/${config.modelId})`,
+    color: 0xef4444, // red
+  });
 
   return { success: true } as const;
 }

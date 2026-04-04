@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { logger, task } from "@trigger.dev/sdk";
 import { prisma } from "./db";
+import { discordLog } from "./discord-log";
 
 interface BackfillPayload {
   ratingMin?: number;
@@ -82,11 +83,36 @@ export const backfill = task({
       select: { contestId: true, index: true, rating: true },
     });
 
-    logger.info(`Queued ${selectedIds.length} problems for generation`, {
-      sample: sampleProblems.map(
+    const sampleLabels = sampleProblems
+      .map(
         (p: { contestId: number; index: string; rating: number | null }) =>
           `${p.contestId}${p.index} (${p.rating ?? "unrated"})`,
-      ),
+      );
+
+    logger.info(`Queued ${selectedIds.length} problems for generation`, {
+      sample: sampleLabels,
+    });
+
+    const filters: string[] = [];
+    if (ratingMin !== undefined || ratingMax !== undefined)
+      filters.push(`Rating: ${ratingMin ?? "∞"}–${ratingMax ?? "∞"}`);
+    if (contestIdMin !== undefined || contestIdMax !== undefined)
+      filters.push(`Contest: ${contestIdMin ?? "∞"}–${contestIdMax ?? "∞"}`);
+    if (tags && tags.length > 0) filters.push(`Tags: ${tags.join(", ")}`);
+
+    const extraBackfill =
+      selectedIds.length > 5 ? `\n(+${selectedIds.length - 5} more)` : "";
+
+    await discordLog.trigger({
+      title: "📋 Backfill Queued",
+      description:
+        `**${selectedIds.length}** problems marked PENDING for generation\n` +
+        sampleLabels.join(", ") +
+        extraBackfill,
+      color: 0xf97316, // orange
+      fields: filters.length > 0
+        ? [{ name: "Filters", value: filters.join("\n") }]
+        : undefined,
     });
 
     return { queued: selectedIds.length };

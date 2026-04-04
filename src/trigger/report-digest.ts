@@ -6,12 +6,12 @@ const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL!;
 export const reportDigest = schedules.task({
   id: "report-digest",
   cron: {
-    pattern: "0 * * * *", // every hour
+    pattern: "0 0 * * *", // midnight daily
     timezone: "America/Phoenix",
   },
   run: async () => {
     const since = new Date();
-    since.setHours(since.getHours() - 1);
+    since.setDate(since.getDate() - 1);
 
     const reports = await prisma.report.findMany({
       where: { createdAt: { gte: since } },
@@ -22,7 +22,7 @@ export const reportDigest = schedules.task({
     });
 
     if (reports.length === 0) {
-      logger.info("No reports in the last hour");
+      logger.info("No reports in the last 24 hours");
       return { sent: false, count: 0 };
     }
 
@@ -37,7 +37,7 @@ export const reportDigest = schedules.task({
     const body = {
       embeds: [
         {
-          title: `🚩 ${reports.length} new report${reports.length === 1 ? "" : "s"} in the last hour`,
+          title: `🚩 ${reports.length} new report${reports.length === 1 ? "" : "s"} today`,
           description: lines.join("\n\n"),
           color: 0xf59e0b, // amber
           timestamp: new Date().toISOString(),

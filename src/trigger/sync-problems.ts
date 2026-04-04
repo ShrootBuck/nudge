@@ -1,5 +1,6 @@
 import { logger, schedules } from "@trigger.dev/sdk";
 import { prisma } from "./db";
+import { discordLog } from "./discord-log";
 
 interface CFProblem {
   contestId: number;
@@ -98,6 +99,17 @@ export const syncProblems = schedules.task({
     }
 
     logger.info(`Sync complete: ${created} created, ${updated} updated`);
+
+    await discordLog.trigger({
+      title: "🔄 Problem Sync Complete",
+      description: `Synced **${problems.length.toLocaleString()}** problems from Codeforces API.`,
+      color: 0x0ea5e9, // sky
+      fields: [
+        { name: "New", value: `${created}`, inline: true },
+        { name: "Updated", value: `${updated}`, inline: true },
+      ],
+    });
+
     return { created, updated, total: problems.length };
   },
 });

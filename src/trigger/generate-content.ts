@@ -3,6 +3,7 @@ import { z } from "zod";
 import { getProvider } from "../lib/ai";
 import type { BatchRequest, ToolDefinition } from "../lib/ai/types";
 import { prisma } from "./db";
+import { discordLog } from "./discord-log";
 
 const BATCH_SIZE = 10;
 const MAX_GENERATION_ATTEMPTS = 3;
@@ -266,6 +267,31 @@ export const generateBatchContent = task({
       `Batch ${batchId} submitted (${problems.length} problems), polling hourly`,
     );
 
+    const problemLabels = problems
+      .slice(0, 5)
+      .map((p) => `${p.contestId}${p.index}`)
+      .join(", ");
+    const extraText =
+      problems.length > 5 ? ` (+${problems.length - 5} more)` : "";
+
+    await discordLog.trigger({
+      title: `📦 Batch Started`,
+      description: `**${problems.length}** problems submitted via **${modelConfig.displayName}**\n${problemLabels}${extraText}`,
+      color: 0x3b82f6, // blue
+      fields: [
+        {
+          name: "Batch ID",
+          value: `\`${batchId}\``,
+          inline: true,
+        },
+        {
+          name: "Provider",
+          value: `${modelConfig.provider}/${modelConfig.modelId}`,
+          inline: true,
+        },
+      ],
+    });
+
     // Poll every hour up to 24 times — each wait is checkpointed (zero compute cost)
     let batchEnded = false;
     for (let attempt = 1; attempt <= 24; attempt++) {
@@ -294,6 +320,13 @@ export const generateBatchContent = task({
         },
         data: { generationStatus: "FAILED" },
       });
+
+      await discordLog.trigger({
+        title: "❌ Batch Timed Out",
+        description: `Batch \`${batchId}\` did not complete after 24 hours.\n**${payload.problemIds.length}** problems marked as FAILED.`,
+        color: 0xef4444, // red
+      });
+
       throw new Error(`Batch ${batchId} not completed after 24 hourly checks`);
     }
 
@@ -354,6 +387,22 @@ export const generateBatchContent = task({
       `Batch ${batchId} complete: ${succeeded} succeeded, ${failed} failed`,
     );
 
+    const emoji = failed === 0 ? "✅" : "⚠️";
+    await discordLog.trigger({
+      title: `${emoji} Batch Complete`,
+      description: `Batch \`${batchId}\` finished processing.`,
+      color: failed === 0 ? 0x10b981 : 0xf59e0b, // emerald / amber
+      fields: [
+        { name: "Succeeded", value: `${succeeded}`, inline: true },
+        { name: "Failed", value: `${failed}`, inline: true },
+        {
+          name: "Provider",
+          value: `${modelInfo.provider}/${modelInfo.modelId}`,
+          inline: true,
+        },
+      ],
+    });
+
     return { batchId, succeeded, failed };
   },
 });
@@ -395,6 +444,19 @@ export const generateContentScheduler = schedules.task({
         payload: { problemIds },
       })),
     );
+
+    const sample = problems
+      .slice(0, 5)
+      .map((p) => `${p.contestId}${p.index}`)
+      .join(", ");
+    const extra =
+      problems.length > 5 ? ` (+${problems.length - 5} more)` : "";
+
+    await discordLog.trigger({
+      title: "📅 Daily Generation Triggered",
+      description: `**${problems.length}** pending problems queued across **${chunks.length}** batch${chunks.length === 1 ? "" : "es"}\n${sample}${extra}`,
+      color: 0x6366f1, // indigo
+    });
 
     return { triggered: problems.length, batches: chunks.length };
   },
