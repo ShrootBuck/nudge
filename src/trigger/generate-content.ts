@@ -8,16 +8,32 @@ import { discordLog } from "./discord-log";
 const BATCH_SIZE = 10;
 const MAX_GENERATION_ATTEMPTS = 3;
 
-const contentSchema = z.object({
-  hints: z.array(
-    z.object({
-      order: z.number(),
-      content: z.string(),
-    }),
-  ),
-  editorial: z.string(),
-  solution: z.string(),
+const hintSchema = z.object({
+  order: z.number().int().min(1).max(5),
+  content: z.string().trim().min(1),
 });
+
+const contentSchema = z
+  .object({
+    hints: z.array(hintSchema).length(5),
+    editorial: z.string().trim().min(1),
+    solution: z.string().trim().min(1),
+  })
+  .superRefine(({ hints }, ctx) => {
+    const orders = [...hints.map((hint) => hint.order)].sort((a, b) => a - b);
+
+    for (const [index, order] of [1, 2, 3, 4, 5].entries()) {
+      if (orders[index] !== order) {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message:
+            "Hints must contain exactly one entry for each order from 1 to 5",
+          path: ["hints"],
+        });
+        break;
+      }
+    }
+  });
 
 // Provider-agnostic tool definition for structured output
 const contentTool: ToolDefinition = {
@@ -352,13 +368,6 @@ export const generateBatchContent = task({
 
         const parsed = contentSchema.parse(result.toolCallInput);
 
-        // Trim whitespace (model sometimes adds leading newlines)
-        parsed.solution = parsed.solution.trim();
-        parsed.editorial = parsed.editorial.trim();
-        for (const hint of parsed.hints) {
-          hint.content = hint.content.trim();
-        }
-
         await saveProblemContent(result.customId, parsed, modelInfo);
         succeeded++;
         logger.info(`Saved content for ${label}`);
@@ -375,13 +384,20 @@ export const generateBatchContent = task({
     }
 
     // Check for problems that were in the batch but had no result entry
-    await prisma.problem.updateMany({
+    const missingResults = await prisma.problem.updateMany({
       where: {
         id: { in: payload.problemIds },
         generationStatus: "PROCESSING", // still PROCESSING = never got a result
       },
       data: { generationStatus: "FAILED" },
     });
+
+    if (missingResults.count > 0) {
+      failed += missingResults.count;
+      logger.error(
+        `Batch ${batchId} finished with ${missingResults.count} missing result(s)`,
+      );
+    }
 
     logger.info(
       `Batch ${batchId} complete: ${succeeded} succeeded, ${failed} failed`,
@@ -449,8 +465,7 @@ export const generateContentScheduler = schedules.task({
       .slice(0, 5)
       .map((p) => `${p.contestId}${p.index}`)
       .join(", ");
-    const extra =
-      problems.length > 5 ? ` (+${problems.length - 5} more)` : "";
+    const extra = problems.length > 5 ? ` (+${problems.length - 5} more)` : "";
 
     await discordLog.trigger({
       title: "📅 Daily Generation Triggered",

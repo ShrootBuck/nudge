@@ -1,33 +1,19 @@
-const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL!;
+import { type DiscordEmbed, sendDiscordWebhook } from "./discord-webhook";
+import { getOptionalEnv } from "./env";
 
-type DiscordEmbed = {
-  title: string;
-  description?: string;
-  color?: number;
-  fields?: Array<{ name: string; value: string; inline?: boolean }>;
-  timestamp?: string;
-};
+let warnedAboutMissingWebhook = false;
 
 export async function sendAdminLog(embed: DiscordEmbed): Promise<void> {
-  const body = {
-    embeds: [
-      {
-        ...embed,
-        color: embed.color ?? 0x3b82f6, // blue by default
-        timestamp: embed.timestamp ?? new Date().toISOString(),
-      },
-    ],
-  };
+  const webhookUrl = getOptionalEnv("DISCORD_WEBHOOK_URL");
 
-  const res = await fetch(DISCORD_WEBHOOK_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-
-  if (!res.ok) {
-    const text = await res.text();
-    console.error(`Discord webhook failed (${res.status}): ${text}`);
-    // Don't throw - we don't want to fail the admin action if Discord is down
+  if (!webhookUrl) {
+    if (!warnedAboutMissingWebhook) {
+      warnedAboutMissingWebhook = true;
+      console.warn("DISCORD_WEBHOOK_URL is not set; skipping admin log");
+    }
+    return;
   }
+
+  // Don't throw - we don't want to fail the admin action if Discord is down.
+  await sendDiscordWebhook(webhookUrl, embed);
 }

@@ -1,7 +1,7 @@
 "use server";
 
-import { prisma } from "@/lib/prisma";
 import { sendAdminLog } from "@/lib/discord";
+import { prisma } from "@/lib/prisma";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -58,6 +58,10 @@ export async function setActiveModel(password: string, configId: string) {
     where: { id: configId },
   });
 
+  if (!config) {
+    return { success: false, error: "Config not found" } as const;
+  }
+
   await prisma.$transaction([
     prisma.modelConfig.updateMany({
       where: { isActive: true },
@@ -71,7 +75,7 @@ export async function setActiveModel(password: string, configId: string) {
 
   await sendAdminLog({
     title: "🔄 Model Switched",
-    description: `**${config?.displayName}** (${config?.provider}/${config?.modelId}) is now active`,
+    description: `**${config.displayName}** (${config.provider}/${config.modelId}) is now active`,
     color: 0x10b981, // emerald
   });
 

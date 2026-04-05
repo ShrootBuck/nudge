@@ -27,21 +27,23 @@ export async function setProblemReviewStatus(
     select: { contestId: true, index: true, name: true },
   });
 
+  if (!problem) {
+    return { success: false, error: "Problem not found" } as const;
+  }
+
   await prisma.problem.update({
     where: { id: problemId },
     data: { reviewStatus },
   });
 
-  if (problem) {
-    const tag = `${problem.contestId}${problem.index}`;
-    const link = `https://nudge.zaydkrunz.com/problem/${problem.contestId}/${problem.index}`;
-    const isVerified = reviewStatus === "VERIFIED";
-    await sendAdminLog({
-      title: isVerified ? "✅ Problem Verified" : "⚠️ Marked Incorrect",
-      description: `**[${tag} — ${problem.name}](${link})**`,
-      color: isVerified ? 0x10b981 : 0xf59e0b, // emerald / amber
-    });
-  }
+  const tag = `${problem.contestId}${problem.index}`;
+  const link = `https://nudge.zaydkrunz.com/problem/${problem.contestId}/${problem.index}`;
+  const isVerified = reviewStatus === "VERIFIED";
+  await sendAdminLog({
+    title: isVerified ? "✅ Problem Verified" : "⚠️ Marked Incorrect",
+    description: `**[${tag} — ${problem.name}](${link})**`,
+    color: isVerified ? 0x10b981 : 0xf59e0b, // emerald / amber
+  });
 
   return { success: true } as const;
 }
@@ -85,6 +87,10 @@ export async function queueRegeneration(problemId: string, password: string) {
     select: { contestId: true, index: true, name: true },
   });
 
+  if (!problem) {
+    return { success: false, error: "Problem not found" } as const;
+  }
+
   await prisma.problem.update({
     where: { id: problemId },
     data: {
@@ -94,15 +100,13 @@ export async function queueRegeneration(problemId: string, password: string) {
     },
   });
 
-  if (problem) {
-    const tag = `${problem.contestId}${problem.index}`;
-    const link = `https://nudge.zaydkrunz.com/problem/${problem.contestId}/${problem.index}`;
-    await sendAdminLog({
-      title: "🔁 Regeneration Queued",
-      description: `**[${tag} — ${problem.name}](${link})**\nAttempt counter reset, will be picked up by next generation run.`,
-      color: 0x8b5cf6, // violet
-    });
-  }
+  const tag = `${problem.contestId}${problem.index}`;
+  const link = `https://nudge.zaydkrunz.com/problem/${problem.contestId}/${problem.index}`;
+  await sendAdminLog({
+    title: "🔁 Regeneration Queued",
+    description: `**[${tag} — ${problem.name}](${link})**\nAttempt counter reset, will be picked up by next generation run.`,
+    color: 0x8b5cf6, // violet
+  });
 
   return { success: true } as const;
 }

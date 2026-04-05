@@ -1,7 +1,7 @@
 import { logger, schedules } from "@trigger.dev/sdk";
+import { sendDiscordWebhook } from "../lib/discord-webhook";
+import { getRequiredEnv } from "../lib/env";
 import { prisma } from "./db";
-
-const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL!;
 
 export const reportDigest = schedules.task({
   id: "report-digest",
@@ -34,27 +34,15 @@ export const reportDigest = schedules.task({
       return `**[${tag} — ${r.problem.name}](${link})**\n${reason}\n${time}`;
     });
 
-    const body = {
-      embeds: [
-        {
-          title: `🚩 ${reports.length} new report${reports.length === 1 ? "" : "s"} today`,
-          description: lines.join("\n\n"),
-          color: 0xf59e0b, // amber
-          timestamp: new Date().toISOString(),
-        },
-      ],
-    };
-
-    const res = await fetch(DISCORD_WEBHOOK_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`Discord webhook failed (${res.status}): ${text}`);
-    }
+    await sendDiscordWebhook(
+      getRequiredEnv("DISCORD_WEBHOOK_URL"),
+      {
+        title: `🚩 ${reports.length} new report${reports.length === 1 ? "" : "s"} today`,
+        description: lines.join("\n\n"),
+        color: 0xf59e0b, // amber
+      },
+      { throwOnError: true },
+    );
 
     logger.info(`Sent digest with ${reports.length} report(s)`);
     return { sent: true, count: reports.length };

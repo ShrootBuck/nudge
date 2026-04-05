@@ -83,11 +83,10 @@ export const backfill = task({
       select: { contestId: true, index: true, rating: true },
     });
 
-    const sampleLabels = sampleProblems
-      .map(
-        (p: { contestId: number; index: string; rating: number | null }) =>
-          `${p.contestId}${p.index} (${p.rating ?? "unrated"})`,
-      );
+    const sampleLabels = sampleProblems.map(
+      (p: { contestId: number; index: string; rating: number | null }) =>
+        `${p.contestId}${p.index} (${p.rating ?? "unrated"})`,
+    );
 
     logger.info(`Queued ${selectedIds.length} problems for generation`, {
       sample: sampleLabels,
@@ -110,9 +109,10 @@ export const backfill = task({
         sampleLabels.join(", ") +
         extraBackfill,
       color: 0xf97316, // orange
-      fields: filters.length > 0
-        ? [{ name: "Filters", value: filters.join("\n") }]
-        : undefined,
+      fields:
+        filters.length > 0
+          ? [{ name: "Filters", value: filters.join("\n") }]
+          : undefined,
     });
 
     return { queued: selectedIds.length };
