@@ -1,15 +1,10 @@
 /**
- * Provider-agnostic tool definition for structured output.
- * Each provider translates this into its own API format.
+ * Provider-agnostic schema definition for structured output.
  */
-export interface ToolDefinition {
+export interface OutputSchema {
   name: string;
   description: string;
-  parameters: {
-    type: "object";
-    properties: Record<string, unknown>;
-    required: string[];
-  };
+  schema: Record<string, unknown>;
 }
 
 /**
@@ -25,7 +20,7 @@ export interface BatchRequest {
         text?: string;
         image_url?: { url: string };
       }>;
-  tools: ToolDefinition[];
+  outputSchema: OutputSchema;
 }
 
 /**
@@ -34,10 +29,8 @@ export interface BatchRequest {
 export interface BatchResult {
   customId: string;
   status: "succeeded" | "failed";
-  /** The parsed input from the first tool call, if the request succeeded. */
-  toolCallInput?: unknown;
-  /** The name of the tool that was called. */
-  toolName?: string;
+  /** The parsed JSON output if the request succeeded. */
+  output?: unknown;
   /** Error description if the request failed. */
   error?: string;
 }

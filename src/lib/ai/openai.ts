@@ -4,7 +4,6 @@ import type {
   BatchRequest,
   BatchResult,
   BatchStatus,
-  ToolDefinition,
 } from "./types";
 
 type OpenAIBatchError = {
@@ -19,19 +18,16 @@ type OpenAIBatchLine = {
     status_code?: number;
     body?: {
       error?: OpenAIBatchError | null;
+      output_text?: string;
       output?: Array<{
         type?: string;
+        text?: string;
         name?: string;
         arguments?: string;
       }>;
       choices?: Array<{
         message?: {
-          tool_calls?: Array<{
-            function?: {
-              name?: string;
-              arguments?: string;
-            };
-          }>;
+          content?: string;
         };
       }>;
     } | null;
@@ -86,67 +82,41 @@ function parseBatchLine(line: string): BatchResult {
     };
   }
 
-  const responseToolCall = responseBody.output?.find(
-    (item) => item.type === "function_call",
-  );
+  // Responses API returns output_text or an output array
+  let jsonString = responseBody.output_text;
+  if (!jsonString && responseBody.output) {
+    const textOutput = responseBody.output.find((item) => item.type === "text");
+    if (textOutput?.text) {
+      jsonString = textOutput.text;
+    }
+  }
 
-  if (responseToolCall?.arguments) {
+  // Chat Completions API fallback
+  if (!jsonString && responseBody.choices?.[0]?.message?.content) {
+    jsonString = responseBody.choices[0].message.content;
+  }
+
+  if (jsonString) {
     try {
       return {
         customId: result.custom_id,
         status: "succeeded",
-        toolCallInput: JSON.parse(responseToolCall.arguments),
-        toolName: responseToolCall.name,
+        output: JSON.parse(jsonString),
       };
     } catch (error) {
       return {
         customId: result.custom_id,
         status: "failed",
-        error: `Invalid tool call JSON: ${error instanceof Error ? error.message : String(error)}`,
+        error: `Invalid JSON output: ${error instanceof Error ? error.message : String(error)}`,
       };
     }
   }
 
-  if (responseBody.output) {
-    return {
-      customId: result.custom_id,
-      status: "failed",
-      error: "No function call in response output",
-    };
-  }
-
-  const choice = responseBody.choices?.[0];
-  if (!choice) {
-    return {
-      customId: result.custom_id,
-      status: "failed",
-      error: "No choice in response",
-    };
-  }
-
-  const toolCall = choice.message?.tool_calls?.[0]?.function;
-  if (!toolCall?.arguments) {
-    return {
-      customId: result.custom_id,
-      status: "failed",
-      error: "No tool call in response",
-    };
-  }
-
-  try {
-    return {
-      customId: result.custom_id,
-      status: "succeeded",
-      toolCallInput: JSON.parse(toolCall.arguments),
-      toolName: toolCall.name,
-    };
-  } catch (error) {
-    return {
-      customId: result.custom_id,
-      status: "failed",
-      error: `Invalid tool call JSON: ${error instanceof Error ? error.message : String(error)}`,
-    };
-  }
+  return {
+    customId: result.custom_id,
+    status: "failed",
+    error: "No text content in response output",
+  };
 }
 
 /**
@@ -181,22 +151,13 @@ function enforceStrictSchema(
     copy.items = enforceStrictSchema(copy.items as Record<string, unknown>);
   }
 
-  return copy;
-}
+  if (Array.isArray(copy.anyOf)) {
+    copy.anyOf = copy.anyOf.map((s) =>
+      enforceStrictSchema(s as Record<string, unknown>),
+    );
+  }
 
-/** Convert a generic tool definition into OpenAI's function format. */
-function toOpenAITool(tool: ToolDefinition) {
-  return {
-    type: "function" as const,
-    name: tool.name,
-    description: tool.description,
-    parameters: enforceStrictSchema({
-      type: "object" as const,
-      properties: tool.parameters.properties,
-      required: tool.parameters.required,
-    }),
-    strict: true,
-  };
+  return copy;
 }
 
 export class OpenAIProvider implements AIProvider {
@@ -225,8 +186,6 @@ export class OpenAIProvider implements AIProvider {
     requests: BatchRequest[],
     effort?: string,
   ): Promise<string> {
-    // GPT-5 batch models reject function tools + reasoning effort on
-    // /v1/chat/completions, so use the Responses API for batch generation.
     const jsonlLines = requests.map((req) => {
       const inputContent =
         typeof req.userPrompt === "string"
@@ -258,8 +217,15 @@ export class OpenAIProvider implements AIProvider {
           model: modelId,
           instructions: req.systemPrompt,
           input: inputContent,
-          tools: req.tools.map(toOpenAITool),
-          tool_choice: "required" as const,
+          text: {
+            format: {
+              type: "json_schema" as const,
+              name: req.outputSchema.name,
+              description: req.outputSchema.description,
+              strict: true,
+              schema: enforceStrictSchema(req.outputSchema.schema),
+            },
+          },
           max_output_tokens: 128000,
           ...(effort && { reasoning: { effort } }),
         },

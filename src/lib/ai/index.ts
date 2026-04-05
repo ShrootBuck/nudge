@@ -39,5 +39,5 @@ export type {
   BatchRequest,
   BatchResult,
   BatchStatus,
-  ToolDefinition,
+  OutputSchema,
 } from "./types";

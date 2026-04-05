@@ -4,20 +4,41 @@ import type {
   BatchRequest,
   BatchResult,
   BatchStatus,
-  ToolDefinition,
 } from "./types";
 
-/** Convert a generic tool definition into Anthropic's tool format. */
-function toAnthropicTool(tool: ToolDefinition) {
-  return {
-    name: tool.name,
-    description: tool.description,
-    input_schema: {
-      type: "object" as const,
-      properties: tool.parameters.properties,
-      required: tool.parameters.required,
-    },
-  };
+function enforceStructuredSchema(
+  schema: Record<string, unknown>,
+): Record<string, unknown> {
+  const copy = { ...schema };
+
+  if (copy.type === "object" && copy.properties) {
+    const props = copy.properties as Record<string, Record<string, unknown>>;
+    copy.properties = Object.fromEntries(
+      Object.entries(props).map(([key, value]) => [
+        key,
+        enforceStructuredSchema(value),
+      ]),
+    );
+    copy.additionalProperties = false;
+  }
+
+  if (copy.type === "array" && copy.items) {
+    copy.items = enforceStructuredSchema(copy.items as Record<string, unknown>);
+  }
+
+  if (Array.isArray(copy.anyOf)) {
+    copy.anyOf = copy.anyOf.map((variant) =>
+      enforceStructuredSchema(variant as Record<string, unknown>),
+    );
+  }
+
+  if (Array.isArray(copy.allOf)) {
+    copy.allOf = copy.allOf.map((variant) =>
+      enforceStructuredSchema(variant as Record<string, unknown>),
+    );
+  }
+
+  return copy;
 }
 
 export class AnthropicProvider implements AIProvider {
@@ -69,7 +90,12 @@ export class AnthropicProvider implements AIProvider {
                     }),
             },
           ],
-          tools: req.tools.map(toAnthropicTool),
+          output_config: {
+            format: {
+              type: "json_schema" as const,
+              schema: enforceStructuredSchema(req.outputSchema.schema),
+            },
+          },
         },
       })),
     });
@@ -104,26 +130,37 @@ export class AnthropicProvider implements AIProvider {
         continue;
       }
 
-      const toolUse = entry.result.message.content.find(
-        (block): block is Anthropic.Messages.ToolUseBlock =>
-          block.type === "tool_use",
-      );
+      const textContent = entry.result.message.content
+        .filter(
+          (block): block is Anthropic.Messages.TextBlock =>
+            block.type === "text",
+        )
+        .map((block) => block.text)
+        .join("")
+        .trim();
 
-      if (!toolUse) {
+      if (!textContent) {
         yield {
           customId: entry.custom_id,
           status: "failed",
-          error: "No tool_use block in response",
+          error: `No text block in response (stop_reason ${entry.result.message.stop_reason ?? "unknown"})`,
         };
         continue;
       }
 
-      yield {
-        customId: entry.custom_id,
-        status: "succeeded",
-        toolCallInput: toolUse.input,
-        toolName: toolUse.name,
-      };
+      try {
+        yield {
+          customId: entry.custom_id,
+          status: "succeeded",
+          output: JSON.parse(textContent),
+        };
+      } catch (error) {
+        yield {
+          customId: entry.custom_id,
+          status: "failed",
+          error: `Invalid JSON output (${entry.result.message.stop_reason ?? "unknown"}): ${error instanceof Error ? error.message : String(error)}`,
+        };
+      }
     }
   }
 }

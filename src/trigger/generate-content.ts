@@ -1,7 +1,7 @@
 import { logger, schedules, task, wait } from "@trigger.dev/sdk";
 import * as cheerio from "cheerio";
 import { z } from "zod";
-import { type BatchRequest, getProvider, type ToolDefinition } from "../lib/ai";
+import { type BatchRequest, getProvider, type OutputSchema } from "../lib/ai";
 import { DISCORD_COLORS } from "../lib/discord-webhook";
 import { prisma } from "../lib/prisma";
 import { cfProblemUrl } from "../lib/utils";
@@ -37,62 +37,65 @@ const contentSchema = z
     }
   });
 
-// Provider-agnostic tool definition for structured output
-const contentTool: ToolDefinition = {
-  name: "submit_content",
+// Provider-agnostic schema for structured output
+const problemOutputSchema: OutputSchema = {
+  name: "problem_response",
   description:
-    "Submit the generated hints, editorial, and solution for this problem.",
-  parameters: {
+    "Submit the generated content for the problem, or report if it is unsolvable.",
+  schema: {
     type: "object",
     properties: {
+      status: {
+        type: "string",
+        enum: ["success", "unsolvable"],
+        description:
+          "Set to 'success' if you can solve the problem. Set to 'unsolvable' if the problem statement is fundamentally incomplete or you cannot solve it.",
+      },
+      reason: {
+        anyOf: [{ type: "string" }, { type: "null" }],
+        description:
+          "If status is 'unsolvable', provide a brief explanation. Otherwise null.",
+      },
       hints: {
-        type: "array",
-        description: "Exactly 5 progressive hints, each building on the last.",
-        items: {
-          type: "object",
-          properties: {
-            order: {
-              type: "number",
-              description: "Hint number, 1 through 5.",
-            },
-            content: {
-              type: "string",
-              description:
-                "Markdown hint text, building on previous hints. Inline ($...$) and display ($$...$$) LaTeX are allowed when they improve clarity.",
+        anyOf: [
+          {
+            type: "array",
+            description:
+              "Exactly 5 progressive hints, each building on the last.",
+            items: {
+              type: "object",
+              properties: {
+                order: {
+                  type: "number",
+                  description: "Hint number, 1 through 5.",
+                },
+                content: {
+                  type: "string",
+                  description: "Markdown hint text.",
+                },
+              },
+              required: ["order", "content"],
+              additionalProperties: false,
             },
           },
-          required: ["order", "content"],
-        },
+          { type: "null" },
+        ],
+        description:
+          "If status is 'success', provide exactly 5 progressive hints. Otherwise null.",
       },
       editorial: {
-        type: "string",
+        anyOf: [{ type: "string" }, { type: "null" }],
         description:
-          "A prose editorial explaining the full solution approach. Write in clean Markdown and use inline ($...$) or display ($$...$$) LaTeX whenever mathematical notation improves clarity.",
+          "If status is 'success', a prose editorial explaining the solution. Otherwise null.",
       },
       solution: {
-        type: "string",
+        anyOf: [{ type: "string" }, { type: "null" }],
         description:
-          "A complete, correct C++ solution using the template given. Return raw C++ only, with no surrounding Markdown fence or prose.",
+          "If status is 'success', a complete C++ solution. Otherwise null.",
       },
     },
-    required: ["hints", "editorial", "solution"],
-  },
-};
-
-const unsolvableTool: ToolDefinition = {
-  name: "report_unsolvable",
-  description:
-    "Call this tool if the problem statement is fundamentally incomplete (e.g. it's just a redirect stub), or if the problem cannot be solved because crucial rules are missing from the text. You can also call if you do not believe you were able to fully solve the problem.",
-  parameters: {
-    type: "object",
-    properties: {
-      reason: {
-        type: "string",
-        description:
-          "A brief explanation of why the problem cannot be solved from the provided text.",
-      },
-    },
-    required: ["reason"],
+    required: ["status", "reason", "hints", "editorial", "solution"],
+    additionalProperties: false,
   },
 };
 
@@ -102,7 +105,7 @@ When generating hints, make them truly progressive: hint 1 should be a gentle nu
 
 The editorial should be crisp, clear prose explaining the "aha!" moments, transitions, and complexity. The solution must be fast, clean, and correct C++ that handles all edge cases. The goal is to teach the intuition, not just dump code.
 
-If a problem cannot be solved because the text provided is just a stub or lacks the actual rules, use the report_unsolvable tool instead of hallucinating. You can also call this if you don't think you are able to fully solve the problem.
+If a problem cannot be solved because the text provided is just a stub or lacks the actual rules, return status = "unsolvable" with a brief reason instead of hallucinating. You can also do this if you don't think you were able to fully solve the problem.
 
 Write hints and editorials in clean Markdown. You MUST use inline LaTeX ($...$) and display LaTeX ($$...$$) for math, invariants, transitions, and complexity ($O(N \\log N)$). Never put mathematical notation inside code fences unless it's literal code.
 
@@ -144,6 +147,9 @@ Formatting & Style Rules:
 - You are writing C++23.
 
 Output strictness:
+- Return JSON matching the provided schema exactly.
+- If the problem is solvable, return \`status: "success"\`, \`reason: null\`, and fill in \`hints\`, \`editorial\`, and \`solution\`.
+- If the problem is not solvable from the given statement, return \`status: "unsolvable"\`, a short \`reason\`, and set \`hints\`, \`editorial\`, and \`solution\` to null.
 - Each hint must be JUST the hint text. No "Hint 1:" or subtitles. The UI adds those automatically.
 - The editorial is already rendered inside an "Editorial" section, so DO NOT start it with an "# Editorial" heading. Just jump straight into the meat (e.g., "## Observation 1").
 
@@ -332,7 +338,7 @@ export const generateBatchContent = task({
         customId: problem.id,
         systemPrompt: SYSTEM_PROMPT,
         userPrompt,
-        tools: [contentTool, unsolvableTool],
+        outputSchema: problemOutputSchema,
       };
     });
 
@@ -440,14 +446,14 @@ export const generateBatchContent = task({
         : result.customId;
 
       try {
-        if (result.status !== "succeeded" || !result.toolCallInput) {
+        if (result.status !== "succeeded" || !result.output) {
           throw new Error(result.error ?? "Unknown error");
         }
 
-        if (result.toolName === "report_unsolvable") {
-          const reason =
-            (result.toolCallInput as Record<string, unknown>)?.reason ||
-            "Unknown reason";
+        const outputData = result.output as Record<string, unknown>;
+
+        if (outputData.status === "unsolvable") {
+          const reason = (outputData.reason as string) || "Unknown reason";
           logger.warn(`Problem ${label} reported as unsolvable: ${reason}`);
 
           await prisma.problem.update({
@@ -468,7 +474,7 @@ export const generateBatchContent = task({
           continue;
         }
 
-        const parsed = contentSchema.parse(result.toolCallInput);
+        const parsed = contentSchema.parse(outputData);
 
         await saveProblemContent(result.customId, parsed, modelInfo);
         succeeded++;
