@@ -260,6 +260,7 @@ export class OpenAIProvider implements AIProvider {
           input: inputContent,
           tools: req.tools.map(toOpenAITool),
           tool_choice: "required" as const,
+          max_output_tokens: 128000,
           ...(effort && { reasoning: { effort } }),
         },
       };
