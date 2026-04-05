@@ -6,7 +6,6 @@ import {
   ChevronRight,
   SearchX,
   Sparkles,
-  X,
 } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -16,8 +15,9 @@ import { ratingTone } from "@/lib/utils";
 import { ProblemFilters } from "./problem-filters";
 
 const PAGE_SIZE = 50;
-const COMPLETED_WHERE = {
-  generationStatus: "COMPLETED" as const,
+const LISTABLE_WHERE: Prisma.ProblemWhereInput = {
+  generationStatus: "COMPLETED",
+  reviewStatus: { notIn: ["UNSOLVABLE", "SOLUTION_INCORRECT"] },
 };
 
 function buildPageUrl(
@@ -65,13 +65,6 @@ function reviewBadge(status: string) {
           Verified
         </span>
       );
-    case "SOLUTION_INCORRECT":
-      return (
-        <span className="inline-flex items-center gap-1 rounded-full border border-rose-500/20 bg-rose-500/10 px-2 py-0.5 text-[11px] font-medium text-rose-300 dark:text-rose-200">
-          <X className="size-3" />
-          Solution incorrect
-        </span>
-      );
     default:
       return null;
   }
@@ -92,7 +85,7 @@ export default async function Home({
   const tagParam = typeof params.tag === "string" ? params.tag : "";
 
   const where: Prisma.ProblemWhereInput = {
-    ...COMPLETED_WHERE,
+    ...LISTABLE_WHERE,
   };
 
   if (query) {
@@ -121,7 +114,7 @@ export default async function Home({
   const [totalCount, verifiedCount] = await Promise.all([
     prisma.problem.count({ where }),
     prisma.problem.count({
-      where: { ...COMPLETED_WHERE, reviewStatus: "VERIFIED" },
+      where: { ...LISTABLE_WHERE, reviewStatus: "VERIFIED" },
     }),
   ]);
 
@@ -134,7 +127,7 @@ export default async function Home({
 
   const problems = await prisma.problem.findMany({
     where,
-    orderBy: [{ updatedAt: "desc" }],
+    orderBy: [{ reviewStatus: "desc" }, { updatedAt: "desc" }],
     skip: (safePage - 1) * PAGE_SIZE,
     take: PAGE_SIZE,
     select: {

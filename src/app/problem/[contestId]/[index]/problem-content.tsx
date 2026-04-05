@@ -4,6 +4,7 @@ import {
   ArrowLeft,
   ArrowUpRight,
   BadgeCheck,
+  Ban,
   BookOpenText,
   Check,
   Code2,
@@ -33,7 +34,7 @@ import {
   setProblemReviewStatus,
 } from "./actions";
 
-type ReviewStatus = "UNREVIEWED" | "VERIFIED" | "SOLUTION_INCORRECT";
+type ReviewStatus = "UNREVIEWED" | "VERIFIED" | "SOLUTION_INCORRECT" | "UNSOLVABLE";
 type ReviewOutcome = Exclude<ReviewStatus, "UNREVIEWED">;
 
 type Problem = {
@@ -85,16 +86,6 @@ function generationState(status: string) {
           "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-200",
         animate: false,
       };
-    case "UNSOLVABLE":
-      return {
-        icon: ShieldAlert,
-        label: "Unsolvable",
-        description:
-          "The model determined this problem cannot be solved from its statement alone (e.g. April Fools stub, hidden content, or missing rules).",
-        className:
-          "border-zinc-500/20 bg-zinc-500/10 text-zinc-700 dark:text-zinc-300",
-        animate: false,
-      };
     default:
       return {
         icon: ShieldAlert,
@@ -130,6 +121,17 @@ function reviewState(status: ReviewStatus) {
         summary:
           "The generated solution was reviewed and does not currently pass. Treat the write-up as suspect until it is fixed.",
       };
+    case "UNSOLVABLE":
+      return {
+        icon: Ban,
+        label: "Unsolvable",
+        badgeClassName:
+          "border-amber-500/20 bg-amber-500/10 text-amber-300 dark:text-amber-200",
+        panelClassName:
+          "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-200",
+        summary:
+          "This problem has been marked as currently unsolvable by AI. The model may claim a solution, but it does not reliably pass.",
+      };
     default:
       return {
         icon: ShieldAlert,
@@ -150,6 +152,8 @@ function solutionSectionDescription(reviewStatus: ReviewStatus) {
       return "This is the full implementation that was manually checked.";
     case "SOLUTION_INCORRECT":
       return "This implementation is currently marked incorrect. Open it if you want to inspect what went wrong.";
+    case "UNSOLVABLE":
+      return "This problem is currently unsolvable by AI. The implementation below may not be correct.";
     default:
       return "This is the full implementation the model produced for the problem.";
   }
@@ -484,6 +488,28 @@ export function ProblemContent({ problem }: { problem: Problem }) {
                   Someone reviewed this output and the generated solution did
                   not pass. Use the hints, editorial, and code cautiously until
                   the content is regenerated or fixed.
+                </p>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {problem.reviewStatus === "UNSOLVABLE" && (
+          <section
+            className={`mt-8 rounded-[1.75rem] border px-6 py-6 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] ${review.panelClassName}`}
+          >
+            <div className="flex items-start gap-4">
+              <div className="rounded-2xl border border-current/15 bg-background/60 p-3">
+                <ReviewIcon className="size-5" />
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold tracking-tight">
+                  This problem is currently unsolvable by AI
+                </h2>
+                <p className="mt-1 max-w-2xl text-sm/7 opacity-90">
+                  The model may generate a plausible-looking solution, but it
+                  does not reliably pass. Treat all generated content with extra
+                  skepticism.
                 </p>
               </div>
             </div>
@@ -936,6 +962,18 @@ function ReviewSection({
                 {pendingStatus === "SOLUTION_INCORRECT"
                   ? "Marking..."
                   : "Mark incorrect"}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={isPending || !password}
+                className="h-10 w-full rounded-xl border-amber-500/20 bg-amber-500/10 px-4 text-amber-200 shadow-sm hover:bg-amber-500/15 hover:text-amber-100 disabled:border-amber-500/10 disabled:bg-amber-500/10 disabled:text-amber-200/55 sm:w-auto"
+                onClick={() => handleReview("UNSOLVABLE")}
+              >
+                {pendingStatus === "UNSOLVABLE"
+                  ? "Marking..."
+                  : "Mark unsolvable"}
               </Button>
               <Button
                 type="button"
