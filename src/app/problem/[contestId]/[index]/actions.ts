@@ -5,7 +5,11 @@ import { DISCORD_COLORS } from "@/lib/discord-webhook";
 import { SITE_URL } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 
-const REVIEW_STATUSES = ["VERIFIED", "SOLUTION_INCORRECT", "UNSOLVABLE"] as const;
+const REVIEW_STATUSES = [
+  "VERIFIED",
+  "SOLUTION_INCORRECT",
+  "UNSOLVABLE",
+] as const;
 
 type ReviewStatus = (typeof REVIEW_STATUSES)[number];
 
@@ -42,8 +46,14 @@ export async function setProblemReviewStatus(
   const link = `${SITE_URL}/problem/${problem.contestId}/${problem.index}`;
   const logConfig = {
     VERIFIED: { title: "✅ Problem Verified", color: DISCORD_COLORS.success },
-    SOLUTION_INCORRECT: { title: "⚠️ Marked Incorrect", color: DISCORD_COLORS.warning },
-    UNSOLVABLE: { title: "🚫 Marked Unsolvable", color: DISCORD_COLORS.warning },
+    SOLUTION_INCORRECT: {
+      title: "⚠️ Marked Incorrect",
+      color: DISCORD_COLORS.warning,
+    },
+    UNSOLVABLE: {
+      title: "🚫 Marked Unsolvable",
+      color: DISCORD_COLORS.warning,
+    },
   } as const;
   const log = logConfig[reviewStatus];
   await sendAdminLog({

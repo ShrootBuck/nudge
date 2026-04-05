@@ -34,7 +34,11 @@ import {
   setProblemReviewStatus,
 } from "./actions";
 
-type ReviewStatus = "UNREVIEWED" | "VERIFIED" | "SOLUTION_INCORRECT" | "UNSOLVABLE";
+type ReviewStatus =
+  | "UNREVIEWED"
+  | "VERIFIED"
+  | "SOLUTION_INCORRECT"
+  | "UNSOLVABLE";
 type ReviewOutcome = Exclude<ReviewStatus, "UNREVIEWED">;
 
 type Problem = {
