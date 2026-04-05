@@ -25,6 +25,12 @@ export function Footer() {
 
           <div className="flex items-center gap-6">
             <Link
+              href="/request"
+              className="text-sm text-muted-foreground transition hover:text-foreground"
+            >
+              Request Problem
+            </Link>
+            <Link
               href="/about"
               className="text-sm text-muted-foreground transition hover:text-foreground"
             >

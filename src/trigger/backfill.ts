@@ -60,7 +60,7 @@ export const backfill = task({
     const candidates = await prisma.problem.findMany({
       where,
       select: { id: true },
-      orderBy: { contestId: "desc" },
+      orderBy: [{ requested: "desc" }, { contestId: "desc" }],
       take: limit,
     });
 

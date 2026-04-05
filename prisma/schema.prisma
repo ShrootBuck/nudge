@@ -32,6 +32,7 @@ model Problem {
   generationStatus   GenerationStatus @default(PENDING)
   generationAttempts Int              @default(0)
   reviewStatus       ReviewStatus     @default(UNREVIEWED)
+  requested          Boolean          @default(false)
 
   // Tracks which provider/model generated this problem's content
   generatedByProvider String? // e.g. "anthropic", "openai"
