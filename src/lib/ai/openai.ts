@@ -175,9 +175,7 @@ function enforceStrictSchema(
   }
 
   if (copy.type === "array" && copy.items) {
-    copy.items = enforceStrictSchema(
-      copy.items as Record<string, unknown>,
-    );
+    copy.items = enforceStrictSchema(copy.items as Record<string, unknown>);
   }
 
   return copy;

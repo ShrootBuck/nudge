@@ -18,7 +18,13 @@ export interface ToolDefinition {
 export interface BatchRequest {
   customId: string;
   systemPrompt: string;
-  userPrompt: string;
+  userPrompt:
+    | string
+    | Array<{
+        type: "text" | "image_url";
+        text?: string;
+        image_url?: { url: string };
+      }>;
   tools: ToolDefinition[];
 }
 

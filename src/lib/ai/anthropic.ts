@@ -49,7 +49,26 @@ export class AnthropicProvider implements AIProvider {
             }),
           },
           system: req.systemPrompt,
-          messages: [{ role: "user" as const, content: req.userPrompt }],
+          messages: [
+            {
+              role: "user" as const,
+              content:
+                typeof req.userPrompt === "string"
+                  ? req.userPrompt
+                  : req.userPrompt.map((item) => {
+                      if (item.type === "image_url" && item.image_url) {
+                        return {
+                          type: "image" as const,
+                          source: {
+                            type: "url" as const,
+                            url: item.image_url.url,
+                          },
+                        };
+                      }
+                      return { type: "text" as const, text: item.text || "" };
+                    }),
+            },
+          ],
           tools: req.tools.map(toAnthropicTool),
         },
       })),

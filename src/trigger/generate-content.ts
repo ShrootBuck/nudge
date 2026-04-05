@@ -1,4 +1,5 @@
 import { logger, schedules, task, wait } from "@trigger.dev/sdk";
+import * as cheerio from "cheerio";
 import { z } from "zod";
 import { getProvider } from "../lib/ai";
 import type { BatchRequest, ToolDefinition } from "../lib/ai/types";
@@ -83,21 +84,28 @@ Write hints and editorials in clean Markdown. You may use inline LaTeX ($...$) a
 
 Use quick and clever humor when appropriate. Tell it like it is (don't sugar-coat responses), and use very casual language. You are fully allowed to swear, just don't overdo it like a sailor (be natural but slightly funny!).`;
 
-function buildPrompt(problem: {
-  contestId: number;
-  index: string;
-  name: string;
-  rating: number | null;
-  tags: string[];
-}) {
+function buildPrompt(
+  problem: {
+    contestId: number;
+    index: string;
+    name: string;
+    rating: number | null;
+    tags: string[];
+  },
+  problemStatement?: string | null,
+) {
   const ratingStr = problem.rating ? ` (rated ${problem.rating})` : "";
   const tagsStr = problem.tags.length > 0 ? problem.tags.join(", ") : "none";
+
+  let statementSection = "";
+  if (problemStatement) {
+    statementSection = `\n\nProblem Statement:\n<problem-statement>\n${problemStatement}\n</problem-statement>\n`;
+  }
 
   return `Generate content for Codeforces problem ${problem.contestId}${problem.index}: "${problem.name}"${ratingStr}.
 Tags: ${tagsStr}
 
-Problem URL: https://codeforces.com/contest/${problem.contestId}/problem/${problem.index}
-
+Problem URL: https://codeforces.com/contest/${problem.contestId}/problem/${problem.index}${statementSection}
 Please generate:
 1. Five progressive hints (hint 1 is the gentlest nudge, hint 5 nearly gives away the approach)
 2. A prose editorial that fully explains the solution strategy, key observations, and complexity analysis
@@ -149,15 +157,49 @@ async function getActiveModelConfig() {
   const config = await prisma.modelConfig.findFirst({
     where: { isActive: true },
   });
-
-  if (!config) {
-    throw new Error(
-      "No active model configuration found. " +
-        "Insert a row into ModelConfig with isActive = true.",
-    );
-  }
-
+  if (!config) throw new Error("No active model configuration found in DB");
   return config;
+}
+
+async function fetchProblemStatement(contestId: number, index: string) {
+  try {
+    const url = `https://codeforces.com/contest/${contestId}/problem/${index}`;
+    const res = await fetch(url);
+    if (!res.ok) {
+      logger.error(
+        `Failed to fetch problem statement for ${contestId}${index}: ${res.statusText}`,
+      );
+      return null;
+    }
+    const html = await res.text();
+
+    // We parse the HTML with Cheerio to extract text and image URLs properly
+    const $ = cheerio.load(html);
+    const statementDiv = $(".problem-statement");
+
+    if (statementDiv.length > 0) {
+      // Find all image tags within the problem statement and turn them into absolute URLs
+      const images: string[] = [];
+      statementDiv.find("img").each((_, img) => {
+        const src = $(img).attr("src");
+        if (src) {
+          const absoluteUrl = new URL(src, "https://codeforces.com").href;
+          images.push(absoluteUrl);
+          // Also update the src in the HTML so the LLM sees the full URL
+          $(img).attr("src", absoluteUrl);
+        }
+      });
+
+      const cleanHtml = statementDiv.html();
+      return cleanHtml ? { html: cleanHtml, images } : null;
+    }
+    return null;
+  } catch (err) {
+    logger.error(`Error fetching problem statement for ${contestId}${index}`, {
+      error: String(err),
+    });
+    return null;
+  }
 }
 
 type ModelInfo = { provider: string; modelId: string };
@@ -250,13 +292,34 @@ export const generateBatchContent = task({
       },
     });
 
+    // Fetch problem statements concurrently
+    const problemStatements = await Promise.all(
+      problems.map((p) => fetchProblemStatement(p.contestId, p.index)),
+    );
+
     // Build provider-agnostic batch requests
-    const requests: BatchRequest[] = problems.map((problem) => ({
-      customId: problem.id,
-      systemPrompt: SYSTEM_PROMPT,
-      userPrompt: buildPrompt(problem),
-      tools: [contentTool],
-    }));
+    const requests: BatchRequest[] = problems.map((problem, i) => {
+      const statement = problemStatements[i];
+      const textPrompt = buildPrompt(problem, statement?.html);
+
+      const userPrompt: BatchRequest["userPrompt"] =
+        statement?.images && statement.images.length > 0
+          ? [
+              { type: "text", text: textPrompt },
+              ...statement.images.map((url) => ({
+                type: "image_url" as const,
+                image_url: { url },
+              })),
+            ]
+          : textPrompt;
+
+      return {
+        customId: problem.id,
+        systemPrompt: SYSTEM_PROMPT,
+        userPrompt,
+        tools: [contentTool],
+      };
+    });
 
     logger.info(`Creating batch with ${problems.length} requests`);
 
