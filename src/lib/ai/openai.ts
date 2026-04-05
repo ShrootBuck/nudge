@@ -235,7 +235,15 @@ export class OpenAIProvider implements AIProvider {
               {
                 type: "message" as const,
                 role: "user" as const,
-                content: req.userPrompt,
+                content: req.userPrompt.map((item) => {
+                  if (item.type === "text") {
+                    return { type: "input_text", text: item.text };
+                  }
+                  if (item.type === "image_url") {
+                    return { type: "input_image", image_url: item.image_url };
+                  }
+                  return item;
+                }),
               },
             ];
 
