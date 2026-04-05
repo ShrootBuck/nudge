@@ -10,6 +10,8 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 Nudge is a read-only platform for Codeforces competitive programming problems. It stores problems and provides AI-generated content for each one: progressive hints, a prose editorial, and a C++ solution.
 
+USE BUN ALWAYS, NEVER NPM SLUDGE!
+
 ## Future Ideas
 
 - **Multi-language solutions**: Currently C++ only. Could support Python, Java, etc. Would need schema changes (multiple solutions per problem, each with a `language` field) and UI for language switching.
