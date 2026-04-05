@@ -456,7 +456,7 @@ export const generateBatchContent = task({
 
           await prisma.problem.update({
             where: { id: result.customId },
-            data: { generationStatus: "FAILED" },
+            data: { generationStatus: "UNSOLVABLE" },
           });
 
           await discordLog.trigger({

@@ -12,6 +12,7 @@ enum GenerationStatus {
   PROCESSING
   COMPLETED
   FAILED
+  UNSOLVABLE
 }
 
 enum ReviewStatus {

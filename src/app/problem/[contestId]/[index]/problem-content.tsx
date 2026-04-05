@@ -107,6 +107,16 @@ function generationState(status: string) {
           "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-200",
         animate: false,
       };
+    case "UNSOLVABLE":
+      return {
+        icon: ShieldAlert,
+        label: "Unsolvable",
+        description:
+          "The model determined this problem cannot be solved from its statement alone (e.g. April Fools stub, hidden content, or missing rules).",
+        className:
+          "border-zinc-500/20 bg-zinc-500/10 text-zinc-700 dark:text-zinc-300",
+        animate: false,
+      };
     default:
       return {
         icon: ShieldAlert,
