@@ -3,7 +3,7 @@ import * as cheerio from "cheerio";
 import { z } from "zod";
 import { getProvider } from "../lib/ai";
 import type { BatchRequest, ToolDefinition } from "../lib/ai/types";
-import { prisma } from "./db";
+import { prisma } from "../lib/prisma";
 import { discordLog } from "./discord-log";
 
 const BATCH_SIZE = 10;

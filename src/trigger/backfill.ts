@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { logger, task } from "@trigger.dev/sdk";
-import { prisma } from "./db";
+import { prisma } from "../lib/prisma";
 import { discordLog } from "./discord-log";
 
 interface BackfillPayload {

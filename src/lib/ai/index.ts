@@ -33,18 +33,6 @@ export function getProvider(providerId: string): AIProvider {
   return provider;
 }
 
-// ---------------------------------------------------------------------------
-// Model display-name fallback
-// ---------------------------------------------------------------------------
-
-/**
- * Fallback when a DB lookup for `ModelConfig.displayName` isn't practical.
- * Just returns the raw model ID as-is.
- */
-export function getModelDisplayName(modelId: string): string {
-  return modelId;
-}
-
 // Re-export all types for convenience
 export type {
   AIProvider,

@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
-import { getModelDisplayName } from "@/lib/ai";
 import { prisma } from "@/lib/prisma";
 import { parseSolutionContent } from "@/lib/problem-solution";
 import {
@@ -47,8 +46,7 @@ export default async function ProblemPage({
       },
       select: { displayName: true },
     });
-    modelDisplayName =
-      config?.displayName ?? getModelDisplayName(problem.generatedByModel);
+    modelDisplayName = config?.displayName ?? problem.generatedByModel;
   }
 
   let preHighlightedSolutionHtml: { light: string; dark: string } | null = null;

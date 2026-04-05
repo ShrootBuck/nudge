@@ -1,7 +1,7 @@
 import { logger, schedules } from "@trigger.dev/sdk";
 import { sendDiscordWebhook } from "../lib/discord-webhook";
 import { getRequiredEnv } from "../lib/env";
-import { prisma } from "./db";
+import { prisma } from "../lib/prisma";
 
 export const reportDigest = schedules.task({
   id: "report-digest",
