@@ -52,38 +52,32 @@ export const syncProblems = schedules.task({
 
       const results = await Promise.allSettled(
         batch.map(async (p) => {
-          const existing = await prisma.problem.findUnique({
+          const result = await prisma.problem.upsert({
             where: {
               contestId_index: {
                 contestId: p.contestId,
                 index: p.index,
               },
             },
-          });
-
-          if (existing) {
-            // Update rating/tags if changed, don't touch generationStatus
-            await prisma.problem.update({
-              where: { id: existing.id },
-              data: {
-                name: p.name,
-                rating: p.rating ?? null,
-                tags: p.tags,
-              },
-            });
-            return "updated" as const;
-          }
-
-          await prisma.problem.create({
-            data: {
+            update: {
+              name: p.name,
+              rating: p.rating ?? null,
+              tags: p.tags,
+            },
+            create: {
               contestId: p.contestId,
               index: p.index,
               name: p.name,
               rating: p.rating ?? null,
               tags: p.tags,
             },
+            select: { createdAt: true, updatedAt: true },
           });
-          return "created" as const;
+
+          // If createdAt equals updatedAt, the row was just created
+          return result.createdAt.getTime() === result.updatedAt.getTime()
+            ? ("created" as const)
+            : ("updated" as const);
         }),
       );
 

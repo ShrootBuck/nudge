@@ -134,7 +134,7 @@ export default async function Home({
 
   const problems = await prisma.problem.findMany({
     where,
-    orderBy: [{ rating: "asc" }, { contestId: "desc" }, { index: "asc" }],
+    orderBy: [{ updatedAt: "desc" }],
     skip: (safePage - 1) * PAGE_SIZE,
     take: PAGE_SIZE,
     select: {

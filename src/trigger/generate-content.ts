@@ -1,8 +1,7 @@
 import { logger, schedules, task, wait } from "@trigger.dev/sdk";
 import * as cheerio from "cheerio";
 import { z } from "zod";
-import { getProvider } from "../lib/ai";
-import type { BatchRequest, ToolDefinition } from "../lib/ai/types";
+import { type BatchRequest, getProvider, type ToolDefinition } from "../lib/ai";
 import { DISCORD_COLORS } from "../lib/discord-webhook";
 import { prisma } from "../lib/prisma";
 import { cfProblemUrl } from "../lib/utils";

@@ -5,6 +5,7 @@ import { useTheme } from "next-themes";
 import { useEffect, useRef, useState } from "react";
 import { codeToHtml } from "shiki";
 import { Button } from "@/components/ui/button";
+import { SHIKI_DARK_THEME, SHIKI_LIGHT_THEME } from "@/lib/shiki";
 import { cn } from "@/lib/utils";
 
 type CopyState = "idle" | "copied" | "error";
@@ -32,7 +33,7 @@ export function CodeBlock({
   const copyResetTimeoutRef = useRef<number | null>(null);
   const fileName = downloadFileName ?? `snippet.${language}`;
   const theme =
-    resolvedTheme === "light" ? "github-light-default" : "github-dark-default";
+    resolvedTheme === "light" ? SHIKI_LIGHT_THEME : SHIKI_DARK_THEME;
 
   useEffect(() => {
     if (preHighlightedHtml) {
