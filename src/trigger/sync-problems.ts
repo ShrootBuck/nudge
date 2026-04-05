@@ -1,4 +1,5 @@
 import { logger, schedules } from "@trigger.dev/sdk";
+import { DISCORD_COLORS } from "../lib/discord-webhook";
 import { prisma } from "../lib/prisma";
 import { discordLog } from "./discord-log";
 
@@ -103,7 +104,7 @@ export const syncProblems = schedules.task({
     await discordLog.trigger({
       title: "🔄 Problem Sync Complete",
       description: `Synced **${problems.length.toLocaleString()}** problems from Codeforces API.`,
-      color: 0x0ea5e9, // sky
+      color: DISCORD_COLORS.sky,
       fields: [
         { name: "New", value: `${created}`, inline: true },
         { name: "Updated", value: `${updated}`, inline: true },

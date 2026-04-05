@@ -3,7 +3,9 @@ import * as cheerio from "cheerio";
 import { z } from "zod";
 import { getProvider } from "../lib/ai";
 import type { BatchRequest, ToolDefinition } from "../lib/ai/types";
+import { DISCORD_COLORS } from "../lib/discord-webhook";
 import { prisma } from "../lib/prisma";
+import { cfProblemUrl } from "../lib/utils";
 import { discordLog } from "./discord-log";
 
 const BATCH_SIZE = 10;
@@ -124,7 +126,7 @@ function buildPrompt(
   return `Generate content for Codeforces problem ${problem.contestId}${problem.index}: "${problem.name}"${ratingStr}.
 Tags: ${tagsStr}
 
-Problem URL: https://codeforces.com/contest/${problem.contestId}/problem/${problem.index}${statementSection}
+Problem URL: ${cfProblemUrl(problem.contestId, problem.index)}${statementSection}
 Please generate:
 1. Five progressive hints (hint 1 is the gentlest nudge, hint 5 nearly gives away the approach)
 2. A prose editorial that fully explains the solution strategy, key observations, and complexity analysis
@@ -182,7 +184,7 @@ async function getActiveModelConfig() {
 
 async function fetchProblemStatement(contestId: number, index: string) {
   try {
-    const url = `https://codeforces.com/contest/${contestId}/problem/${index}`;
+    const url = cfProblemUrl(contestId, index);
     const res = await fetch(url);
     if (!res.ok) {
       logger.error(
@@ -375,7 +377,7 @@ export const generateBatchContent = task({
     await discordLog.trigger({
       title: `📦 Batch Started`,
       description: `**${problems.length}** problems submitted via **${modelConfig.displayName}**\n${problemLabels}${extraText}`,
-      color: 0x3b82f6, // blue
+      color: DISCORD_COLORS.info,
       fields: [
         {
           name: "Batch ID",
@@ -422,7 +424,7 @@ export const generateBatchContent = task({
       await discordLog.trigger({
         title: "❌ Batch Timed Out",
         description: `Batch \`${batchId}\` did not complete after 24 hours.\n**${payload.problemIds.length}** problems marked as FAILED.`,
-        color: 0xef4444, // red
+        color: DISCORD_COLORS.error,
       });
 
       throw new Error(`Batch ${batchId} not completed after 24 hourly checks`);
@@ -462,7 +464,7 @@ export const generateBatchContent = task({
           await discordLog.trigger({
             title: `🚫 Unsolvable Problem`,
             description: `Model reported that problem **${label}** cannot be solved.\n**Reason:** ${reason}`,
-            color: 0xef4444, // red
+            color: DISCORD_COLORS.error,
           });
 
           failed++;
@@ -510,7 +512,7 @@ export const generateBatchContent = task({
     await discordLog.trigger({
       title: `${emoji} Batch Complete`,
       description: `Batch \`${batchId}\` finished processing.`,
-      color: failed === 0 ? 0x10b981 : 0xf59e0b, // emerald / amber
+      color: failed === 0 ? DISCORD_COLORS.success : DISCORD_COLORS.warning,
       fields: [
         { name: "Succeeded", value: `${succeeded}`, inline: true },
         { name: "Failed", value: `${failed}`, inline: true },
@@ -573,7 +575,7 @@ export const generateContentScheduler = schedules.task({
     await discordLog.trigger({
       title: "📅 Daily Generation Triggered",
       description: `**${problems.length}** pending problems queued across **${chunks.length}** batch${chunks.length === 1 ? "" : "es"}\n${sample}${extra}`,
-      color: 0x6366f1, // indigo
+      color: DISCORD_COLORS.indigo,
     });
 
     return { triggered: problems.length, batches: chunks.length };

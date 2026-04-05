@@ -26,7 +26,7 @@ import { CodeBlock } from "@/components/code-block";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { parseSolutionContent } from "@/lib/problem-solution";
-import { cn, ratingTone } from "@/lib/utils";
+import { cfProblemUrl, cn, ratingTone } from "@/lib/utils";
 import {
   queueRegeneration,
   reportProblem,
@@ -317,7 +317,7 @@ function SolutionCode({
 export function ProblemContent({ problem }: { problem: Problem }) {
   const [showEditorial, setShowEditorial] = useState(false);
   const [showSolution, setShowSolution] = useState(false);
-  const cfUrl = `https://codeforces.com/contest/${problem.contestId}/problem/${problem.index}`;
+  const cfUrl = cfProblemUrl(problem.contestId, problem.index);
   const hasContent = problem.generationStatus === "COMPLETED";
   const state = generationState(problem.generationStatus);
   const StateIcon = state.icon;

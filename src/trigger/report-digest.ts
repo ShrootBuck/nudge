@@ -1,6 +1,6 @@
 import { logger, schedules } from "@trigger.dev/sdk";
-import { sendDiscordWebhook } from "../lib/discord-webhook";
-import { getRequiredEnv } from "../lib/env";
+import { DISCORD_COLORS, sendDiscordWebhook } from "../lib/discord-webhook";
+import { getRequiredEnv, SITE_URL } from "../lib/env";
 import { prisma } from "../lib/prisma";
 
 export const reportDigest = schedules.task({
@@ -28,7 +28,7 @@ export const reportDigest = schedules.task({
 
     const lines = reports.map((r) => {
       const tag = `${r.problem.contestId}${r.problem.index}`;
-      const link = `https://nudge.zaydkrunz.com/problem/${r.problem.contestId}/${r.problem.index}`;
+      const link = `${SITE_URL}/problem/${r.problem.contestId}/${r.problem.index}`;
       const reason = r.reason ?? "_No reason given_";
       const time = `<t:${Math.floor(r.createdAt.getTime() / 1000)}:R>`;
       return `**[${tag} — ${r.problem.name}](${link})**\n${reason}\n${time}`;
@@ -39,7 +39,7 @@ export const reportDigest = schedules.task({
       {
         title: `🚩 ${reports.length} new report${reports.length === 1 ? "" : "s"} today`,
         description: lines.join("\n\n"),
-        color: 0xf59e0b, // amber
+        color: DISCORD_COLORS.warning,
       },
       { throwOnError: true },
     );

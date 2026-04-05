@@ -1,3 +1,14 @@
+export const DISCORD_COLORS = {
+  success: 0x10b981, // emerald
+  warning: 0xf59e0b, // amber
+  error: 0xef4444, // red
+  info: 0x3b82f6, // blue
+  violet: 0x8b5cf6,
+  sky: 0x0ea5e9,
+  indigo: 0x6366f1,
+  orange: 0xf97316,
+} as const;
+
 export type DiscordEmbed = {
   title: string;
   description?: string;
@@ -15,7 +26,7 @@ export async function sendDiscordWebhook(
     embeds: [
       {
         ...embed,
-        color: embed.color ?? 0x3b82f6,
+        color: embed.color ?? DISCORD_COLORS.info,
         timestamp: embed.timestamp ?? new Date().toISOString(),
       },
     ],

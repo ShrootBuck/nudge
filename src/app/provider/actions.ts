@@ -1,6 +1,7 @@
 "use server";
 
 import { sendAdminLog } from "@/lib/discord";
+import { DISCORD_COLORS } from "@/lib/discord-webhook";
 import { prisma } from "@/lib/prisma";
 
 // ---------------------------------------------------------------------------
@@ -76,7 +77,7 @@ export async function setActiveModel(password: string, configId: string) {
   await sendAdminLog({
     title: "🔄 Model Switched",
     description: `**${config.displayName}** (${config.provider}/${config.modelId}) is now active`,
-    color: 0x10b981, // emerald
+    color: DISCORD_COLORS.success,
   });
 
   return { success: true } as const;
@@ -125,7 +126,7 @@ export async function addModelConfig(
   await sendAdminLog({
     title: "➕ Model Added",
     description: `**${displayName}**\n${provider}/${modelId}${effortText}`,
-    color: 0x8b5cf6, // violet
+    color: DISCORD_COLORS.violet,
   });
 
   return { success: true, id: created.id } as const;
@@ -160,7 +161,7 @@ export async function deleteModelConfig(password: string, configId: string) {
   await sendAdminLog({
     title: "🗑️ Model Deleted",
     description: `**${config.displayName}** (${config.provider}/${config.modelId})`,
-    color: 0xef4444, // red
+    color: DISCORD_COLORS.error,
   });
 
   return { success: true } as const;

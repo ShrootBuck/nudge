@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { logger, task } from "@trigger.dev/sdk";
+import { DISCORD_COLORS } from "../lib/discord-webhook";
 import { prisma } from "../lib/prisma";
 import { discordLog } from "./discord-log";
 
@@ -68,7 +69,7 @@ export const backfill = task({
       return { queued: 0 };
     }
 
-    const selectedIds = candidates.map((c: { id: string }) => c.id);
+    const selectedIds = candidates.map((c) => c.id);
 
     // Mark them all as PENDING
     await prisma.problem.updateMany({
@@ -84,8 +85,7 @@ export const backfill = task({
     });
 
     const sampleLabels = sampleProblems.map(
-      (p: { contestId: number; index: string; rating: number | null }) =>
-        `${p.contestId}${p.index} (${p.rating ?? "unrated"})`,
+      (p) => `${p.contestId}${p.index} (${p.rating ?? "unrated"})`,
     );
 
     logger.info(`Queued ${selectedIds.length} problems for generation`, {
@@ -108,7 +108,7 @@ export const backfill = task({
         `**${selectedIds.length}** problems marked PENDING for generation\n` +
         sampleLabels.join(", ") +
         extraBackfill,
-      color: 0xf97316, // orange
+      color: DISCORD_COLORS.orange,
       fields:
         filters.length > 0
           ? [{ name: "Filters", value: filters.join("\n") }]

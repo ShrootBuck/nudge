@@ -12,3 +12,6 @@ export function getRequiredEnv(name: string): string {
 
   return value;
 }
+
+export const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://nudge.zaydkrunz.com";
