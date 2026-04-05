@@ -240,7 +240,7 @@ export class OpenAIProvider implements AIProvider {
                     return { type: "input_text", text: item.text };
                   }
                   if (item.type === "image_url") {
-                    return { type: "input_image", image_url: item.image_url };
+                    return { type: "input_image", image_url: item.image_url?.url };
                   }
                   return item;
                 }),
