@@ -37,6 +37,10 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
+          <div className="bg-orange-500/10 px-4 py-2 text-center text-sm font-medium text-orange-600 dark:bg-orange-500/20 dark:text-orange-400 border-b border-orange-500/20">
+            ⚠️ Heads up: This is experimental alpha software. Expect bugs and
+            breaking changes.
+          </div>
           <Navbar />
           {children}
           <Footer />

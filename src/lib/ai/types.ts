@@ -36,6 +36,8 @@ export interface BatchResult {
   status: "succeeded" | "failed";
   /** The parsed input from the first tool call, if the request succeeded. */
   toolCallInput?: unknown;
+  /** The name of the tool that was called. */
+  toolName?: string;
   /** Error description if the request failed. */
   error?: string;
 }

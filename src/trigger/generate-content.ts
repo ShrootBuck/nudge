@@ -78,7 +78,26 @@ const contentTool: ToolDefinition = {
   },
 };
 
+const unsolvableTool: ToolDefinition = {
+  name: "report_unsolvable",
+  description:
+    "Call this tool if the problem statement is fundamentally incomplete (e.g. it's just a redirect stub), or if the problem cannot be solved because crucial rules are missing from the text. You can also call if you do not believe you were able to fully solve the problem.",
+  parameters: {
+    type: "object",
+    properties: {
+      reason: {
+        type: "string",
+        description:
+          "A brief explanation of why the problem cannot be solved from the provided text.",
+      },
+    },
+    required: ["reason"],
+  },
+};
+
 const SYSTEM_PROMPT = `You are an expert competitive programmer and teacher. You have deep knowledge of algorithms, data structures, and Codeforces problems. When generating hints, make them truly progressive: hint 1 should be a gentle nudge about what area to think about, while hint 5 should basically give away the key insight. The editorial should be clear prose (not code), and the solution must be correct, efficient C++ that handles all edge cases but also makes sense to read. The goal is to teach here.
+
+If a problem cannot be solved because the text provided is just a stub or lacks the actual rules, use the report_unsolvable tool instead of guessing. You can also call this if you do not believe you were able to fully solve the problem.
 
 Write hints and editorials in clean Markdown. You may use inline LaTeX ($...$) and display LaTeX ($$...$$) for formulas, invariants, transitions, and complexity expressions wherever it improves clarity. Never put mathematical notation inside code fences unless it is actual code.
 
@@ -317,7 +336,7 @@ export const generateBatchContent = task({
         customId: problem.id,
         systemPrompt: SYSTEM_PROMPT,
         userPrompt,
-        tools: [contentTool],
+        tools: [contentTool, unsolvableTool],
       };
     });
 
@@ -427,6 +446,27 @@ export const generateBatchContent = task({
       try {
         if (result.status !== "succeeded" || !result.toolCallInput) {
           throw new Error(result.error ?? "Unknown error");
+        }
+
+        if (result.toolName === "report_unsolvable") {
+          const reason =
+            (result.toolCallInput as Record<string, unknown>)?.reason ||
+            "Unknown reason";
+          logger.warn(`Problem ${label} reported as unsolvable: ${reason}`);
+
+          await prisma.problem.update({
+            where: { id: result.customId },
+            data: { generationStatus: "FAILED" },
+          });
+
+          await discordLog.trigger({
+            title: `🚫 Unsolvable Problem`,
+            description: `Model reported that problem **${label}** cannot be solved.\n**Reason:** ${reason}`,
+            color: 0xef4444, // red
+          });
+
+          failed++;
+          continue;
         }
 
         const parsed = contentSchema.parse(result.toolCallInput);

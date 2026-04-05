@@ -21,12 +21,14 @@ type OpenAIBatchLine = {
       error?: OpenAIBatchError | null;
       output?: Array<{
         type?: string;
+        name?: string;
         arguments?: string;
       }>;
       choices?: Array<{
         message?: {
           tool_calls?: Array<{
             function?: {
+              name?: string;
               arguments?: string;
             };
           }>;
@@ -84,16 +86,17 @@ function parseBatchLine(line: string): BatchResult {
     };
   }
 
-  const responseToolCallArguments = responseBody.output?.find(
+  const responseToolCall = responseBody.output?.find(
     (item) => item.type === "function_call",
-  )?.arguments;
+  );
 
-  if (responseToolCallArguments) {
+  if (responseToolCall?.arguments) {
     try {
       return {
         customId: result.custom_id,
         status: "succeeded",
-        toolCallInput: JSON.parse(responseToolCallArguments),
+        toolCallInput: JSON.parse(responseToolCall.arguments),
+        toolName: responseToolCall.name,
       };
     } catch (error) {
       return {
@@ -121,9 +124,8 @@ function parseBatchLine(line: string): BatchResult {
     };
   }
 
-  const toolCallArguments =
-    choice.message?.tool_calls?.[0]?.function?.arguments;
-  if (!toolCallArguments) {
+  const toolCall = choice.message?.tool_calls?.[0]?.function;
+  if (!toolCall?.arguments) {
     return {
       customId: result.custom_id,
       status: "failed",
@@ -135,7 +137,8 @@ function parseBatchLine(line: string): BatchResult {
     return {
       customId: result.custom_id,
       status: "succeeded",
-      toolCallInput: JSON.parse(toolCallArguments),
+      toolCallInput: JSON.parse(toolCall.arguments),
+      toolName: toolCall.name,
     };
   } catch (error) {
     return {
@@ -225,6 +228,17 @@ export class OpenAIProvider implements AIProvider {
     // GPT-5 batch models reject function tools + reasoning effort on
     // /v1/chat/completions, so use the Responses API for batch generation.
     const jsonlLines = requests.map((req) => {
+      const inputContent =
+        typeof req.userPrompt === "string"
+          ? req.userPrompt
+          : [
+              {
+                type: "message" as const,
+                role: "user" as const,
+                content: req.userPrompt,
+              },
+            ];
+
       const batchItem = {
         custom_id: req.customId,
         method: "POST" as const,
@@ -232,7 +246,7 @@ export class OpenAIProvider implements AIProvider {
         body: {
           model: modelId,
           instructions: req.systemPrompt,
-          input: req.userPrompt,
+          input: inputContent,
           tools: req.tools.map(toOpenAITool),
           tool_choice: "required" as const,
           ...(effort && { reasoning: { effort } }),

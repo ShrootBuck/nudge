@@ -122,6 +122,7 @@ export class AnthropicProvider implements AIProvider {
         customId: entry.custom_id,
         status: "succeeded",
         toolCallInput: toolUse.input,
+        toolName: toolUse.name,
       };
     }
   }
