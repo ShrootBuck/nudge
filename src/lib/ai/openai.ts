@@ -146,17 +146,54 @@ function parseBatchLine(line: string): BatchResult {
   }
 }
 
+/**
+ * Recursively enforce OpenAI strict-mode constraints on a JSON Schema:
+ * - Every object must have `additionalProperties: false`
+ * - Every object must list ALL its properties in `required`
+ *
+ * @see https://developers.openai.com/api/docs/guides/structured-outputs
+ */
+function enforceStrictSchema(
+  schema: Record<string, unknown>,
+): Record<string, unknown> {
+  const copy = { ...schema };
+
+  if (copy.type === "object" && copy.properties) {
+    const props = copy.properties as Record<string, Record<string, unknown>>;
+    copy.properties = Object.fromEntries(
+      Object.entries(props).map(([key, value]) => [
+        key,
+        enforceStrictSchema(value),
+      ]),
+    );
+    copy.additionalProperties = false;
+
+    // Strict mode requires every property to appear in `required`
+    if (!copy.required) {
+      copy.required = Object.keys(props);
+    }
+  }
+
+  if (copy.type === "array" && copy.items) {
+    copy.items = enforceStrictSchema(
+      copy.items as Record<string, unknown>,
+    );
+  }
+
+  return copy;
+}
+
 /** Convert a generic tool definition into OpenAI's function format. */
 function toOpenAITool(tool: ToolDefinition) {
   return {
     type: "function" as const,
     name: tool.name,
     description: tool.description,
-    parameters: {
+    parameters: enforceStrictSchema({
       type: "object" as const,
       properties: tool.parameters.properties,
       required: tool.parameters.required,
-    },
+    }),
     strict: true,
   };
 }
