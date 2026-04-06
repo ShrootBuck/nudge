@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { GitHubIcon } from "@/components/github-icon";
+import { NAV_LINKS } from "@/lib/nav-links";
 
 export function Footer() {
   return (
@@ -24,24 +25,15 @@ export function Footer() {
           </div>
 
           <div className="flex items-center gap-6">
-            <Link
-              href="/request"
-              className="text-sm text-muted-foreground transition hover:text-foreground"
-            >
-              Request Problem
-            </Link>
-            <Link
-              href="/about"
-              className="text-sm text-muted-foreground transition hover:text-foreground"
-            >
-              About
-            </Link>
-            <Link
-              href="/contact"
-              className="text-sm text-muted-foreground transition hover:text-foreground"
-            >
-              Contact
-            </Link>
+            {NAV_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="text-sm text-muted-foreground transition hover:text-foreground"
+              >
+                {link.label}
+              </Link>
+            ))}
             <a
               href="https://github.com/ShrootBuck/nudge"
               target="_blank"

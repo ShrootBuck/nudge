@@ -5,14 +5,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { GitHubIcon } from "@/components/github-icon";
+import { NAV_LINKS } from "@/lib/nav-links";
 import { cn } from "@/lib/utils";
-
-const NAV_LINKS = [
-  { href: "/", label: "Problems" },
-  { href: "/request", label: "Request Problem" },
-  { href: "/about", label: "About" },
-  { href: "/contact", label: "Contact" },
-];
 
 export function Navbar() {
   const pathname = usePathname();
