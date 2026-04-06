@@ -35,11 +35,11 @@ function isValidProblem(problem: CFProblem) {
   );
 }
 
-// Runs weekly at midnight Phoenix time (America/Phoenix = MST, no DST)
+// Runs daily at midnight Phoenix time (America/Phoenix = MST, no DST)
 export const syncProblems = schedules.task({
   id: "sync-problems",
   cron: {
-    pattern: "0 0 * * 0", // midnight every Sunday
+    pattern: "0 0 * * *", // midnight daily
     timezone: "America/Phoenix",
   },
   run: async () => {
