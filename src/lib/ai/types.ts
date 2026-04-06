@@ -45,12 +45,12 @@ export type BatchStatus = "processing" | "ended" | "failed";
  * and parsing vendor-specific responses back into a common format.
  */
 export interface AIProvider {
-  /** Unique identifier matching the `provider` column in ModelConfig (e.g. "anthropic"). */
+  /** Unique identifier matching the `provider` column in ProviderModel (e.g. "anthropic"). */
   readonly id: string;
 
   /**
    * Submit a batch of requests for processing.
-   * @param effort Optional reasoning-effort level (provider-native string, e.g. "low" | "medium" | "high").
+   * @param effort Optional reasoning-effort level (provider-native string, e.g. "low" | "medium" | "high" | "max").
    * @returns An opaque batch ID for polling and result retrieval.
    */
   createBatch(

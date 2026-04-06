@@ -5,7 +5,7 @@ import type { RunState } from "@/lib/problem-pipeline";
 export type ReviewStatus =
   | "UNREVIEWED"
   | "VERIFIED"
-  | "SOLUTION_INCORRECT"
+  | "INCORRECT"
   | "UNSOLVABLE";
 
 export type ReviewOutcome = Exclude<ReviewStatus, "UNREVIEWED">;
@@ -105,7 +105,7 @@ export function reviewState(status: ReviewStatus): ReviewState {
           "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200",
         summary: "Marked verified and safer to trust heavily.",
       };
-    case "SOLUTION_INCORRECT":
+    case "INCORRECT":
       return {
         icon: X,
         label: "Solution incorrect",
@@ -145,7 +145,7 @@ export function solutionSectionDescription(reviewStatus: ReviewStatus) {
   switch (reviewStatus) {
     case "VERIFIED":
       return "This is the full implementation that was manually checked.";
-    case "SOLUTION_INCORRECT":
+    case "INCORRECT":
       return "This implementation is currently marked incorrect. Open it if you want to inspect what went wrong.";
     case "UNSOLVABLE":
       return "This problem is currently unsolvable by AI. The implementation below may not be correct.";

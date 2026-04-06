@@ -15,15 +15,17 @@ import { cn } from "@/lib/utils";
 import {
   addModelConfig,
   deleteModelConfig,
-  type ModelConfig,
+  type ProviderModel,
   setActiveModel,
 } from "./actions";
+
+const PROVIDER_OPTIONS = ["anthropic", "openai"] as const;
 
 // ---------------------------------------------------------------------------
 // Root
 // ---------------------------------------------------------------------------
 
-export function ProviderPanel({ initial }: { initial: ModelConfig[] }) {
+export function ProviderPanel({ initial }: { initial: ProviderModel[] }) {
   const [configs, setConfigs] = useState(initial);
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -120,7 +122,7 @@ function ConfigCard({
   onActivated,
   onDeleted,
 }: {
-  config: ModelConfig;
+  config: ProviderModel;
   password: string;
   onError: (msg: string) => void;
   onActivated: (id: string) => void;
@@ -195,11 +197,6 @@ function ConfigCard({
             </p>
             <p className="mt-0.5 font-mono text-xs text-muted-foreground">
               {config.provider}/{config.modelId}
-              {config.effort && (
-                <span className="ml-2 rounded-md border border-border/50 bg-background/60 px-1.5 py-0.5 font-sans text-[10px] tracking-wide text-muted-foreground/80">
-                  effort: {config.effort}
-                </span>
-              )}
             </p>
           </div>
         </div>
@@ -253,13 +250,12 @@ function AddConfigForm({
 }: {
   password: string;
   onError: (msg: string) => void;
-  onAdded: (cfg: ModelConfig) => void;
+  onAdded: (cfg: ProviderModel) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [provider, setProvider] = useState("");
+  const [provider, setProvider] = useState<string>("anthropic");
   const [modelId, setModelId] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [effort, setEffort] = useState("");
   const [isPending, startTransition] = useTransition();
 
   function handleSubmit(e: React.FormEvent) {
@@ -276,7 +272,6 @@ function AddConfigForm({
           provider,
           modelId,
           displayName,
-          effort: effort || undefined,
         });
 
         if (result.success) {
@@ -285,13 +280,11 @@ function AddConfigForm({
             provider: provider.trim().toLowerCase(),
             modelId: modelId.trim(),
             displayName: displayName.trim(),
-            effort: effort.trim() || null,
             isActive: false,
           });
-          setProvider("");
+          setProvider("anthropic");
           setModelId("");
           setDisplayName("");
-          setEffort("");
           setOpen(false);
         } else {
           onError(result.error);
@@ -333,13 +326,20 @@ function AddConfigForm({
           >
             Provider
           </label>
-          <Input
+          <select
             id="new-provider"
             value={provider}
-            onChange={(e) => setProvider(e.target.value)}
-            placeholder="anthropic"
+            onChange={(e) => {
+              setProvider(e.target.value);
+            }}
             className={inputClass}
-          />
+          >
+            {PROVIDER_OPTIONS.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
         </div>
 
         <div>
@@ -370,25 +370,6 @@ function AddConfigForm({
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
             placeholder="Claude Opus 4.6"
-            className={inputClass}
-          />
-        </div>
-
-        <div>
-          <label
-            htmlFor="new-effort"
-            className="mb-1.5 block text-xs font-semibold tracking-[0.18em] text-muted-foreground uppercase"
-          >
-            Effort{" "}
-            <span className="normal-case tracking-normal text-muted-foreground/60">
-              (optional)
-            </span>
-          </label>
-          <Input
-            id="new-effort"
-            value={effort}
-            onChange={(e) => setEffort(e.target.value)}
-            placeholder="high"
             className={inputClass}
           />
         </div>

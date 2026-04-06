@@ -375,9 +375,9 @@ export function ReviewSection({
                 variant="outline"
                 disabled={isPending || !password}
                 className="h-10 w-full rounded-xl border-rose-500/20 bg-rose-500/10 px-4 text-rose-200 shadow-sm hover:bg-rose-500/15 hover:text-rose-100 disabled:border-rose-500/10 disabled:bg-rose-500/10 disabled:text-rose-200/55 sm:w-auto"
-                onClick={() => handleReview("SOLUTION_INCORRECT")}
+                onClick={() => handleReview("INCORRECT")}
               >
-                {pendingStatus === "SOLUTION_INCORRECT"
+                {pendingStatus === "INCORRECT"
                   ? "Marking..."
                   : "Mark incorrect"}
               </Button>

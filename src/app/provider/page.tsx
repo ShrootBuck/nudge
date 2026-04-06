@@ -1,7 +1,7 @@
 import { Cpu } from "lucide-react";
 import type { Metadata } from "next";
 import { connection } from "next/server";
-import { listModelConfigs } from "./actions";
+import { listProviderModels } from "./actions";
 import { ProviderPanel } from "./provider-panel";
 
 export const metadata: Metadata = {
@@ -11,7 +11,7 @@ export const metadata: Metadata = {
 
 export default async function ProviderPage() {
   await connection();
-  const configs = await listModelConfigs();
+  const configs = await listProviderModels();
 
   return (
     <main className="min-h-screen pb-16">

@@ -9,11 +9,7 @@ import {
   problemUpdateData,
 } from "@/lib/problem-pipeline-db";
 
-const REVIEW_STATUSES = [
-  "VERIFIED",
-  "SOLUTION_INCORRECT",
-  "UNSOLVABLE",
-] as const;
+const REVIEW_STATUSES = ["VERIFIED", "INCORRECT", "UNSOLVABLE"] as const;
 
 type ReviewStatus = (typeof REVIEW_STATUSES)[number];
 
@@ -51,7 +47,7 @@ export async function setProblemReviewStatus(
   const link = `${SITE_URL}/problem/${problem.contestId}/${problem.index}`;
   const logConfig = {
     VERIFIED: { title: "✅ Problem Verified", color: DISCORD_COLORS.success },
-    SOLUTION_INCORRECT: {
+    INCORRECT: {
       title: "⚠️ Marked Incorrect",
       color: DISCORD_COLORS.warning,
     },
@@ -121,7 +117,6 @@ export async function queueRegeneration(problemId: string, password: string) {
       generationAttempts: 0,
       reviewStatus: "UNREVIEWED",
       requestedCount: 1,
-      requestedAt: new Date(),
       activeBatchId: null,
       processingStartedAt: null,
       lastGenerationError: null,

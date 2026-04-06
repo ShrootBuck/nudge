@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { normalizeEffort, validateEffortForProvider } from "./effort";
 import type {
   AIProvider,
   BatchRequest,
@@ -6,9 +7,23 @@ import type {
   BatchStatus,
 } from "./types";
 
+type OpenAIEffort = "none" | "low" | "medium" | "high" | "xhigh";
+
 type OpenAIBatchError = {
   code?: string;
   message?: string;
+};
+
+type OpenAIBatchOutputMessageContent = {
+  type?: string;
+  text?: string;
+  refusal?: string;
+};
+
+type OpenAIBatchOutputItem = {
+  type?: string;
+  text?: string;
+  content?: OpenAIBatchOutputMessageContent[];
 };
 
 type OpenAIBatchLine = {
@@ -18,21 +33,31 @@ type OpenAIBatchLine = {
     status_code?: number;
     body?: {
       error?: OpenAIBatchError | null;
+      status?: string;
+      incomplete_details?: {
+        reason?: string;
+      } | null;
       output_text?: string;
-      output?: Array<{
-        type?: string;
-        text?: string;
-        name?: string;
-        arguments?: string;
-      }>;
-      choices?: Array<{
-        message?: {
-          content?: string;
-        };
-      }>;
+      output?: OpenAIBatchOutputItem[];
     } | null;
   } | null;
 };
+
+function parseOpenAIEffort(
+  effort: string | undefined,
+): OpenAIEffort | undefined {
+  const normalizedEffort = normalizeEffort(effort);
+  if (!normalizedEffort) {
+    return undefined;
+  }
+
+  const validation = validateEffortForProvider("openai", normalizedEffort);
+  if (!validation.ok) {
+    throw new Error(validation.error);
+  }
+
+  return validation.effort as OpenAIEffort;
+}
 
 function formatOpenAIBatchError(
   error: OpenAIBatchError | null | undefined,
@@ -45,6 +70,45 @@ function formatOpenAIBatchError(
   return error.code
     ? `${error.code}: ${error.message ?? fallback}`
     : (error.message ?? fallback);
+}
+
+function extractOutputText(
+  body: NonNullable<OpenAIBatchLine["response"]>["body"],
+) {
+  if (!body) {
+    return null;
+  }
+
+  if (
+    typeof body.output_text === "string" &&
+    body.output_text.trim().length > 0
+  ) {
+    return body.output_text;
+  }
+
+  for (const item of body.output ?? []) {
+    if (
+      (item.type === "output_text" || item.type === "text") &&
+      typeof item.text === "string" &&
+      item.text.trim().length > 0
+    ) {
+      return item.text;
+    }
+
+    if (item.type === "message") {
+      for (const contentItem of item.content ?? []) {
+        if (
+          contentItem.type === "output_text" &&
+          typeof contentItem.text === "string" &&
+          contentItem.text.trim().length > 0
+        ) {
+          return contentItem.text;
+        }
+      }
+    }
+  }
+
+  return null;
 }
 
 function parseBatchLine(line: string): BatchResult {
@@ -82,19 +146,7 @@ function parseBatchLine(line: string): BatchResult {
     };
   }
 
-  // Responses API returns output_text or an output array
-  let jsonString = responseBody.output_text;
-  if (!jsonString && responseBody.output) {
-    const textOutput = responseBody.output.find((item) => item.type === "text");
-    if (textOutput?.text) {
-      jsonString = textOutput.text;
-    }
-  }
-
-  // Chat Completions API fallback
-  if (!jsonString && responseBody.choices?.[0]?.message?.content) {
-    jsonString = responseBody.choices[0].message.content;
-  }
+  const jsonString = extractOutputText(responseBody);
 
   if (jsonString) {
     try {
@@ -112,10 +164,22 @@ function parseBatchLine(line: string): BatchResult {
     }
   }
 
+  if (
+    responseBody.status === "incomplete" &&
+    responseBody.incomplete_details?.reason === "max_output_tokens"
+  ) {
+    return {
+      customId: result.custom_id,
+      status: "failed",
+      error:
+        "Response incomplete (max_output_tokens): likely exhausted reasoning/output budget before final JSON",
+    };
+  }
+
   return {
     customId: result.custom_id,
     status: "failed",
-    error: "No text content in response output",
+    error: `No text content in response output${responseBody.status ? ` (status ${responseBody.status})` : ""}`,
   };
 }
 
@@ -186,6 +250,8 @@ export class OpenAIProvider implements AIProvider {
     requests: BatchRequest[],
     effort?: string,
   ): Promise<string> {
+    const parsedEffort = parseOpenAIEffort(effort);
+
     const jsonlLines = requests.map((req) => {
       const inputContent =
         typeof req.userPrompt === "string"
@@ -227,7 +293,7 @@ export class OpenAIProvider implements AIProvider {
             },
           },
           max_output_tokens: 128000,
-          ...(effort && { reasoning: { effort } }),
+          ...(parsedEffort ? { reasoning: { effort: parsedEffort } } : {}),
         },
       };
       return JSON.stringify(batchItem);

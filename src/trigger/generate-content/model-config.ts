@@ -1,9 +1,9 @@
 import { prisma } from "../../lib/prisma";
 
 export async function getActiveModelConfig() {
-  const activeConfigs = await prisma.modelConfig.findMany({
+  const activeConfigs = await prisma.providerModel.findMany({
     where: { isActive: true },
-    orderBy: { updatedAt: "desc" },
+    orderBy: { createdAt: "desc" },
     take: 2,
   });
 

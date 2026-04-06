@@ -20,7 +20,7 @@ function listableWhere(): Prisma.ProblemWhereInput {
   return problemWhere({
     AND: [
       completedContentWhere(),
-      { reviewStatus: { notIn: ["UNSOLVABLE", "SOLUTION_INCORRECT"] } },
+      { reviewStatus: { notIn: ["UNSOLVABLE", "INCORRECT"] } },
     ],
   });
 }

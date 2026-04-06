@@ -68,7 +68,7 @@ export const backfill = task({
       select: { id: true },
       orderBy: [
         { requestedCount: "desc" },
-        { requestedAt: "desc" },
+        { updatedAt: "desc" },
         { contestId: "desc" },
       ] as unknown as Prisma.ProblemOrderByWithRelationInput[],
       take: limit,

@@ -1,10 +1,39 @@
 import Anthropic from "@anthropic-ai/sdk";
+import { normalizeEffort, validateEffortForProvider } from "./effort";
 import type {
   AIProvider,
   BatchRequest,
   BatchResult,
   BatchStatus,
 } from "./types";
+
+const ANTHROPIC_OUTPUT_300K_BETA = "output-300k-2026-03-24";
+const ANTHROPIC_BATCH_MAX_TOKENS = 300000;
+
+type AnthropicEffort = "low" | "medium" | "high" | "max";
+
+function parseAnthropicEffort(
+  effort: string | undefined,
+  modelId: string,
+): AnthropicEffort | undefined {
+  const normalizedEffort = normalizeEffort(effort);
+  if (!normalizedEffort) {
+    return undefined;
+  }
+
+  const validation = validateEffortForProvider("anthropic", normalizedEffort);
+  if (!validation.ok) {
+    throw new Error(validation.error);
+  }
+
+  if (validation.effort === "max" && !modelId.includes("opus-4-6")) {
+    throw new Error(
+      `Effort "max" is only supported on Claude Opus 4.6 (model: ${modelId}).`,
+    );
+  }
+
+  return validation.effort as AnthropicEffort;
+}
 
 function enforceStructuredSchema(
   schema: Record<string, unknown>,
@@ -57,48 +86,55 @@ export class AnthropicProvider implements AIProvider {
     requests: BatchRequest[],
     effort?: string,
   ): Promise<string> {
-    const batch = await this.getClient().messages.batches.create({
-      requests: requests.map((req) => ({
-        custom_id: req.customId,
-        params: {
-          model: modelId,
-          max_tokens: 128000,
-          thinking: {
-            type: "adaptive" as const,
-            ...(effort && {
-              effort: effort as "low" | "medium" | "high",
-            }),
-          },
-          system: req.systemPrompt,
-          messages: [
-            {
-              role: "user" as const,
-              content:
-                typeof req.userPrompt === "string"
-                  ? req.userPrompt
-                  : req.userPrompt.map((item) => {
-                      if (item.type === "image_url" && item.image_url) {
-                        return {
-                          type: "image" as const,
-                          source: {
-                            type: "url" as const,
-                            url: item.image_url.url,
-                          },
-                        };
-                      }
-                      return { type: "text" as const, text: item.text || "" };
-                    }),
+    const parsedEffort = parseAnthropicEffort(effort, modelId);
+
+    const batch = await this.getClient().messages.batches.create(
+      {
+        requests: requests.map((req) => ({
+          custom_id: req.customId,
+          params: {
+            model: modelId,
+            max_tokens: ANTHROPIC_BATCH_MAX_TOKENS,
+            thinking: {
+              type: "adaptive" as const,
             },
-          ],
-          output_config: {
-            format: {
-              type: "json_schema" as const,
-              schema: enforceStructuredSchema(req.outputSchema.schema),
+            system: req.systemPrompt,
+            messages: [
+              {
+                role: "user" as const,
+                content:
+                  typeof req.userPrompt === "string"
+                    ? req.userPrompt
+                    : req.userPrompt.map((item) => {
+                        if (item.type === "image_url" && item.image_url) {
+                          return {
+                            type: "image" as const,
+                            source: {
+                              type: "url" as const,
+                              url: item.image_url.url,
+                            },
+                          };
+                        }
+                        return { type: "text" as const, text: item.text || "" };
+                      }),
+              },
+            ],
+            output_config: {
+              ...(parsedEffort ? { effort: parsedEffort } : {}),
+              format: {
+                type: "json_schema" as const,
+                schema: enforceStructuredSchema(req.outputSchema.schema),
+              },
             },
           },
+        })),
+      },
+      {
+        headers: {
+          "anthropic-beta": ANTHROPIC_OUTPUT_300K_BETA,
         },
-      })),
-    });
+      },
+    );
 
     return batch.id;
   }
@@ -139,11 +175,20 @@ export class AnthropicProvider implements AIProvider {
         .join("")
         .trim();
 
+      const stopReason = entry.result.message.stop_reason ?? "unknown";
+      const outputTokens = entry.result.message.usage?.output_tokens;
+
       if (!textContent) {
         yield {
           customId: entry.custom_id,
           status: "failed",
-          error: `No text block in response (stop_reason ${entry.result.message.stop_reason ?? "unknown"})`,
+          error:
+            `No text block in response (stop_reason ${stopReason}` +
+            (outputTokens ? `, output_tokens ${outputTokens}` : "") +
+            (stopReason === "max_tokens"
+              ? "; likely exhausted output tokens before final JSON"
+              : "") +
+            ")",
         };
         continue;
       }
@@ -158,7 +203,7 @@ export class AnthropicProvider implements AIProvider {
         yield {
           customId: entry.custom_id,
           status: "failed",
-          error: `Invalid JSON output (${entry.result.message.stop_reason ?? "unknown"}): ${error instanceof Error ? error.message : String(error)}`,
+          error: `Invalid JSON output (${stopReason}): ${error instanceof Error ? error.message : String(error)}`,
         };
       }
     }

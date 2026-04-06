@@ -134,7 +134,6 @@ export async function requestProblem(_prevState: unknown, formData: FormData) {
             currentRequestedCount + 1,
             MAX_REQUESTED_COUNT,
           ),
-          requestedAt: new Date(),
         }),
       });
 

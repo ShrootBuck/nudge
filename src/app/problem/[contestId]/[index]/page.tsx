@@ -39,7 +39,7 @@ export default async function ProblemPage({
   // Resolve the human-readable model name for display
   let modelDisplayName: string | null = null;
   if (problem.generatedByProvider && problem.generatedByModel) {
-    const config = await prisma.modelConfig.findUnique({
+    const config = await prisma.providerModel.findUnique({
       where: {
         provider_modelId: {
           provider: problem.generatedByProvider,

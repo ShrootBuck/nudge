@@ -161,7 +161,7 @@ export function ProblemContentBody({ problem }: { problem: ProblemView }) {
           </section>
         )}
 
-        {hasContent && problem.reviewStatus === "SOLUTION_INCORRECT" && (
+        {hasContent && problem.reviewStatus === "INCORRECT" && (
           <section
             className={`mt-8 rounded-[1.75rem] border px-6 py-6 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] ${review.panelClassName}`}
           >

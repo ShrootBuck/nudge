@@ -9,12 +9,11 @@ import { prisma } from "@/lib/prisma";
 // Types
 // ---------------------------------------------------------------------------
 
-export type ModelConfig = {
+export type ProviderModel = {
   id: string;
   provider: string;
   modelId: string;
   displayName: string;
-  effort: string | null;
   isActive: boolean;
 };
 
@@ -22,9 +21,9 @@ export type ModelConfig = {
 // Read (no password needed)
 // ---------------------------------------------------------------------------
 
-export async function listModelConfigs(): Promise<ModelConfig[]> {
-  const configs = await prisma.modelConfig.findMany({
-    orderBy: [{ isActive: "desc" }, { updatedAt: "desc" }],
+export async function listProviderModels(): Promise<ProviderModel[]> {
+  const configs = await prisma.providerModel.findMany({
+    orderBy: [{ isActive: "desc" }, { createdAt: "desc" }],
   });
 
   return configs.map((c) => ({
@@ -32,7 +31,6 @@ export async function listModelConfigs(): Promise<ModelConfig[]> {
     provider: c.provider,
     modelId: c.modelId,
     displayName: c.displayName,
-    effort: c.effort,
     isActive: c.isActive,
   }));
 }
@@ -58,7 +56,7 @@ export async function setActiveModel(password: string, configId: string) {
   const denied = auth(password);
   if (denied) return denied;
 
-  const config = await prisma.modelConfig.findUnique({
+  const config = await prisma.providerModel.findUnique({
     where: { id: configId },
   });
 
@@ -67,11 +65,11 @@ export async function setActiveModel(password: string, configId: string) {
   }
 
   await prisma.$transaction([
-    prisma.modelConfig.updateMany({
+    prisma.providerModel.updateMany({
       where: { isActive: true },
       data: { isActive: false },
     }),
-    prisma.modelConfig.update({
+    prisma.providerModel.update({
       where: { id: configId },
       data: { isActive: true },
     }),
@@ -95,7 +93,6 @@ export async function addModelConfig(
     provider: string;
     modelId: string;
     displayName: string;
-    effort?: string;
   },
 ) {
   const denied = auth(password);
@@ -104,13 +101,18 @@ export async function addModelConfig(
   const provider = data.provider.trim().toLowerCase();
   const modelId = data.modelId.trim();
   const displayName = data.displayName.trim();
-  const effort = data.effort?.trim() || null;
-
   if (!provider || !modelId || !displayName) {
     return { success: false, error: "All fields are required" } as const;
   }
 
-  const existing = await prisma.modelConfig.findUnique({
+  if (provider !== "anthropic" && provider !== "openai") {
+    return {
+      success: false,
+      error: `Unsupported provider "${provider}". Supported providers: anthropic, openai`,
+    } as const;
+  }
+
+  const existing = await prisma.providerModel.findUnique({
     where: { provider_modelId: { provider, modelId } },
   });
 
@@ -121,14 +123,18 @@ export async function addModelConfig(
     } as const;
   }
 
-  const created = await prisma.modelConfig.create({
-    data: { provider, modelId, displayName, effort, isActive: false },
+  const created = await prisma.providerModel.create({
+    data: {
+      provider,
+      modelId,
+      displayName,
+      isActive: false,
+    },
   });
 
-  const effortText = effort ? ` (effort: ${effort})` : "";
   await sendAdminLog({
     title: "➕ Model Added",
-    description: `**${displayName}**\n${provider}/${modelId}${effortText}`,
+    description: `**${displayName}**\n${provider}/${modelId}`,
     color: DISCORD_COLORS.violet,
   });
 
@@ -143,7 +149,7 @@ export async function deleteModelConfig(password: string, configId: string) {
   const denied = auth(password);
   if (denied) return denied;
 
-  const config = await prisma.modelConfig.findUnique({
+  const config = await prisma.providerModel.findUnique({
     where: { id: configId },
   });
 
@@ -159,7 +165,7 @@ export async function deleteModelConfig(password: string, configId: string) {
     } as const;
   }
 
-  await prisma.modelConfig.delete({ where: { id: configId } });
+  await prisma.providerModel.delete({ where: { id: configId } });
 
   await sendAdminLog({
     title: "🗑️ Model Deleted",

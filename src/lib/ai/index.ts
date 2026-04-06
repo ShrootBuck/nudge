@@ -18,7 +18,7 @@ register(new OpenAIProvider());
 
 /**
  * Look up a registered AI provider by its ID.
- * The ID must match the `provider` column stored in `ModelConfig`.
+ * The ID must match the `provider` column stored in `ProviderModel`.
  *
  * @throws If no provider is registered under that ID.
  */

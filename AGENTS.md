@@ -12,6 +12,14 @@ Nudge is a read-only platform for Codeforces competitive programming problems. I
 
 USE BUN ALWAYS, NEVER NPM SLUDGE!
 
+## AI Provider Policy (No Legacy)
+
+- OpenAI and Anthropic integrations must use only current, future-proof APIs and model patterns.
+- Do not add or keep legacy/deprecated endpoints, parameters, response parsing paths, or model compatibility shims.
+- OpenAI must use Responses/Batches patterns for generation flows; do not use Chat Completions or legacy completions paths.
+- Anthropic must use current Messages/Batches patterns and current reasoning/effort controls; do not use legacy reasoning controls.
+- If a provider API changes, migrate forward immediately instead of adding backward-compatibility fallbacks.
+
 ## Future Ideas
 
 - **Multi-language solutions**: Currently C++ only. Could support Python, Java, etc. Would need schema changes (multiple solutions per problem, each with a `language` field) and UI for language switching.

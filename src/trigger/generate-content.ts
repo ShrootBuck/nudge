@@ -1,6 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import { logger, schedules, task, wait } from "@trigger.dev/sdk";
 import { type BatchRequest, getProvider } from "../lib/ai";
+import { buildEffortPlanForProvider } from "../lib/ai/effort";
 import { DISCORD_COLORS } from "../lib/discord-webhook";
 import { prisma } from "../lib/prisma";
 import {
@@ -159,10 +160,12 @@ export const generateBatchContent = task({
 
     const modelConfig = await getActiveModelConfig();
     const provider = getProvider(modelConfig.provider);
+    const effortPlan = buildEffortPlanForProvider(modelConfig.provider);
+    const selectedEffort = effortPlan[0];
 
     logger.info(
       `Using provider "${modelConfig.provider}" / model "${modelConfig.modelId}" (${modelConfig.displayName})` +
-        (modelConfig.effort ? ` [effort=${modelConfig.effort}]` : ""),
+        (selectedEffort ? ` [effort=${selectedEffort}]` : ""),
     );
 
     const problems = await prisma.problem.findMany({
@@ -207,161 +210,300 @@ export const generateBatchContent = task({
       problemMap.set(problem.id, problem);
     }
 
-    logger.info(`Creating batch with ${problems.length} requests`);
-    const requests = await buildBatchRequests(problems);
-
-    let batchId: string;
-    try {
-      batchId = await provider.createBatch(
-        modelConfig.modelId,
-        requests,
-        modelConfig.effort ?? undefined,
-      );
-    } catch (error) {
-      const reason = `Batch creation failed: ${toErrorMessage(error)}`;
-      logger.error(reason);
-
-      await markProblemsFailed(foundProblemIds, reason);
-      throw error;
-    }
-
-    await prisma.problem.updateMany({
-      where: problemWhere({ id: { in: foundProblemIds } }),
-      data: problemUpdateManyData({
-        ...pipelineStateData("READY", "RUNNING"),
-        generationAttempts: { increment: 1 },
-        activeBatchId: batchId,
-        processingStartedAt: new Date(),
-        lastGenerationError: null,
-      }),
-    });
-
     logger.info(
-      `Batch ${batchId} submitted (${problems.length} problems), polling hourly`,
+      `Creating batch request payload for ${problems.length} problems`,
     );
-
-    await discordLog.trigger({
-      title: "📦 Batch Started",
-      description: `**${problems.length}** problems submitted via **${modelConfig.displayName}**\n${toBatchSample(problems)}`,
-      color: DISCORD_COLORS.info,
-      fields: [
-        { name: "Batch ID", value: `\`${batchId}\``, inline: true },
-        {
-          name: "Provider",
-          value: `${modelConfig.provider}/${modelConfig.modelId}`,
-          inline: true,
-        },
-      ],
-    });
-
-    let batchEnded = false;
-
-    for (let attempt = 1; attempt <= BATCH_POLL_MAX_CHECKS; attempt++) {
-      await wait.for({ hours: BATCH_POLL_INTERVAL_HOURS });
-
-      const status = await provider.checkBatchStatus(batchId);
-      logger.info(
-        `Batch ${batchId} check ${attempt}/${BATCH_POLL_MAX_CHECKS}: ${status}`,
-      );
-
-      if (status === "ended") {
-        batchEnded = true;
-        break;
-      }
-
-      if (status === "failed") {
-        logger.error(`Batch ${batchId} reported failure`);
-        break;
-      }
-    }
-
-    if (!batchEnded) {
-      const reason = `Batch ${batchId} did not complete successfully`;
-      const failedCount = await markProblemsFailed(foundProblemIds, reason);
-
-      await discordLog.trigger({
-        title: "❌ Batch Incomplete",
-        description: `Batch \`${batchId}\` failed or timed out.\n**${failedCount}** problems marked FAILED.`,
-        color: DISCORD_COLORS.error,
-      });
-
-      throw new Error(
-        `Batch ${batchId} not completed after ${BATCH_POLL_MAX_CHECKS} checks`,
-      );
-    }
-
+    const requests = await buildBatchRequests(problems);
+    const requestsById = new Map(
+      requests.map((request) => [request.customId, request]),
+    );
+    const batchesUsed: string[] = [];
     const modelInfo: ModelInfo = {
       provider: modelConfig.provider,
       modelId: modelConfig.modelId,
     };
 
+    logger.info(
+      `Effort plan: ${effortPlan.map((effort) => effort ?? "default").join(" -> ")}`,
+    );
+
     let succeeded = 0;
     let failed = 0;
-    const pendingResultIds = new Set(foundProblemIds);
+    let latestBatchId: string | null = null;
+    const pendingIds = new Set(foundProblemIds);
+    const lastErrorByProblemId = new Map<string, string>();
 
-    try {
-      for await (const result of provider.getBatchResults(batchId)) {
-        pendingResultIds.delete(result.customId);
+    for (let effortIndex = 0; effortIndex < effortPlan.length; effortIndex++) {
+      if (pendingIds.size === 0) {
+        break;
+      }
 
-        const problem = problemMap.get(result.customId);
-        const label = problem ? toProblemLabel(problem) : result.customId;
+      const effortForAttempt = effortPlan[effortIndex];
+      const hasNextAttempt = effortIndex < effortPlan.length - 1;
+      const attemptProblemIds = [...pendingIds];
+      const attemptRequests = attemptProblemIds
+        .map((id) => requestsById.get(id))
+        .filter((request): request is BatchRequest => Boolean(request));
 
-        if (!problem) {
+      if (attemptRequests.length === 0) {
+        break;
+      }
+
+      logger.info(
+        `Submitting batch attempt ${effortIndex + 1}/${effortPlan.length} for ${attemptRequests.length} problems` +
+          (effortForAttempt ? ` [effort=${effortForAttempt}]` : ""),
+      );
+
+      let batchId: string;
+      try {
+        batchId = await provider.createBatch(
+          modelConfig.modelId,
+          attemptRequests,
+          effortForAttempt,
+        );
+      } catch (error) {
+        const reason = `Batch creation failed${effortForAttempt ? ` (effort ${effortForAttempt})` : ""}: ${toErrorMessage(error)}`;
+        logger.error(reason);
+
+        for (const id of attemptProblemIds) {
+          lastErrorByProblemId.set(id, reason);
+        }
+
+        if (hasNextAttempt) {
           logger.warn(
-            `Batch ${batchId} returned unknown customId ${result.customId}`,
+            `Retrying ${attemptProblemIds.length} problems at lower effort after batch creation failure`,
           );
           continue;
         }
 
-        try {
-          if (result.status !== "succeeded" || !result.output) {
-            throw new Error(result.error ?? "Unknown provider error");
-          }
+        const failedCount = await markProblemsFailed(attemptProblemIds, reason);
+        failed += failedCount;
+        pendingIds.clear();
+        break;
+      }
 
-          const outputData = result.output as Record<string, unknown>;
+      latestBatchId = batchId;
+      batchesUsed.push(batchId);
 
-          if (outputData.status === "unsolvable") {
-            const reason =
-              typeof outputData.reason === "string" && outputData.reason.trim()
-                ? outputData.reason
-                : "Unknown reason";
+      await prisma.problem.updateMany({
+        where: problemWhere({ id: { in: attemptProblemIds } }),
+        data: problemUpdateManyData({
+          ...pipelineStateData("READY", "RUNNING"),
+          ...(effortIndex === 0
+            ? { generationAttempts: { increment: 1 } }
+            : {}),
+          activeBatchId: batchId,
+          processingStartedAt: new Date(),
+          lastGenerationError: null,
+        }),
+      });
 
-            logger.warn(`Problem ${label} reported as unsolvable: ${reason}`);
+      logger.info(
+        `Batch ${batchId} submitted (${attemptRequests.length} problems), polling hourly`,
+      );
 
-            await prisma.problem.update({
-              where: { id: result.customId },
-              data: problemUpdateData({
-                ...pipelineStateData("READY", "SUCCEEDED"),
-                reviewStatus: "UNSOLVABLE",
-                activeBatchId: null,
-                processingStartedAt: null,
-                lastGenerationError: null,
-              }),
-            });
+      if (effortIndex === 0) {
+        await discordLog.trigger({
+          title: "📦 Batch Started",
+          description: `**${problems.length}** problems submitted via **${modelConfig.displayName}**\n${toBatchSample(problems)}`,
+          color: DISCORD_COLORS.info,
+          fields: [
+            { name: "Batch ID", value: `\`${batchId}\``, inline: true },
+            {
+              name: "Provider",
+              value: `${modelConfig.provider}/${modelConfig.modelId}`,
+              inline: true,
+            },
+          ],
+        });
+      }
 
-            await discordLog.trigger({
-              title: "🚫 Unsolvable Problem",
-              description: `Model reported that problem **${label}** cannot be solved.\n**Reason:** ${reason}`,
-              color: DISCORD_COLORS.error,
-            });
+      let batchEnded = false;
 
-            failed++;
+      for (let attempt = 1; attempt <= BATCH_POLL_MAX_CHECKS; attempt++) {
+        await wait.for({ hours: BATCH_POLL_INTERVAL_HOURS });
+
+        const status = await provider.checkBatchStatus(batchId);
+        logger.info(
+          `Batch ${batchId} check ${attempt}/${BATCH_POLL_MAX_CHECKS}: ${status}`,
+        );
+
+        if (status === "ended") {
+          batchEnded = true;
+          break;
+        }
+
+        if (status === "failed") {
+          logger.error(`Batch ${batchId} reported failure`);
+          break;
+        }
+      }
+
+      if (!batchEnded) {
+        const reason = `Batch ${batchId} did not complete successfully`;
+        for (const id of attemptProblemIds) {
+          lastErrorByProblemId.set(id, reason);
+        }
+
+        if (hasNextAttempt) {
+          logger.warn(
+            `Batch ${batchId} incomplete, retrying ${attemptProblemIds.length} problems at lower effort`,
+          );
+          continue;
+        }
+
+        const failedCount = await markProblemsFailed(attemptProblemIds, reason);
+        failed += failedCount;
+        for (const id of attemptProblemIds) {
+          pendingIds.delete(id);
+        }
+        break;
+      }
+
+      const pendingResultIds = new Set(attemptProblemIds);
+      const retryProblemIds = new Set<string>();
+
+      try {
+        for await (const result of provider.getBatchResults(batchId)) {
+          pendingResultIds.delete(result.customId);
+
+          const problem = problemMap.get(result.customId);
+          const label = problem ? toProblemLabel(problem) : result.customId;
+
+          if (!problem || !pendingIds.has(result.customId)) {
+            logger.warn(
+              `Batch ${batchId} returned unknown customId ${result.customId}`,
+            );
             continue;
           }
 
-          const parsed = contentSchema.parse(outputData);
-          await saveProblemContent(result.customId, parsed, modelInfo);
+          try {
+            if (result.status !== "succeeded" || !result.output) {
+              throw new Error(result.error ?? "Unknown provider error");
+            }
 
-          succeeded++;
-          logger.info(`Saved content for ${label}`);
-        } catch (error) {
-          failed++;
-          const reason = `Failed to process result for ${label}: ${toErrorMessage(error)}`;
+            const outputData = result.output as Record<string, unknown>;
 
-          logger.error(reason);
+            if (outputData.status === "unsolvable") {
+              const reason =
+                typeof outputData.reason === "string" &&
+                outputData.reason.trim()
+                  ? outputData.reason
+                  : "Unknown reason";
 
-          await prisma.problem.update({
-            where: { id: result.customId },
+              logger.warn(`Problem ${label} reported as unsolvable: ${reason}`);
+
+              await prisma.problem.update({
+                where: { id: result.customId },
+                data: problemUpdateData({
+                  ...pipelineStateData("READY", "SUCCEEDED"),
+                  reviewStatus: "UNSOLVABLE",
+                  activeBatchId: null,
+                  processingStartedAt: null,
+                  lastGenerationError: null,
+                }),
+              });
+
+              await discordLog.trigger({
+                title: "🚫 Unsolvable Problem",
+                description: `Model reported that problem **${label}** cannot be solved.\n**Reason:** ${reason}`,
+                color: DISCORD_COLORS.error,
+              });
+
+              failed++;
+              pendingIds.delete(result.customId);
+              continue;
+            }
+
+            const parsed = contentSchema.parse(outputData);
+            await saveProblemContent(result.customId, parsed, modelInfo);
+
+            succeeded++;
+            pendingIds.delete(result.customId);
+            logger.info(`Saved content for ${label}`);
+          } catch (error) {
+            const reason = `Failed to process result for ${label}: ${toErrorMessage(error)}`;
+
+            logger.error(reason);
+            lastErrorByProblemId.set(result.customId, reason);
+
+            if (hasNextAttempt) {
+              retryProblemIds.add(result.customId);
+            } else {
+              failed++;
+              pendingIds.delete(result.customId);
+              await prisma.problem.update({
+                where: { id: result.customId },
+                data: problemUpdateData({
+                  ...pipelineStateData("READY", "FAILED"),
+                  activeBatchId: null,
+                  processingStartedAt: null,
+                  lastGenerationError: reason,
+                }),
+              });
+            }
+          }
+        }
+      } catch (error) {
+        const reason = `Batch ${batchId} result stream failed: ${toErrorMessage(error)}`;
+        logger.error(reason);
+
+        for (const id of attemptProblemIds) {
+          if (!pendingIds.has(id)) {
+            continue;
+          }
+          lastErrorByProblemId.set(id, reason);
+          if (hasNextAttempt) {
+            retryProblemIds.add(id);
+          }
+        }
+      }
+
+      if (pendingResultIds.size > 0) {
+        const missingIds = [...pendingResultIds].filter((id) =>
+          pendingIds.has(id),
+        );
+        const reason = `Batch ${batchId} finished with missing result entries`;
+
+        for (const id of missingIds) {
+          lastErrorByProblemId.set(id, reason);
+          if (hasNextAttempt) {
+            retryProblemIds.add(id);
+          } else {
+            failed++;
+            pendingIds.delete(id);
+          }
+        }
+
+        if (!hasNextAttempt && missingIds.length > 0) {
+          await markProblemsFailed(missingIds, reason);
+        }
+
+        if (missingIds.length > 0) {
+          logger.error(
+            `Batch ${batchId} finished with ${missingIds.length} missing result(s)`,
+          );
+        }
+      }
+
+      if (hasNextAttempt && retryProblemIds.size > 0) {
+        logger.warn(
+          `Retrying ${retryProblemIds.size} failed problem(s) at lower effort`,
+        );
+      }
+    }
+
+    if (pendingIds.size > 0) {
+      const remainingIds = [...pendingIds];
+
+      await Promise.all(
+        remainingIds.map((id) => {
+          const reason =
+            lastErrorByProblemId.get(id) ??
+            "Generation failed after exhausting effort fallbacks";
+
+          return prisma.problem.update({
+            where: { id },
             data: problemUpdateData({
               ...pipelineStateData("READY", "FAILED"),
               activeBatchId: null,
@@ -369,34 +511,27 @@ export const generateBatchContent = task({
               lastGenerationError: reason,
             }),
           });
-        }
-      }
-    } catch (error) {
-      const reason = `Batch ${batchId} result stream failed: ${toErrorMessage(error)}`;
-      logger.error(reason);
+        }),
+      );
+
+      failed += remainingIds.length;
+      pendingIds.clear();
     }
 
-    if (pendingResultIds.size > 0) {
-      const missingIds = [...pendingResultIds];
-      const reason = `Batch ${batchId} finished with missing result entries`;
-      const failedCount = await markProblemsFailed(missingIds, reason);
-
-      if (failedCount > 0) {
-        failed += failedCount;
-        logger.error(
-          `Batch ${batchId} finished with ${failedCount} missing result(s)`,
-        );
-      }
-    }
+    const completedBatchText =
+      batchesUsed.length > 0 ? batchesUsed.join(", ") : "none";
 
     logger.info(
-      `Batch ${batchId} complete: ${succeeded} succeeded, ${failed} failed`,
+      `Batches ${completedBatchText} complete: ${succeeded} succeeded, ${failed} failed`,
     );
 
     const emoji = failed === 0 ? "✅" : "⚠️";
     await discordLog.trigger({
       title: `${emoji} Batch Complete`,
-      description: `Batch \`${batchId}\` finished processing.`,
+      description:
+        batchesUsed.length > 0
+          ? `Batch${batchesUsed.length === 1 ? "" : "es"} ${batchesUsed.map((id) => `\`${id}\``).join(", ")} finished processing.`
+          : "No batch was submitted successfully. All requests failed before submission.",
       color: failed === 0 ? DISCORD_COLORS.success : DISCORD_COLORS.warning,
       fields: [
         { name: "Succeeded", value: `${succeeded}`, inline: true },
@@ -409,7 +544,7 @@ export const generateBatchContent = task({
       ],
     });
 
-    return { batchId, succeeded, failed };
+    return { batchId: latestBatchId, succeeded, failed };
   },
 });
 
