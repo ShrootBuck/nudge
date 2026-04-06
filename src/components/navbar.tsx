@@ -12,7 +12,7 @@ export function Navbar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Close mobile menu on route change
+  // Close the mobile menu when navigation changes
   // biome-ignore lint/correctness/useExhaustiveDependencies: pathname is required to trigger on route change
   useEffect(() => {
     setMobileOpen(false);
@@ -22,7 +22,6 @@ export function Navbar() {
     <header className="sticky top-0 z-50 w-full">
       <div className="border-b border-border/50 bg-background/60 backdrop-blur-xl">
         <nav className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          {/* Logo */}
           <Link
             href="/"
             className="flex items-center gap-2 text-lg font-semibold tracking-tight transition hover:opacity-80"
@@ -33,7 +32,6 @@ export function Navbar() {
             Nudge
           </Link>
 
-          {/* Desktop nav links */}
           <div className="hidden items-center gap-1 sm:flex">
             {NAV_LINKS.map((link) => {
               const isActive =
@@ -58,7 +56,6 @@ export function Navbar() {
             })}
           </div>
 
-          {/* Right side actions */}
           <div className="flex items-center gap-2">
             <a
               href="https://github.com/ShrootBuck/nudge"
@@ -70,7 +67,6 @@ export function Navbar() {
               <GitHubIcon className="size-4" />
             </a>
 
-            {/* Mobile menu toggle */}
             <button
               type="button"
               onClick={() => setMobileOpen(!mobileOpen)}
@@ -87,7 +83,6 @@ export function Navbar() {
         </nav>
       </div>
 
-      {/* Mobile dropdown */}
       {mobileOpen && (
         <div className="border-b border-border/50 bg-background/80 backdrop-blur-xl sm:hidden">
           <div className="mx-auto max-w-6xl space-y-1 px-4 pb-4 pt-2">

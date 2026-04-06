@@ -35,11 +35,12 @@ function isValidProblem(problem: CFProblem) {
   );
 }
 
-// Runs daily at midnight Phoenix time (America/Phoenix = MST, no DST)
+// Run daily at midnight Phoenix time (America/Phoenix has no DST)
 export const syncProblems = schedules.task({
   id: "sync-problems",
   cron: {
-    pattern: "0 0 * * *", // midnight daily
+    // Midnight every day
+    pattern: "0 0 * * *",
     timezone: "America/Phoenix",
   },
   run: async () => {
@@ -70,7 +71,7 @@ export const syncProblems = schedules.task({
     const problems = data.result.problems.filter(isValidProblem);
     logger.info(`Fetched ${problems.length} valid problems from Codeforces`);
 
-    // Upsert in batches of 100
+    // Process upserts in batches to avoid oversized concurrent workloads
     let created = 0;
     let updated = 0;
     let failed = 0;
@@ -104,7 +105,7 @@ export const syncProblems = schedules.task({
             select: { createdAt: true, updatedAt: true },
           });
 
-          // If createdAt equals updatedAt, the row was just created
+          // On insert Prisma sets createdAt and updatedAt to the same value
           return result.createdAt.getTime() === result.updatedAt.getTime()
             ? ("created" as const)
             : ("updated" as const);

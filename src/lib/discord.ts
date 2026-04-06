@@ -14,6 +14,6 @@ export async function sendAdminLog(embed: DiscordEmbed): Promise<void> {
     return;
   }
 
-  // Don't throw - we don't want to fail the admin action if Discord is down.
+  // Do not throw here so admin actions still succeed if Discord is down
   await sendDiscordWebhook(webhookUrl, embed);
 }

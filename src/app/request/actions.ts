@@ -98,7 +98,6 @@ export async function requestProblem(_prevState: unknown, formData: FormData) {
   const { contestId, index } = parsedProblem;
 
   try {
-    // See if the problem exists in the db
     const problem = await prisma.problem.findUnique({
       where: {
         contestId_index: {

@@ -183,13 +183,8 @@ function parseBatchLine(line: string): BatchResult {
   };
 }
 
-/**
- * Recursively enforce OpenAI strict-mode constraints on a JSON Schema:
- * - Every object must have `additionalProperties: false`
- * - Every object must list ALL its properties in `required`
- *
- * @see https://developers.openai.com/api/docs/guides/structured-outputs
- */
+// Make the schema compatible with OpenAI strict json schema mode
+// See https://developers.openai.com/api/docs/guides/structured-outputs
 function enforceStrictSchema(
   schema: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -205,7 +200,7 @@ function enforceStrictSchema(
     );
     copy.additionalProperties = false;
 
-    // Strict mode requires every property to appear in `required`
+    // OpenAI strict mode requires every property to be listed in required
     if (!copy.required) {
       copy.required = Object.keys(props);
     }
@@ -230,7 +225,7 @@ export class OpenAIProvider implements AIProvider {
 
   private getClient(): OpenAI {
     if (!this.client) {
-      this.client = new OpenAI(); // uses OPENAI_API_KEY env var
+      this.client = new OpenAI();
     }
     return this.client;
   }
@@ -301,7 +296,6 @@ export class OpenAIProvider implements AIProvider {
 
     const jsonlContent = jsonlLines.join("\n");
 
-    // Upload the JSONL file
     const file = await this.getClient().files.create({
       file: new File([jsonlContent], "batch.jsonl", {
         type: "application/jsonl",
@@ -309,7 +303,6 @@ export class OpenAIProvider implements AIProvider {
       purpose: "batch",
     });
 
-    // Create the batch
     const batch = await this.getClient().batches.create({
       input_file_id: file.id,
       endpoint: "/v1/responses",
@@ -330,7 +323,7 @@ export class OpenAIProvider implements AIProvider {
       case "cancelled":
         return "failed";
       default:
-        // "validating", "in_progress", "finalizing", "cancelling"
+        // Includes statuses like validating, in_progress, and finalizing
         return "processing";
     }
   }

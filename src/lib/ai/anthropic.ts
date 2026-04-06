@@ -76,7 +76,7 @@ export class AnthropicProvider implements AIProvider {
 
   private getClient(): Anthropic {
     if (!this.client) {
-      this.client = new Anthropic(); // uses ANTHROPIC_API_KEY env var
+      this.client = new Anthropic();
     }
     return this.client;
   }
@@ -148,7 +148,7 @@ export class AnthropicProvider implements AIProvider {
       case "canceling":
         return "failed";
       default:
-        // "in_progress" or any future status
+        // Treat in progress and unknown future statuses as still processing
         return "processing";
     }
   }

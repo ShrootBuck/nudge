@@ -5,10 +5,6 @@ import { DISCORD_COLORS } from "@/lib/discord-webhook";
 import { verifyAdminPassword } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 export type ProviderModel = {
   id: string;
   provider: string;
@@ -16,10 +12,6 @@ export type ProviderModel = {
   displayName: string;
   isActive: boolean;
 };
-
-// ---------------------------------------------------------------------------
-// Read (no password needed)
-// ---------------------------------------------------------------------------
 
 export async function listProviderModels(): Promise<ProviderModel[]> {
   const configs = await prisma.providerModel.findMany({
@@ -35,10 +27,6 @@ export async function listProviderModels(): Promise<ProviderModel[]> {
   }));
 }
 
-// ---------------------------------------------------------------------------
-// Mutations (all password-protected)
-// ---------------------------------------------------------------------------
-
 function auth(password: string) {
   const authResult = verifyAdminPassword(password);
   if (!authResult.ok) {
@@ -48,10 +36,7 @@ function auth(password: string) {
   return null;
 }
 
-/**
- * Set a model config as the active one.
- * Deactivates all others in a single transaction.
- */
+// Set one model config active and turn off the rest in one transaction
 export async function setActiveModel(password: string, configId: string) {
   const denied = auth(password);
   if (denied) return denied;
@@ -84,9 +69,6 @@ export async function setActiveModel(password: string, configId: string) {
   return { success: true } as const;
 }
 
-/**
- * Add a new model configuration.
- */
 export async function addModelConfig(
   password: string,
   data: {
@@ -146,10 +128,6 @@ export async function addModelConfig(
   return { success: true, id: created.id, isActive: isFirst } as const;
 }
 
-/**
- * Delete a model configuration.
- * Cannot delete the currently active config.
- */
 export async function deleteModelConfig(password: string, configId: string) {
   const denied = auth(password);
   if (denied) return denied;

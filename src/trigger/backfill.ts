@@ -16,10 +16,11 @@ interface BackfillPayload {
   contestIdMin?: number;
   contestIdMax?: number;
   tags?: string[];
-  limit?: number; // max problems to queue, defaults to 100
+  // Max problems to queue defaults to 100
+  limit?: number;
 }
 
-// Manually triggered — marks backlog problems as ready based on filters
+// Manually mark backlog problems as ready using optional filters
 export const backfill = task({
   id: "backfill",
   run: async (payload: BackfillPayload) => {
@@ -80,7 +81,7 @@ export const backfill = task({
 
     const selectedIds = candidates.map((c) => c.id);
 
-    // Mark them all as READY + IDLE
+    // Reset selected problems so generation can pick them up
     await prisma.problem.updateMany({
       where: { id: { in: selectedIds } },
       data: problemUpdateManyData({
@@ -91,7 +92,7 @@ export const backfill = task({
       }),
     });
 
-    // Fetch sample details for logging (max 5)
+    // Include up to five examples in logs for quick checks
     const sampleIds = selectedIds.slice(0, 5);
     const sampleProblems = await prisma.problem.findMany({
       where: { id: { in: sampleIds } },

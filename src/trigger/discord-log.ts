@@ -10,10 +10,7 @@ function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/**
- * Best-effort Discord logger for Trigger runs.
- * This avoids creating a separate Trigger task run for every log event.
- */
+// Best effort Discord logger for Trigger runs avoids spawning extra task runs
 export async function discordLog(embed: DiscordEmbed): Promise<void> {
   const webhookUrl = getOptionalEnv("DISCORD_WEBHOOK_URL");
 

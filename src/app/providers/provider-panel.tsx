@@ -22,10 +22,6 @@ import {
 
 const PROVIDER_OPTIONS = ["anthropic", "openai"] as const;
 
-// ---------------------------------------------------------------------------
-// Root
-// ---------------------------------------------------------------------------
-
 export function ProviderPanel({ initial }: { initial: ProviderModel[] }) {
   const [configs, setConfigs] = useState(initial);
   const [password, setPassword] = useState("");
@@ -38,7 +34,6 @@ export function ProviderPanel({ initial }: { initial: ProviderModel[] }) {
 
   return (
     <div className="space-y-6">
-      {/* Password bar */}
       <div className="rounded-[1.75rem] border border-border/70 bg-card/75 p-5 shadow-sm backdrop-blur sm:p-6">
         <label
           htmlFor="provider-password"
@@ -59,7 +54,6 @@ export function ProviderPanel({ initial }: { initial: ProviderModel[] }) {
         />
       </div>
 
-      {/* Toasts */}
       {error && (
         <p className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-2.5 text-sm text-rose-200">
           {error}
@@ -71,7 +65,6 @@ export function ProviderPanel({ initial }: { initial: ProviderModel[] }) {
         </p>
       )}
 
-      {/* Config list */}
       <div className="space-y-3">
         {configs.map((cfg) => (
           <ConfigCard
@@ -99,7 +92,6 @@ export function ProviderPanel({ initial }: { initial: ProviderModel[] }) {
         )}
       </div>
 
-      {/* Add new */}
       <AddConfigForm
         password={password}
         onError={setError}
@@ -111,10 +103,6 @@ export function ProviderPanel({ initial }: { initial: ProviderModel[] }) {
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Config card
-// ---------------------------------------------------------------------------
 
 function ConfigCard({
   config,
@@ -175,7 +163,6 @@ function ConfigCard({
       )}
     >
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        {/* Info */}
         <div className="flex items-start gap-3.5">
           <span
             className={cn(
@@ -202,7 +189,6 @@ function ConfigCard({
           </div>
         </div>
 
-        {/* Actions */}
         <div className="flex items-center gap-2">
           {config.isActive ? (
             <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-300">
@@ -239,10 +225,6 @@ function ConfigCard({
     </div>
   );
 }
-
-// ---------------------------------------------------------------------------
-// Add form
-// ---------------------------------------------------------------------------
 
 function AddConfigForm({
   password,
