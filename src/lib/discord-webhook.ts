@@ -1,3 +1,5 @@
+import { fetchWithTimeout } from "./http";
+
 export const DISCORD_COLORS = {
   success: 0x10b981, // emerald
   warning: 0xf59e0b, // amber
@@ -22,6 +24,17 @@ export async function sendDiscordWebhook(
   embed: DiscordEmbed,
   options?: { throwOnError?: boolean },
 ): Promise<boolean> {
+  const normalizedWebhookUrl = webhookUrl.trim();
+  if (!normalizedWebhookUrl) {
+    const message = "Discord webhook URL is missing or empty";
+    if (options?.throwOnError) {
+      throw new Error(message);
+    }
+
+    console.error(message);
+    return false;
+  }
+
   const body = {
     embeds: [
       {
@@ -32,11 +45,25 @@ export async function sendDiscordWebhook(
     ],
   };
 
-  const response = await fetch(webhookUrl, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
+  let response: Response;
+
+  try {
+    response = await fetchWithTimeout(normalizedWebhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      timeoutMs: 10_000,
+    });
+  } catch (error) {
+    const message = `Discord webhook request failed: ${error instanceof Error ? error.message : String(error)}`;
+
+    if (options?.throwOnError) {
+      throw new Error(message);
+    }
+
+    console.error(message);
+    return false;
+  }
 
   if (response.ok) {
     return true;

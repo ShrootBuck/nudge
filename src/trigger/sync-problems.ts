@@ -1,5 +1,6 @@
 import { logger, schedules } from "@trigger.dev/sdk";
 import { DISCORD_COLORS } from "../lib/discord-webhook";
+import { fetchWithTimeout } from "../lib/http";
 import { prisma } from "../lib/prisma";
 import { discordLog } from "./discord-log";
 
@@ -19,6 +20,17 @@ interface CFResponse {
   };
 }
 
+function isValidProblem(problem: CFProblem) {
+  return (
+    Number.isSafeInteger(problem.contestId) &&
+    problem.contestId > 0 &&
+    typeof problem.index === "string" &&
+    problem.index.trim().length > 0 &&
+    typeof problem.name === "string" &&
+    problem.name.trim().length > 0
+  );
+}
+
 // Runs weekly at midnight Phoenix time (America/Phoenix = MST, no DST)
 export const syncProblems = schedules.task({
   id: "sync-problems",
@@ -29,22 +41,35 @@ export const syncProblems = schedules.task({
   run: async () => {
     logger.info("Fetching problems from Codeforces API");
 
-    const res = await fetch("https://codeforces.com/api/problemset.problems");
+    const res = await fetchWithTimeout(
+      "https://codeforces.com/api/problemset.problems",
+      {
+        timeoutMs: 20_000,
+        headers: {
+          "User-Agent":
+            "nudge-bot/1.0 (+https://nudge.zaydkrunz.com; contact@zaydkrunz.com)",
+        },
+      },
+    );
+
     if (!res.ok) {
-      throw new Error(`Codeforces API returned ${res.status}`);
+      throw new Error(
+        `Codeforces API returned ${res.status} ${res.statusText}`,
+      );
     }
 
-    const data: CFResponse = await res.json();
+    const data = (await res.json()) as CFResponse;
     if (data.status !== "OK") {
       throw new Error("Codeforces API returned non-OK status");
     }
 
-    const problems = data.result.problems;
-    logger.info(`Fetched ${problems.length} problems from Codeforces`);
+    const problems = data.result.problems.filter(isValidProblem);
+    logger.info(`Fetched ${problems.length} valid problems from Codeforces`);
 
     // Upsert in batches of 100
     let created = 0;
     let updated = 0;
+    let failed = 0;
     const batchSize = 100;
 
     for (let i = 0; i < problems.length; i += batchSize) {
@@ -85,6 +110,11 @@ export const syncProblems = schedules.task({
         if (r.status === "fulfilled") {
           if (r.value === "created") created++;
           else updated++;
+        } else {
+          failed++;
+          logger.error("Problem upsert failed", {
+            error: String(r.reason),
+          });
         }
       }
 
@@ -93,18 +123,30 @@ export const syncProblems = schedules.task({
       );
     }
 
-    logger.info(`Sync complete: ${created} created, ${updated} updated`);
+    logger.info(
+      `Sync complete: ${created} created, ${updated} updated, ${failed} failed`,
+    );
 
     await discordLog.trigger({
       title: "🔄 Problem Sync Complete",
-      description: `Synced **${problems.length.toLocaleString()}** problems from Codeforces API.`,
-      color: DISCORD_COLORS.sky,
+      description:
+        failed > 0
+          ? `Synced **${problems.length.toLocaleString()}** problems from Codeforces API with **${failed}** failures.`
+          : `Synced **${problems.length.toLocaleString()}** problems from Codeforces API.`,
+      color: failed > 0 ? DISCORD_COLORS.warning : DISCORD_COLORS.sky,
       fields: [
         { name: "New", value: `${created}`, inline: true },
         { name: "Updated", value: `${updated}`, inline: true },
+        ...(failed > 0
+          ? [{ name: "Failed", value: `${failed}`, inline: true }]
+          : []),
       ],
     });
 
-    return { created, updated, total: problems.length };
+    if (failed > 0) {
+      throw new Error(`Problem sync completed with ${failed} failed upserts`);
+    }
+
+    return { created, updated, total: problems.length, failed };
   },
 });

@@ -3,6 +3,7 @@ import * as cheerio from "cheerio";
 import { z } from "zod";
 import { type BatchRequest, getProvider, type OutputSchema } from "../lib/ai";
 import { DISCORD_COLORS } from "../lib/discord-webhook";
+import { fetchWithTimeout } from "../lib/http";
 import { prisma } from "../lib/prisma";
 import { cfProblemUrl } from "../lib/utils";
 import { discordLog } from "./discord-log";
@@ -175,20 +176,39 @@ int main() { setIO(); }
  * Throws if no row has `isActive = true`.
  */
 async function getActiveModelConfig() {
-  const config = await prisma.modelConfig.findFirst({
+  const activeConfigs = await prisma.modelConfig.findMany({
     where: { isActive: true },
+    orderBy: { updatedAt: "desc" },
+    take: 2,
   });
-  if (!config) throw new Error("No active model configuration found in DB");
-  return config;
+
+  if (activeConfigs.length === 0) {
+    throw new Error("No active model configuration found in DB");
+  }
+
+  if (activeConfigs.length > 1) {
+    throw new Error(
+      "Multiple active model configurations found. Keep exactly one config active.",
+    );
+  }
+
+  return activeConfigs[0];
 }
 
 async function fetchProblemStatement(contestId: number, index: string) {
   try {
     const url = cfProblemUrl(contestId, index);
-    const res = await fetch(url);
+    const res = await fetchWithTimeout(url, {
+      timeoutMs: 15_000,
+      headers: {
+        "User-Agent":
+          "nudge-bot/1.0 (+https://nudge.zaydkrunz.com; contact@zaydkrunz.com)",
+      },
+    });
+
     if (!res.ok) {
       logger.error(
-        `Failed to fetch problem statement for ${contestId}${index}: ${res.statusText}`,
+        `Failed to fetch problem statement for ${contestId}${index}: ${res.status} ${res.statusText}`,
       );
       return null;
     }
@@ -284,6 +304,13 @@ export const generateBatchContent = task({
   queue: { concurrencyLimit: 5 },
   retry: { maxAttempts: 2 },
   run: async (payload: { problemIds: string[] }) => {
+    if (payload.problemIds.length === 0) {
+      logger.warn(
+        "generate-batch-content called with an empty problemIds list",
+      );
+      return { batchId: null, succeeded: 0, failed: 0 };
+    }
+
     // Resolve the active provider + model from the DB
     const modelConfig = await getActiveModelConfig();
     const provider = getProvider(modelConfig.provider);
@@ -298,6 +325,26 @@ export const generateBatchContent = task({
       where: { id: { in: payload.problemIds } },
     });
 
+    if (problems.length === 0) {
+      logger.warn("No matching problems found for batch payload", {
+        requestedProblemIds: payload.problemIds,
+      });
+      return {
+        batchId: null,
+        succeeded: 0,
+        failed: 0,
+      };
+    }
+
+    const foundProblemIds = problems.map((problem) => problem.id);
+
+    if (foundProblemIds.length !== payload.problemIds.length) {
+      logger.warn("Some batch problem IDs were missing from the database", {
+        requested: payload.problemIds.length,
+        found: foundProblemIds.length,
+      });
+    }
+
     // Build a lookup so we can map custom_id -> problem later
     const problemMap = new Map<string, ProblemForBatch>();
     for (const p of problems) {
@@ -306,7 +353,7 @@ export const generateBatchContent = task({
 
     // Mark all as PROCESSING and increment attempt counter
     await prisma.problem.updateMany({
-      where: { id: { in: payload.problemIds } },
+      where: { id: { in: foundProblemIds } },
       data: {
         generationStatus: "PROCESSING",
         generationAttempts: { increment: 1 },
@@ -357,7 +404,7 @@ export const generateBatchContent = task({
         error: String(error),
       });
       await prisma.problem.updateMany({
-        where: { id: { in: payload.problemIds } },
+        where: { id: { in: foundProblemIds } },
         data: { generationStatus: "PENDING" },
       });
       throw error;
@@ -415,7 +462,7 @@ export const generateBatchContent = task({
       logger.error(`Batch ${batchId} still not done after 24 hours`);
       await prisma.problem.updateMany({
         where: {
-          id: { in: payload.problemIds },
+          id: { in: foundProblemIds },
           generationStatus: "PROCESSING",
         },
         data: { generationStatus: "FAILED" },
@@ -423,7 +470,7 @@ export const generateBatchContent = task({
 
       await discordLog.trigger({
         title: "❌ Batch Timed Out",
-        description: `Batch \`${batchId}\` did not complete after 24 hours.\n**${payload.problemIds.length}** problems marked as FAILED.`,
+        description: `Batch \`${batchId}\` did not complete after 24 hours.\n**${foundProblemIds.length}** problems marked as FAILED.`,
         color: DISCORD_COLORS.error,
       });
 
@@ -494,7 +541,7 @@ export const generateBatchContent = task({
     // Check for problems that were in the batch but had no result entry
     const missingResults = await prisma.problem.updateMany({
       where: {
-        id: { in: payload.problemIds },
+        id: { in: foundProblemIds },
         generationStatus: "PROCESSING", // still PROCESSING = never got a result
       },
       data: { generationStatus: "FAILED" },

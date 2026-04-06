@@ -2,7 +2,7 @@
 
 import { sendAdminLog } from "@/lib/discord";
 import { DISCORD_COLORS } from "@/lib/discord-webhook";
-import { SITE_URL } from "@/lib/env";
+import { SITE_URL, verifyAdminPassword } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 
 const REVIEW_STATUSES = [
@@ -20,8 +20,9 @@ export async function setProblemReviewStatus(
   password: string,
   reviewStatus: ReviewStatus,
 ) {
-  if (password !== process.env.VERIFY_PASSWORD) {
-    return { success: false, error: "Wrong password" } as const;
+  const auth = verifyAdminPassword(password);
+  if (!auth.ok) {
+    return { success: false, error: auth.error } as const;
   }
 
   if (!REVIEW_STATUSES.includes(reviewStatus)) {
@@ -95,8 +96,9 @@ export async function reportProblem(problemId: string, reason: string) {
 }
 
 export async function queueRegeneration(problemId: string, password: string) {
-  if (password !== process.env.VERIFY_PASSWORD) {
-    return { success: false, error: "Wrong password" } as const;
+  const auth = verifyAdminPassword(password);
+  if (!auth.ok) {
+    return { success: false, error: auth.error } as const;
   }
 
   const problem = await prisma.problem.findUnique({

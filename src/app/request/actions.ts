@@ -2,39 +2,96 @@
 
 import { prisma } from "@/lib/prisma";
 
+const PROBLEM_IDENTIFIER_PATTERN =
+  /^(\d+)\s*(?:\/|\s)?\s*([A-Za-z][A-Za-z0-9]*)$/;
+const URL_SUFFIX_PATTERN = /(\d+)\/(?:problem\/)?([A-Za-z][A-Za-z0-9]*)$/i;
+const URL_WITH_SCHEME_PATTERN = /^[a-z][a-z\d+\-.]*:\/\//i;
+
+function toProblemInput(value: FormDataEntryValue | null): string {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function parseProblemIdentifier(input: string) {
+  const match = input.match(PROBLEM_IDENTIFIER_PATTERN);
+  if (!match) {
+    return null;
+  }
+
+  const contestId = Number.parseInt(match[1], 10);
+  if (!Number.isSafeInteger(contestId) || contestId <= 0) {
+    return null;
+  }
+
+  return {
+    contestId,
+    index: match[2].toUpperCase(),
+  };
+}
+
+function normalizeCodeforcesUrlInput(input: string) {
+  if (input.startsWith("//")) {
+    return `https:${input}`;
+  }
+
+  if (URL_WITH_SCHEME_PATTERN.test(input)) {
+    return input;
+  }
+
+  return `https://${input}`;
+}
+
+function parseRequestedProblem(input: string) {
+  const parsedIdentifier = parseProblemIdentifier(input);
+  if (parsedIdentifier) {
+    return parsedIdentifier;
+  }
+
+  try {
+    const url = new URL(normalizeCodeforcesUrlInput(input));
+    const hostname = url.hostname.toLowerCase();
+
+    if (
+      hostname !== "codeforces.com" &&
+      !hostname.endsWith(".codeforces.com")
+    ) {
+      return null;
+    }
+
+    const cleanPath = url.pathname.replace(/\/+$/, "");
+    const pathMatch = cleanPath.match(URL_SUFFIX_PATTERN);
+    if (!pathMatch) {
+      return null;
+    }
+
+    const contestId = Number.parseInt(pathMatch[1], 10);
+    if (!Number.isSafeInteger(contestId) || contestId <= 0) {
+      return null;
+    }
+
+    return {
+      contestId,
+      index: pathMatch[2].toUpperCase(),
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function requestProblem(_prevState: unknown, formData: FormData) {
-  const urlOrId = formData.get("problem") as string;
-  if (!urlOrId) {
+  const input = toProblemInput(formData.get("problem"));
+  if (!input) {
     return { error: "Please provide a problem." };
   }
 
-  let contestId: number;
-  let index: string;
-
-  // Try to parse URL or ID
-  // e.g., https://codeforces.com/problemset/problem/123/A
-  // e.g., https://codeforces.com/contest/123/problem/A
-  // e.g., 123A, 123 A, 123/A
-  const match = urlOrId.match(
-    /(?:problem\/|contest\/|^\s*)(\d+)(?:\/problem\/|\/|\s+|)([A-Za-z][A-Za-z0-9]*)\b/,
-  );
-
-  if (match) {
-    contestId = parseInt(match[1], 10);
-    index = match[2].toUpperCase();
-  } else {
-    // try matching 123A
-    const simpleMatch = urlOrId.match(/^(\d+)([A-Za-z][A-Za-z0-9]*)$/);
-    if (simpleMatch) {
-      contestId = parseInt(simpleMatch[1], 10);
-      index = simpleMatch[2].toUpperCase();
-    } else {
-      return {
-        error:
-          "Could not parse problem ID or URL. Please use format like '123 A' or a Codeforces URL.",
-      };
-    }
+  const parsedProblem = parseRequestedProblem(input);
+  if (!parsedProblem) {
+    return {
+      error:
+        "Could not parse problem ID or URL. Use formats like '123 A', '123A', '123/A', or a Codeforces URL.",
+    };
   }
+
+  const { contestId, index } = parsedProblem;
 
   try {
     // See if the problem exists in the db
@@ -54,11 +111,13 @@ export async function requestProblem(_prevState: unknown, formData: FormData) {
         };
       }
 
-      // Mark as requested
       await prisma.problem.update({
         where: { id: problem.id },
-        data: { requested: true },
+        data: {
+          requested: true,
+        },
       });
+
       return {
         message: `Problem ${contestId}${index} has been requested and prioritized!`,
       };
@@ -67,8 +126,7 @@ export async function requestProblem(_prevState: unknown, formData: FormData) {
     return {
       error: `Problem ${contestId}${index} does not exist in our database.`,
     };
-  } catch (e) {
-    console.error(e);
+  } catch {
     return { error: "An error occurred while requesting the problem." };
   }
 }

@@ -2,6 +2,7 @@
 
 import { sendAdminLog } from "@/lib/discord";
 import { DISCORD_COLORS } from "@/lib/discord-webhook";
+import { verifyAdminPassword } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 
 // ---------------------------------------------------------------------------
@@ -41,9 +42,11 @@ export async function listModelConfigs(): Promise<ModelConfig[]> {
 // ---------------------------------------------------------------------------
 
 function auth(password: string) {
-  if (password !== process.env.VERIFY_PASSWORD) {
-    return { success: false, error: "Wrong password" } as const;
+  const authResult = verifyAdminPassword(password);
+  if (!authResult.ok) {
+    return { success: false, error: authResult.error } as const;
   }
+
   return null;
 }
 
