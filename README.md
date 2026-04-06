@@ -22,7 +22,7 @@ All content is AI-generated using the Anthropic/OpenAI batch APIs, then stored i
 2. **Queue** — Backfill moves backlog problems into the ready queue, prioritized by request count.
 3. **Generate** — A daily scheduler batches ready problems into provider batch API calls. The model generates five progressive hints, a Markdown editorial with LaTeX, and a complete C++ solution for each.
 4. **Serve** — Next.js renders the problem list with filtering by rating, tag, and search. Each problem page has collapsible hint panels so you control exactly how much you see.
-5. **Recover** — An hourly watchdog detects stale running jobs and marks them failed for retry.
+5. **Recover** — A daily midnight watchdog detects stale running batches older than 48 hours and marks them failed for retry.
 6. **Report** — Users can flag incorrect content. A daily digest sends new reports to Discord via webhook for human verification.
 
 ## Tech stack
@@ -79,7 +79,7 @@ This connects to Trigger.dev and registers the scheduled tasks:
 
 - **`sync-problems`** — weekly Codeforces sync (Sundays at midnight MST)
 - **`generate-content-scheduler`** — daily batch generation (midnight MST)
-- **`generation-state-watchdog`** — hourly stale-run recovery
+- **`generation-state-watchdog`** — daily stale-batch recovery (48h threshold)
 - **`report-digest`** — daily Discord digest of user-reported issues
 - **`backfill`** — manually triggered, queues backlog problems by rating/tag filters
 

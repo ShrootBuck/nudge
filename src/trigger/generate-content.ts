@@ -30,7 +30,7 @@ const BATCH_SIZE = 10;
 const MAX_GENERATION_ATTEMPTS = 3;
 const BATCH_POLL_MAX_CHECKS = 24;
 const BATCH_POLL_INTERVAL_HOURS = 1;
-const STALE_RUN_THRESHOLD_HOURS = 26;
+const STALE_BATCH_THRESHOLD_HOURS = 48;
 
 type ProblemForBatch = {
   id: string;
@@ -303,7 +303,7 @@ export const generateBatchContent = task({
       );
 
       if (effortIndex === 0) {
-        await discordLog.trigger({
+        await discordLog({
           title: "📦 Batch Started",
           description: `**${problems.length}** problems submitted via **${modelConfig.displayName}**\n${toBatchSample(problems)}`,
           color: DISCORD_COLORS.info,
@@ -404,7 +404,7 @@ export const generateBatchContent = task({
                 }),
               });
 
-              await discordLog.trigger({
+              await discordLog({
                 title: "🚫 Unsolvable Problem",
                 description: `Model reported that problem **${label}** cannot be solved.\n**Reason:** ${reason}`,
                 color: DISCORD_COLORS.error,
@@ -526,7 +526,7 @@ export const generateBatchContent = task({
     );
 
     const emoji = failed === 0 ? "✅" : "⚠️";
-    await discordLog.trigger({
+    await discordLog({
       title: `${emoji} Batch Complete`,
       description:
         batchesUsed.length > 0
@@ -579,7 +579,7 @@ export const generateContentScheduler = schedules.task({
       chunks.map((problemIds) => ({ payload: { problemIds } })),
     );
 
-    await discordLog.trigger({
+    await discordLog({
       title: "📅 Daily Generation Triggered",
       description: `**${problems.length}** ready problems queued across **${chunks.length}** batch${chunks.length === 1 ? "" : "es"}\n${toBatchSample(problems)}`,
       color: DISCORD_COLORS.indigo,
@@ -592,12 +592,12 @@ export const generateContentScheduler = schedules.task({
 export const generationStateWatchdog = schedules.task({
   id: "generation-state-watchdog",
   cron: {
-    pattern: "0 * * * *",
+    pattern: "0 0 * * *",
     timezone: "America/Phoenix",
   },
   run: async () => {
     const staleBefore = new Date(
-      Date.now() - STALE_RUN_THRESHOLD_HOURS * 60 * 60 * 1000,
+      Date.now() - STALE_BATCH_THRESHOLD_HOURS * 60 * 60 * 1000,
     );
 
     const staleRuns = await prisma.problem.findMany({
@@ -619,11 +619,11 @@ export const generationStateWatchdog = schedules.task({
     }
 
     const staleIds = staleRuns.map((problem) => problem.id);
-    const reason = `Run exceeded ${STALE_RUN_THRESHOLD_HOURS}h without completion`;
+    const reason = `Batch exceeded ${STALE_BATCH_THRESHOLD_HOURS}h without completion`;
 
     const recovered = await markProblemsFailed(staleIds, `Watchdog: ${reason}`);
 
-    await discordLog.trigger({
+    await discordLog({
       title: "🛟 Generation Watchdog Recovered Stale Runs",
       description: `Marked **${recovered}** stale running problem${recovered === 1 ? "" : "s"} as FAILED and ready for retry.`,
       color: DISCORD_COLORS.warning,

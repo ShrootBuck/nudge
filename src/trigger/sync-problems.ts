@@ -132,7 +132,7 @@ export const syncProblems = schedules.task({
       `Sync complete: ${created} created, ${updated} updated, ${failed} failed`,
     );
 
-    await discordLog.trigger({
+    await discordLog({
       title: "🔄 Problem Sync Complete",
       description:
         failed > 0

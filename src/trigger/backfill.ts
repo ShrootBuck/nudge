@@ -68,8 +68,7 @@ export const backfill = task({
       select: { id: true },
       orderBy: [
         { requestedCount: "desc" },
-        { updatedAt: "desc" },
-        { contestId: "desc" },
+        { createdAt: "desc" },
       ] as unknown as Prisma.ProblemOrderByWithRelationInput[],
       take: limit,
     });
@@ -117,7 +116,7 @@ export const backfill = task({
     const extraBackfill =
       selectedIds.length > 5 ? `\n(+${selectedIds.length - 5} more)` : "";
 
-    await discordLog.trigger({
+    await discordLog({
       title: "📋 Backfill Queued",
       description:
         `**${selectedIds.length}** backlog problems marked ready for generation\n` +

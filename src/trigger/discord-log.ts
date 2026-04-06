@@ -1,20 +1,41 @@
-import { task } from "@trigger.dev/sdk";
 import { type DiscordEmbed, sendDiscordWebhook } from "../lib/discord-webhook";
-import { getRequiredEnv } from "../lib/env";
+import { getOptionalEnv } from "../lib/env";
+
+const MAX_DISCORD_LOG_ATTEMPTS = 3;
+const DISCORD_LOG_RETRY_DELAY_MS = 1_000;
+
+let warnedAboutMissingWebhook = false;
+
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 /**
- * Fire-and-forget Discord webhook task.
- * Trigger tasks use this instead of the lib/discord helper
- * (which runs in the Next.js process).
+ * Best-effort Discord logger for Trigger runs.
+ * This avoids creating a separate Trigger task run for every log event.
  */
-export const discordLog = task({
-  id: "discord-log",
-  retry: { maxAttempts: 3 },
-  run: async (payload: DiscordEmbed) => {
-    await sendDiscordWebhook(getRequiredEnv("DISCORD_WEBHOOK_URL"), payload, {
-      throwOnError: true,
-    });
+export async function discordLog(embed: DiscordEmbed): Promise<void> {
+  const webhookUrl = getOptionalEnv("DISCORD_WEBHOOK_URL");
 
-    return { sent: true };
-  },
-});
+  if (!webhookUrl) {
+    if (!warnedAboutMissingWebhook) {
+      warnedAboutMissingWebhook = true;
+      console.warn(
+        "DISCORD_WEBHOOK_URL is not set; skipping trigger Discord logs",
+      );
+    }
+    return;
+  }
+
+  for (let attempt = 1; attempt <= MAX_DISCORD_LOG_ATTEMPTS; attempt++) {
+    const sent = await sendDiscordWebhook(webhookUrl, embed);
+
+    if (sent) {
+      return;
+    }
+
+    if (attempt < MAX_DISCORD_LOG_ATTEMPTS) {
+      await wait(DISCORD_LOG_RETRY_DELAY_MS * attempt);
+    }
+  }
+}
