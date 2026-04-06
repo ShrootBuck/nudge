@@ -112,9 +112,12 @@ export async function addModelConfig(
     } as const;
   }
 
-  const existing = await prisma.providerModel.findUnique({
-    where: { provider_modelId: { provider, modelId } },
-  });
+  const [existing, count] = await Promise.all([
+    prisma.providerModel.findUnique({
+      where: { provider_modelId: { provider, modelId } },
+    }),
+    prisma.providerModel.count(),
+  ]);
 
   if (existing) {
     return {
@@ -123,12 +126,14 @@ export async function addModelConfig(
     } as const;
   }
 
+  const isFirst = count === 0;
+
   const created = await prisma.providerModel.create({
     data: {
       provider,
       modelId,
       displayName,
-      isActive: false,
+      isActive: isFirst,
     },
   });
 
@@ -138,7 +143,7 @@ export async function addModelConfig(
     color: DISCORD_COLORS.violet,
   });
 
-  return { success: true, id: created.id } as const;
+  return { success: true, id: created.id, isActive: isFirst } as const;
 }
 
 /**

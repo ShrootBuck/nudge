@@ -2,6 +2,7 @@
 
 import {
   Check,
+  ChevronDown,
   CircleDot,
   LoaderCircle,
   Plus,
@@ -280,7 +281,7 @@ function AddConfigForm({
             provider: provider.trim().toLowerCase(),
             modelId: modelId.trim(),
             displayName: displayName.trim(),
-            isActive: false,
+            isActive: result.isActive,
           });
           setProvider("anthropic");
           setModelId("");
@@ -326,20 +327,23 @@ function AddConfigForm({
           >
             Provider
           </label>
-          <select
-            id="new-provider"
-            value={provider}
-            onChange={(e) => {
-              setProvider(e.target.value);
-            }}
-            className={inputClass}
-          >
-            {PROVIDER_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </select>
+          <div className="relative">
+            <select
+              id="new-provider"
+              value={provider}
+              onChange={(e) => {
+                setProvider(e.target.value);
+              }}
+              className={`${inputClass} appearance-none pr-10`}
+            >
+              {PROVIDER_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          </div>
         </div>
 
         <div>
