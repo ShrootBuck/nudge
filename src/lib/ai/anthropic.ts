@@ -148,7 +148,7 @@ export class AnthropicProvider implements AIProvider {
       case "canceling":
         return "failed";
       default:
-        // Treat in progress and unknown future statuses as still processing
+        // Treat in-progress and unknown future statuses as still processing.
         return "processing";
     }
   }

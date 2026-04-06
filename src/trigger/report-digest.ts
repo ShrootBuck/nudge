@@ -6,7 +6,7 @@ import { prisma } from "../lib/prisma";
 export const reportDigest = schedules.task({
   id: "report-digest",
   cron: {
-    pattern: "0 0 * * *", // midnight daily
+    pattern: "0 0 * * *",
     timezone: "America/Phoenix",
   },
   run: async () => {

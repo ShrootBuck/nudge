@@ -28,10 +28,10 @@ enum ReviewStatus {
 model Problem {
   id        String   @id @default(cuid())
   contestId Int
-  index     String // e.g. "A", "B1"
+  index     String
   name      String
   rating    Int?
-  tags      String[] // e.g. ["dp", "greedy"]
+  tags      String[]
 
   queueState          QueueState   @default(BACKLOG)
   runState            RunState     @default(IDLE)
@@ -42,9 +42,8 @@ model Problem {
   processingStartedAt DateTime?
   lastGenerationError String?      @db.Text
 
-  // Tracks which provider/model generated this problem's content
-  generatedByProvider String? // e.g. "anthropic", "openai"
-  generatedByModel    String? // e.g. "claude-opus-4-6", "gpt-5-4"
+  generatedByProvider String?
+  generatedByModel    String?
 
   hints     Hint[]
   editorial Editorial?
@@ -61,7 +60,7 @@ model Problem {
 
 model Hint {
   id      String @id @default(cuid())
-  order   Int // 1-5
+  order   Int
   content String @db.Text
 
   problemId String
@@ -82,7 +81,7 @@ model Editorial {
 
 model Solution {
   id      String @id @default(cuid())
-  content String @db.Text // C++ code
+  content String @db.Text
 
   problemId String  @unique
   problem   Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
@@ -102,9 +101,9 @@ model Report {
 
 model ProviderModel {
   id          String  @id @default(cuid())
-  provider    String // e.g. "anthropic", "openai"
-  modelId     String // e.g. "claude-opus-4-6", "gpt-5-4"
-  displayName String // e.g. "Claude Opus 4.6"
+  provider    String
+  modelId     String
+  displayName String
   isActive    Boolean @default(false)
 
   createdAt DateTime @default(now())

@@ -36,7 +36,6 @@ export default async function ProblemPage({
 
   if (!problem) notFound();
 
-  // Prefer the configured display name over the raw stored model ID
   let modelDisplayName: string | null = null;
   if (problem.generatedByProvider && problem.generatedByModel) {
     const config = await prisma.providerModel.findUnique({

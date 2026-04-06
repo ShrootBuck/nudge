@@ -10,7 +10,7 @@ function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Best effort Discord logger for Trigger runs avoids spawning extra task runs
+// Best-effort Trigger logger; keeps runs successful if Discord is unavailable.
 export async function discordLog(embed: DiscordEmbed): Promise<void> {
   const webhookUrl = getOptionalEnv("DISCORD_WEBHOOK_URL");
 

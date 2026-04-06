@@ -36,7 +36,7 @@ function auth(password: string) {
   return null;
 }
 
-// Set one model config active and turn off the rest in one transaction
+// Activate one model config and deactivate the rest in one transaction.
 export async function setActiveModel(password: string, configId: string) {
   const denied = auth(password);
   if (denied) return denied;

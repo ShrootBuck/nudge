@@ -183,8 +183,7 @@ function parseBatchLine(line: string): BatchResult {
   };
 }
 
-// Make the schema compatible with OpenAI strict json schema mode
-// See https://developers.openai.com/api/docs/guides/structured-outputs
+// Adapt schema for OpenAI strict JSON schema mode.
 function enforceStrictSchema(
   schema: Record<string, unknown>,
 ): Record<string, unknown> {
@@ -200,7 +199,7 @@ function enforceStrictSchema(
     );
     copy.additionalProperties = false;
 
-    // OpenAI strict mode requires every property to be listed in required
+    // OpenAI strict mode requires every property in `required`.
     if (!copy.required) {
       copy.required = Object.keys(props);
     }
@@ -323,7 +322,7 @@ export class OpenAIProvider implements AIProvider {
       case "cancelled":
         return "failed";
       default:
-        // Includes statuses like validating, in_progress, and finalizing
+        // Includes statuses like validating, in_progress, and finalizing.
         return "processing";
     }
   }

@@ -1,10 +1,10 @@
 import { fetchWithTimeout } from "./http";
 
 export const DISCORD_COLORS = {
-  success: 0x10b981, // emerald
-  warning: 0xf59e0b, // amber
-  error: 0xef4444, // red
-  info: 0x3b82f6, // blue
+  success: 0x10b981,
+  warning: 0xf59e0b,
+  error: 0xef4444,
+  info: 0x3b82f6,
   violet: 0x8b5cf6,
   sky: 0x0ea5e9,
   indigo: 0x6366f1,

@@ -12,8 +12,7 @@ export function Navbar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Close the mobile menu when navigation changes
-  // biome-ignore lint/correctness/useExhaustiveDependencies: pathname is required to trigger on route change
+  // biome-ignore lint/correctness/useExhaustiveDependencies: Depends on pathname to close the menu on route changes.
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);

@@ -11,7 +11,6 @@ function register(provider: AIProvider) {
 register(new AnthropicProvider());
 register(new OpenAIProvider());
 
-// Get a provider by id from the registry
 export function getProvider(providerId: string): AIProvider {
   const provider = providers.get(providerId);
   if (!provider) {
