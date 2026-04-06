@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { prisma } from "@/lib/prisma";
+import type { RunState } from "@/lib/problem-pipeline";
 import { parseSolutionContent } from "@/lib/problem-solution";
 import {
   highlightCodeHtml,
@@ -8,6 +9,7 @@ import {
   SHIKI_LIGHT_THEME,
 } from "@/lib/shiki";
 import { ProblemContent } from "./problem-content";
+import type { ProblemView } from "./problem-view-types";
 
 export default async function ProblemPage({
   params,
@@ -75,18 +77,25 @@ export default async function ProblemPage({
     }
   }
 
-  return (
-    <ProblemContent
-      problem={{
-        ...problem,
-        modelDisplayName,
-        solution: problem.solution
-          ? {
-              ...problem.solution,
-              preHighlightedHtml: preHighlightedSolutionHtml,
-            }
-          : null,
-      }}
-    />
-  );
+  const viewProblem: ProblemView = {
+    id: problem.id,
+    contestId: problem.contestId,
+    index: problem.index,
+    name: problem.name,
+    rating: problem.rating,
+    tags: problem.tags,
+    reviewStatus: problem.reviewStatus,
+    runState: problem.runState as RunState,
+    modelDisplayName,
+    hints: problem.hints,
+    editorial: problem.editorial,
+    solution: problem.solution
+      ? {
+          ...problem.solution,
+          preHighlightedHtml: preHighlightedSolutionHtml,
+        }
+      : null,
+  };
+
+  return <ProblemContent problem={viewProblem} />;
 }

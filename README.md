@@ -16,12 +16,14 @@ Progressive hints, clean editorials, and full C++ solutions for Codeforces probl
 
 Most editorial sites give you the whole answer or nothing. Nudge sits in between: every problem has **progressive hints** that go from a gentle nudge toward the right area all the way to the key insight, plus a prose editorial and the full C++ solution when you're ready.
 
-All content is AI-generated using the Anthropic Batch API, then stored in Postgres and served through a Next.js frontend. Problems are synced from the Codeforces API automatically.
+All content is AI-generated using the Anthropic/OpenAI batch APIs, then stored in Postgres and served through a Next.js frontend. Problems are synced from the Codeforces API automatically.
 
-1. **Sync** — A weekly Trigger.dev scheduled task pulls every problem from the Codeforces API and upserts them into Postgres.
-2. **Generate** — A daily scheduler batches pending problems into Anthropic Batch API calls. Claude generates five progressive hints, a Markdown editorial with LaTeX, and a complete C++ solution for each.
-3. **Serve** — Next.js renders the problem list with filtering by rating, tag, and search. Each problem page has collapsible hint panels so you control exactly how much you see.
-4. **Report** — Users can flag incorrect content. A daily digest sends new reports to Discord via webhook for human verification.
+1. **Sync** — A weekly Trigger.dev scheduled task pulls every problem from the Codeforces API and upserts them into Postgres as backlog.
+2. **Queue** — Backfill moves backlog problems into the ready queue, prioritized by request count.
+3. **Generate** — A daily scheduler batches ready problems into provider batch API calls. The model generates five progressive hints, a Markdown editorial with LaTeX, and a complete C++ solution for each.
+4. **Serve** — Next.js renders the problem list with filtering by rating, tag, and search. Each problem page has collapsible hint panels so you control exactly how much you see.
+5. **Recover** — An hourly watchdog detects stale running jobs and marks them failed for retry.
+6. **Report** — Users can flag incorrect content. A daily digest sends new reports to Discord via webhook for human verification.
 
 ## Tech stack
 
@@ -32,7 +34,7 @@ All content is AI-generated using the Anthropic Batch API, then stored in Postgr
 | **Database**        | PostgreSQL on [Supabase](https://supabase.com)                                                                                         |
 | **ORM**             | [Prisma v7](https://prisma.io) with `@prisma/adapter-pg`                                                                               |
 | **Background jobs** | [Trigger.dev v4](https://trigger.dev)                                                                                                  |
-| **AI**              | [Anthropic Batch API](https://platform.claude.com/docs/en/build-with-claude/batch-processing) - Always the biggest, baddest Opus model |
+| **AI**              | Provider-agnostic batch pipeline (Anthropic/OpenAI via structured outputs)                                                               |
 | **Styling**         | [Tailwind CSS v4](https://tailwindcss.com), [shadcn/ui](https://ui.shadcn.com)                                                         |
 | **Linting**         | [Biome](https://biomejs.dev)                                                                                                           |
 
@@ -42,7 +44,7 @@ All content is AI-generated using the Anthropic Batch API, then stored in Postgr
 
 - [Bun](https://bun.sh) installed
 - A PostgreSQL database (Supabase, Neon, local, etc.)
-- An [Anthropic API key](https://console.anthropic.com)
+- An Anthropic and/or OpenAI API key (depending on active provider)
 - A [Trigger.dev](https://trigger.dev) account + project
 
 ### Setup
@@ -77,7 +79,8 @@ This connects to Trigger.dev and registers the scheduled tasks:
 
 - **`sync-problems`** — weekly Codeforces sync (Sundays at midnight MST)
 - **`generate-content-scheduler`** — daily batch generation (midnight MST)
+- **`generation-state-watchdog`** — hourly stale-run recovery
 - **`report-digest`** — daily Discord digest of user-reported issues
-- **`backfill`** — manually triggered, queues ungenerated problems by rating/tag filters
+- **`backfill`** — manually triggered, queues backlog problems by rating/tag filters
 
 Or, you know, use the [live website](https://nudge.shrootbuck.com)

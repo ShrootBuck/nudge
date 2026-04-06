@@ -2,6 +2,10 @@ import { logger, schedules } from "@trigger.dev/sdk";
 import { DISCORD_COLORS } from "../lib/discord-webhook";
 import { fetchWithTimeout } from "../lib/http";
 import { prisma } from "../lib/prisma";
+import {
+  pipelineStateData,
+  problemCreateData,
+} from "../lib/problem-pipeline-db";
 import { discordLog } from "./discord-log";
 
 interface CFProblem {
@@ -90,6 +94,7 @@ export const syncProblems = schedules.task({
               tags: p.tags,
             },
             create: {
+              ...problemCreateData(pipelineStateData("BACKLOG", "IDLE")),
               contestId: p.contestId,
               index: p.index,
               name: p.name,

@@ -1,6 +1,10 @@
 "use server";
 
 import { prisma } from "@/lib/prisma";
+import { resolveRunState } from "@/lib/problem-pipeline";
+import { problemUpdateData } from "@/lib/problem-pipeline-db";
+
+const MAX_REQUESTED_COUNT = 2_000_000_000;
 
 const PROBLEM_IDENTIFIER_PATTERN =
   /^(\d+)\s*(?:\/|\s)?\s*([A-Za-z][A-Za-z0-9]*)$/;
@@ -105,7 +109,19 @@ export async function requestProblem(_prevState: unknown, formData: FormData) {
     });
 
     if (problem) {
-      if (problem.generationStatus === "COMPLETED") {
+      const problemRecord = problem as Record<string, unknown>;
+      const runState = resolveRunState(
+        typeof problemRecord.runState === "string"
+          ? problemRecord.runState
+          : null,
+      );
+
+      const currentRequestedCount =
+        typeof problemRecord.requestedCount === "number"
+          ? Math.max(0, Math.trunc(problemRecord.requestedCount))
+          : 0;
+
+      if (runState === "SUCCEEDED") {
         return {
           message: "This problem is already solved and available on Nudge!",
         };
@@ -113,9 +129,13 @@ export async function requestProblem(_prevState: unknown, formData: FormData) {
 
       await prisma.problem.update({
         where: { id: problem.id },
-        data: {
-          requested: true,
-        },
+        data: problemUpdateData({
+          requestedCount: Math.min(
+            currentRequestedCount + 1,
+            MAX_REQUESTED_COUNT,
+          ),
+          requestedAt: new Date(),
+        }),
       });
 
       return {

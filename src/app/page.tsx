@@ -11,14 +11,19 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { connection } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { completedContentWhere, problemWhere } from "@/lib/problem-pipeline-db";
 import { ratingTone } from "@/lib/utils";
 import { ProblemFilters } from "./problem-filters";
 
 const PAGE_SIZE = 50;
-const LISTABLE_WHERE: Prisma.ProblemWhereInput = {
-  generationStatus: "COMPLETED",
-  reviewStatus: { notIn: ["UNSOLVABLE", "SOLUTION_INCORRECT"] },
-};
+function listableWhere(): Prisma.ProblemWhereInput {
+  return problemWhere({
+    AND: [
+      completedContentWhere(),
+      { reviewStatus: { notIn: ["UNSOLVABLE", "SOLUTION_INCORRECT"] } },
+    ],
+  });
+}
 
 function buildPageUrl(
   searchParams: Record<string, string | string[] | undefined>,
@@ -85,7 +90,7 @@ export default async function Home({
   const tagParam = typeof params.tag === "string" ? params.tag : "";
 
   const where: Prisma.ProblemWhereInput = {
-    ...LISTABLE_WHERE,
+    ...listableWhere(),
   };
 
   if (query) {
@@ -114,7 +119,7 @@ export default async function Home({
   const [totalCount, verifiedCount] = await Promise.all([
     prisma.problem.count({ where }),
     prisma.problem.count({
-      where: { ...LISTABLE_WHERE, reviewStatus: "VERIFIED" },
+      where: { ...listableWhere(), reviewStatus: "VERIFIED" },
     }),
   ]);
 

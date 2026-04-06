@@ -2,6 +2,12 @@ import type { Prisma } from "@prisma/client";
 import { logger, task } from "@trigger.dev/sdk";
 import { DISCORD_COLORS } from "../lib/discord-webhook";
 import { prisma } from "../lib/prisma";
+import {
+  backlogWhere,
+  pipelineStateData,
+  problemUpdateManyData,
+  problemWhere,
+} from "../lib/problem-pipeline-db";
 import { discordLog } from "./discord-log";
 
 interface BackfillPayload {
@@ -13,7 +19,7 @@ interface BackfillPayload {
   limit?: number; // max problems to queue, defaults to 100
 }
 
-// Manually triggered — marks UNQUEUED problems as PENDING based on filters
+// Manually triggered — marks backlog problems as ready based on filters
 export const backfill = task({
   id: "backfill",
   run: async (payload: BackfillPayload) => {
@@ -36,7 +42,7 @@ export const backfill = task({
     });
 
     const where: Prisma.ProblemWhereInput = {
-      generationStatus: "UNQUEUED",
+      ...backlogWhere(),
     };
 
     if (ratingMin !== undefined || ratingMax !== undefined) {
@@ -58,23 +64,32 @@ export const backfill = task({
     }
 
     const candidates = await prisma.problem.findMany({
-      where,
+      where: problemWhere(where),
       select: { id: true },
-      orderBy: [{ requested: "desc" }, { contestId: "desc" }],
+      orderBy: [
+        { requestedCount: "desc" },
+        { requestedAt: "desc" },
+        { contestId: "desc" },
+      ] as unknown as Prisma.ProblemOrderByWithRelationInput[],
       take: limit,
     });
 
     if (candidates.length === 0) {
-      logger.info("No matching UNQUEUED problems found");
+      logger.info("No matching backlog problems found");
       return { queued: 0 };
     }
 
     const selectedIds = candidates.map((c) => c.id);
 
-    // Mark them all as PENDING
+    // Mark them all as READY + IDLE
     await prisma.problem.updateMany({
       where: { id: { in: selectedIds } },
-      data: { generationStatus: "PENDING" },
+      data: problemUpdateManyData({
+        ...pipelineStateData("READY", "IDLE"),
+        activeBatchId: null,
+        processingStartedAt: null,
+        lastGenerationError: null,
+      }),
     });
 
     // Fetch sample details for logging (max 5)
@@ -105,7 +120,7 @@ export const backfill = task({
     await discordLog.trigger({
       title: "📋 Backfill Queued",
       description:
-        `**${selectedIds.length}** problems marked PENDING for generation\n` +
+        `**${selectedIds.length}** backlog problems marked ready for generation\n` +
         sampleLabels.join(", ") +
         extraBackfill,
       color: DISCORD_COLORS.orange,

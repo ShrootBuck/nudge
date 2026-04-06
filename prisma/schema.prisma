@@ -6,11 +6,15 @@ datasource db {
   provider = "postgresql"
 }
 
-enum GenerationStatus {
-  UNQUEUED
-  PENDING
-  PROCESSING
-  COMPLETED
+enum QueueState {
+  BACKLOG
+  READY
+}
+
+enum RunState {
+  IDLE
+  RUNNING
+  SUCCEEDED
   FAILED
 }
 
@@ -29,10 +33,15 @@ model Problem {
   rating    Int?
   tags      String[] // e.g. ["dp", "greedy"]
 
-  generationStatus   GenerationStatus @default(PENDING)
+  queueState          QueueState       @default(BACKLOG)
+  runState            RunState         @default(IDLE)
   generationAttempts Int              @default(0)
   reviewStatus       ReviewStatus     @default(UNREVIEWED)
-  requested          Boolean          @default(false)
+  requestedCount     Int              @default(0)
+  requestedAt         DateTime?
+  activeBatchId       String?
+  processingStartedAt DateTime?
+  lastGenerationError String?          @db.Text
 
   // Tracks which provider/model generated this problem's content
   generatedByProvider String? // e.g. "anthropic", "openai"
@@ -47,6 +56,8 @@ model Problem {
   updatedAt DateTime @updatedAt
 
   @@unique([contestId, index])
+  @@index([queueState, runState, generationAttempts])
+  @@index([requestedCount, requestedAt, updatedAt])
 }
 
 model Hint {

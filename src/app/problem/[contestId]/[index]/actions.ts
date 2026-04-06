@@ -4,6 +4,10 @@ import { sendAdminLog } from "@/lib/discord";
 import { DISCORD_COLORS } from "@/lib/discord-webhook";
 import { SITE_URL, verifyAdminPassword } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
+import {
+  pipelineStateData,
+  problemUpdateData,
+} from "@/lib/problem-pipeline-db";
 
 const REVIEW_STATUSES = [
   "VERIFIED",
@@ -112,11 +116,16 @@ export async function queueRegeneration(problemId: string, password: string) {
 
   await prisma.problem.update({
     where: { id: problemId },
-    data: {
-      generationStatus: "PENDING",
+    data: problemUpdateData({
+      ...pipelineStateData("READY", "IDLE"),
       generationAttempts: 0,
       reviewStatus: "UNREVIEWED",
-    },
+      requestedCount: 1,
+      requestedAt: new Date(),
+      activeBatchId: null,
+      processingStartedAt: null,
+      lastGenerationError: null,
+    }),
   });
 
   const tag = `${problem.contestId}${problem.index}`;
