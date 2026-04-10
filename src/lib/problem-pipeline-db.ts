@@ -1,47 +1,46 @@
-import type { Prisma } from "@prisma/client";
-import type { QueueState, RunState } from "./problem-pipeline";
+import type { Prisma, QueueState, RunState } from "@prisma/client";
 
-function castWhere(input: unknown): Prisma.ProblemWhereInput {
-  return input as Prisma.ProblemWhereInput;
+export function problemWhere<T extends Prisma.ProblemWhereInput>(input: T): T {
+  return input;
 }
 
-export function problemWhere(input: unknown): Prisma.ProblemWhereInput {
-  return castWhere(input);
+export function problemCreateData<T extends Partial<Prisma.ProblemCreateInput>>(
+  input: T,
+): T {
+  return input;
 }
 
-export function problemCreateData(input: unknown): Prisma.ProblemCreateInput {
-  return input as Prisma.ProblemCreateInput;
+export function problemUpdateData<T extends Prisma.ProblemUpdateInput>(
+  input: T,
+): T {
+  return input;
 }
 
-export function problemUpdateData(input: unknown): Prisma.ProblemUpdateInput {
-  return input as Prisma.ProblemUpdateInput;
+export function problemUpdateManyData<
+  T extends Prisma.ProblemUpdateManyMutationInput,
+>(input: T): T {
+  return input;
 }
 
-export function problemUpdateManyData(
-  input: unknown,
-): Prisma.ProblemUpdateManyMutationInput {
-  return input as Prisma.ProblemUpdateManyMutationInput;
+export function problemOrderBy<
+  T extends Prisma.ProblemOrderByWithRelationInput[],
+>(input: T): T {
+  return input;
 }
 
-export function problemOrderBy(
-  input: unknown,
-): Prisma.ProblemOrderByWithRelationInput[] {
-  return input as Prisma.ProblemOrderByWithRelationInput[];
-}
-
-export function problemSelect<T = Record<string, unknown>>(input: unknown): T {
-  return input as T;
+export function problemSelect<T extends Prisma.ProblemSelect>(input: T): T {
+  return input;
 }
 
 export function pipelineStateData(queueState: QueueState, runState: RunState) {
   return {
     queueState,
     runState,
-  };
+  } satisfies Pick<Prisma.ProblemCreateInput, "queueState" | "runState">;
 }
 
 export function readyToRunWhere(maxAttempts: number): Prisma.ProblemWhereInput {
-  return castWhere({
+  return problemWhere({
     generationAttempts: { lt: maxAttempts },
     queueState: "READY",
     runState: { in: ["IDLE", "FAILED"] },
@@ -49,13 +48,13 @@ export function readyToRunWhere(maxAttempts: number): Prisma.ProblemWhereInput {
 }
 
 export function backlogWhere(): Prisma.ProblemWhereInput {
-  return castWhere({
+  return problemWhere({
     queueState: "BACKLOG",
   });
 }
 
 export function completedContentWhere(): Prisma.ProblemWhereInput {
-  return castWhere({
+  return problemWhere({
     runState: "SUCCEEDED",
   });
 }

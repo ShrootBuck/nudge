@@ -1,7 +1,6 @@
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { prisma } from "@/lib/prisma";
-import type { RunState } from "@/lib/problem-pipeline";
 import { parseSolutionContent } from "@/lib/problem-solution";
 import {
   highlightCodeHtml,
@@ -84,7 +83,7 @@ export default async function ProblemPage({
     rating: problem.rating,
     tags: problem.tags,
     reviewStatus: problem.reviewStatus,
-    runState: problem.runState as RunState,
+    runState: problem.runState,
     modelDisplayName,
     hints: problem.hints,
     editorial: problem.editorial,

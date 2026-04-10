@@ -1,6 +1,6 @@
+import type { RunState } from "@prisma/client";
 import { BadgeCheck, Ban, LoaderCircle, ShieldAlert, X } from "lucide-react";
 import type { ComponentType } from "react";
-import type { RunState } from "@/lib/problem-pipeline";
 
 export type ReviewStatus =
   | "UNREVIEWED"

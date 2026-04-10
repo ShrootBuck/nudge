@@ -1,8 +1,7 @@
 "use server";
 
+import type { RunState } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { resolveRunState } from "@/lib/problem-pipeline";
-import { problemUpdateData } from "@/lib/problem-pipeline-db";
 
 const MAX_REQUESTED_COUNT = 2_000_000_000;
 
@@ -81,6 +80,10 @@ function parseRequestedProblem(input: string) {
   }
 }
 
+function isCompletedRunState(runState: RunState) {
+  return runState === "SUCCEEDED";
+}
+
 export async function requestProblem(_prevState: unknown, formData: FormData) {
   const input = toProblemInput(formData.get("problem"));
   if (!input) {
@@ -105,35 +108,28 @@ export async function requestProblem(_prevState: unknown, formData: FormData) {
           index,
         },
       },
+      select: {
+        id: true,
+        runState: true,
+      },
     });
 
     if (problem) {
-      const problemRecord = problem as Record<string, unknown>;
-      const runState = resolveRunState(
-        typeof problemRecord.runState === "string"
-          ? problemRecord.runState
-          : null,
-      );
-
-      const currentRequestedCount =
-        typeof problemRecord.requestedCount === "number"
-          ? Math.max(0, Math.trunc(problemRecord.requestedCount))
-          : 0;
-
-      if (runState === "SUCCEEDED") {
+      if (isCompletedRunState(problem.runState)) {
         return {
           message: "This problem is already solved and available on Nudge!",
+          problemHref: `/problem/${contestId}/${index}`,
         };
       }
 
-      await prisma.problem.update({
-        where: { id: problem.id },
-        data: problemUpdateData({
-          requestedCount: Math.min(
-            currentRequestedCount + 1,
-            MAX_REQUESTED_COUNT,
-          ),
-        }),
+      await prisma.problem.updateMany({
+        where: {
+          id: problem.id,
+          requestedCount: { lt: MAX_REQUESTED_COUNT },
+        },
+        data: {
+          requestedCount: { increment: 1 },
+        },
       });
 
       return {

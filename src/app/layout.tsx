@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import { Footer } from "@/components/footer";
 import { Navbar } from "@/components/navbar";
 import { ThemeProvider } from "@/components/theme-provider";
+import { SITE_URL } from "@/lib/env";
 import "./globals.css";
 
 const inter = Inter({
@@ -11,9 +12,31 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Nudge",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "Nudge",
+    template: "%s | Nudge",
+  },
   description:
-    "AI-powered hints, editorials, and solutions for Codeforces problems",
+    "Progressive hints, clean editorials, and full C++ solutions for Codeforces problems.",
+  applicationName: "Nudge",
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    title: "Nudge",
+    description:
+      "Progressive hints, clean editorials, and full C++ solutions for Codeforces problems.",
+    url: SITE_URL,
+    siteName: "Nudge",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "Nudge",
+    description:
+      "Progressive hints, clean editorials, and full C++ solutions for Codeforces problems.",
+  },
   icons: {
     icon: "https://fav.farm/💻",
   },

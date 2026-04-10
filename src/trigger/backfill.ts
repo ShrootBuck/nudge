@@ -5,6 +5,7 @@ import { prisma } from "../lib/prisma";
 import {
   backlogWhere,
   pipelineStateData,
+  problemOrderBy,
   problemUpdateManyData,
   problemWhere,
 } from "../lib/problem-pipeline-db";
@@ -65,10 +66,10 @@ export const backfill = task({
     const candidates = await prisma.problem.findMany({
       where: problemWhere(where),
       select: { id: true },
-      orderBy: [
+      orderBy: problemOrderBy([
         { requestedCount: "desc" },
         { createdAt: "desc" },
-      ] as unknown as Prisma.ProblemOrderByWithRelationInput[],
+      ]),
       take: limit,
     });
 

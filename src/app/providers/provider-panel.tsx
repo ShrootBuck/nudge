@@ -22,14 +22,22 @@ import {
 
 const PROVIDER_OPTIONS = ["anthropic", "openai"] as const;
 
+type Feedback =
+  | { kind: "error"; message: string }
+  | { kind: "success"; message: string }
+  | null;
+
 export function ProviderPanel({ initial }: { initial: ProviderModel[] }) {
   const [configs, setConfigs] = useState(initial);
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<Feedback>(null);
 
-  function flash(msg: string) {
-    setSuccess(msg);
+  function showSuccess(message: string) {
+    setFeedback({ kind: "success", message });
+  }
+
+  function showError(message: string) {
+    setFeedback({ kind: "error", message });
   }
 
   return (
@@ -47,21 +55,26 @@ export function ProviderPanel({ initial }: { initial: ProviderModel[] }) {
           value={password}
           onChange={(e) => {
             setPassword(e.target.value);
-            setError(null);
+            if (feedback?.kind === "error") {
+              setFeedback(null);
+            }
           }}
           placeholder="Enter password to make changes"
           className="h-10 max-w-sm rounded-xl border-border/50 bg-background/65 px-4 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] placeholder:text-muted-foreground/70 focus-visible:border-foreground/15 focus-visible:ring-0 focus-visible:outline-none"
         />
       </div>
 
-      {error && (
-        <p className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-2.5 text-sm text-rose-200">
-          {error}
-        </p>
-      )}
-      {success && (
-        <p className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-2.5 text-sm text-emerald-200">
-          {success}
+      {feedback && (
+        <p
+          role={feedback.kind === "error" ? "alert" : "status"}
+          className={cn(
+            "rounded-xl px-4 py-2.5 text-sm",
+            feedback.kind === "error"
+              ? "border border-rose-500/20 bg-rose-500/10 text-rose-200"
+              : "border border-emerald-500/20 bg-emerald-500/10 text-emerald-200",
+          )}
+        >
+          {feedback.message}
         </p>
       )}
 
@@ -71,16 +84,16 @@ export function ProviderPanel({ initial }: { initial: ProviderModel[] }) {
             key={cfg.id}
             config={cfg}
             password={password}
-            onError={setError}
+            onError={showError}
             onActivated={(id) => {
               setConfigs((prev) =>
                 prev.map((c) => ({ ...c, isActive: c.id === id })),
               );
-              flash("Active model updated");
+              showSuccess("Active model updated");
             }}
             onDeleted={(id) => {
               setConfigs((prev) => prev.filter((c) => c.id !== id));
-              flash("Configuration deleted");
+              showSuccess("Configuration deleted");
             }}
           />
         ))}
@@ -94,10 +107,10 @@ export function ProviderPanel({ initial }: { initial: ProviderModel[] }) {
 
       <AddConfigForm
         password={password}
-        onError={setError}
+        onError={showError}
         onAdded={(cfg) => {
           setConfigs((prev) => [...prev, cfg]);
-          flash("Configuration added");
+          showSuccess("Configuration added");
         }}
       />
     </div>
@@ -126,11 +139,15 @@ function ConfigCard({
     }
     startTransition(() => {
       void (async () => {
-        const result = await setActiveModel(password, config.id);
-        if (result.success) {
-          onActivated(config.id);
-        } else {
-          onError(result.error);
+        try {
+          const result = await setActiveModel(password, config.id);
+          if (result.success) {
+            onActivated(config.id);
+          } else {
+            onError(result.error);
+          }
+        } catch {
+          onError("Failed to activate the model");
         }
       })();
     });
@@ -143,11 +160,15 @@ function ConfigCard({
     }
     startTransition(() => {
       void (async () => {
-        const result = await deleteModelConfig(password, config.id);
-        if (result.success) {
-          onDeleted(config.id);
-        } else {
-          onError(result.error);
+        try {
+          const result = await deleteModelConfig(password, config.id);
+          if (result.success) {
+            onDeleted(config.id);
+          } else {
+            onError(result.error);
+          }
+        } catch {
+          onError("Failed to delete the configuration");
         }
       })();
     });
@@ -251,26 +272,30 @@ function AddConfigForm({
 
     startTransition(() => {
       void (async () => {
-        const result = await addModelConfig(password, {
-          provider,
-          modelId,
-          displayName,
-        });
-
-        if (result.success) {
-          onAdded({
-            id: result.id,
-            provider: provider.trim().toLowerCase(),
-            modelId: modelId.trim(),
-            displayName: displayName.trim(),
-            isActive: result.isActive,
+        try {
+          const result = await addModelConfig(password, {
+            provider,
+            modelId,
+            displayName,
           });
-          setProvider("anthropic");
-          setModelId("");
-          setDisplayName("");
-          setOpen(false);
-        } else {
-          onError(result.error);
+
+          if (result.success) {
+            onAdded({
+              id: result.id,
+              provider: provider.trim().toLowerCase(),
+              modelId: modelId.trim(),
+              displayName: displayName.trim(),
+              isActive: result.isActive,
+            });
+            setProvider("anthropic");
+            setModelId("");
+            setDisplayName("");
+            setOpen(false);
+          } else {
+            onError(result.error);
+          }
+        } catch {
+          onError("Failed to add the configuration");
         }
       })();
     });

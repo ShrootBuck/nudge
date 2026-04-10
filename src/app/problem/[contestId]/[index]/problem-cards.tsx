@@ -1,6 +1,6 @@
 "use client";
 
-import { type ComponentType, useState } from "react";
+import { type ComponentType, useId, useState } from "react";
 import { CodeBlock } from "@/components/code-block";
 import { parseSolutionContent } from "@/lib/problem-solution";
 import { cn } from "@/lib/utils";
@@ -9,13 +9,16 @@ import { HINT_LABELS, type ProblemView } from "./problem-view-types";
 
 export function AnimatedCollapse({
   open,
+  id,
   children,
 }: {
   open: boolean;
+  id?: string;
   children: React.ReactNode;
 }) {
   return (
     <div
+      id={id}
       className={cn(
         "grid overflow-hidden transition-all duration-300 ease-out",
         open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
@@ -55,6 +58,7 @@ export function HintCard({
   index: number;
 }) {
   const [open, setOpen] = useState(false);
+  const panelId = useId();
 
   return (
     <div
@@ -68,6 +72,8 @@ export function HintCard({
       <button
         type="button"
         onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-controls={panelId}
         className="flex w-full cursor-pointer items-center justify-between gap-4 px-5 py-4 text-left sm:px-6"
       >
         <div className="flex min-w-0 items-center gap-4">
@@ -85,7 +91,7 @@ export function HintCard({
         <ChevronIcon open={open} />
       </button>
 
-      <AnimatedCollapse open={open}>
+      <AnimatedCollapse open={open} id={panelId}>
         <div className="border-t border-border/60 px-5 pb-5 pt-4 sm:px-6">
           <ProblemMarkdown content={hint.content} />
         </div>
@@ -164,6 +170,8 @@ export function CollapsibleSection({
   icon: ComponentType<{ className?: string }>;
   children: React.ReactNode;
 }) {
+  const panelId = useId();
+
   return (
     <section
       className={cn(
@@ -174,6 +182,8 @@ export function CollapsibleSection({
       <button
         type="button"
         onClick={onToggle}
+        aria-expanded={open}
+        aria-controls={panelId}
         className="flex w-full cursor-pointer items-center justify-between gap-4 p-5 text-left sm:p-6"
       >
         <div className="flex items-start gap-4">
@@ -193,7 +203,7 @@ export function CollapsibleSection({
         <ChevronIcon open={open} />
       </button>
 
-      <AnimatedCollapse open={open}>
+      <AnimatedCollapse open={open} id={panelId}>
         <div className="border-t border-border/60 px-5 pb-5 pt-4 sm:px-6">
           {children}
         </div>

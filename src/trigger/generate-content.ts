@@ -15,8 +15,8 @@ import {
 } from "../lib/problem-pipeline-db";
 import { discordLog } from "./discord-log";
 import {
-  contentSchema,
   problemOutputSchema,
+  problemResultSchema,
 } from "./generate-content/content-schema";
 import { getActiveModelConfig } from "./generate-content/model-config";
 import {
@@ -382,14 +382,10 @@ export const generateBatchContent = task({
               throw new Error(result.error ?? "Unknown provider error");
             }
 
-            const outputData = result.output as Record<string, unknown>;
+            const outputData = problemResultSchema.parse(result.output);
 
             if (outputData.status === "unsolvable") {
-              const reason =
-                typeof outputData.reason === "string" &&
-                outputData.reason.trim()
-                  ? outputData.reason
-                  : "Unknown reason";
+              const reason = outputData.reason;
 
               logger.warn(`Problem ${label} reported as unsolvable: ${reason}`);
 
@@ -415,8 +411,7 @@ export const generateBatchContent = task({
               continue;
             }
 
-            const parsed = contentSchema.parse(outputData);
-            await saveProblemContent(result.customId, parsed, modelInfo);
+            await saveProblemContent(result.customId, outputData, modelInfo);
 
             succeeded++;
             pendingIds.delete(result.customId);

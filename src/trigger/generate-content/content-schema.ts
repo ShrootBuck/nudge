@@ -8,6 +8,8 @@ const hintSchema = z.object({
 
 export const contentSchema = z
   .object({
+    status: z.literal("success"),
+    reason: z.null(),
     hints: z.array(hintSchema).length(5),
     editorial: z.string().trim().min(1),
     solution: z.string().trim().min(1),
@@ -28,7 +30,21 @@ export const contentSchema = z
     }
   });
 
+const unsolvableContentSchema = z.object({
+  status: z.literal("unsolvable"),
+  reason: z.string().trim().min(1),
+  hints: z.null(),
+  editorial: z.null(),
+  solution: z.null(),
+});
+
+export const problemResultSchema = z.discriminatedUnion("status", [
+  contentSchema,
+  unsolvableContentSchema,
+]);
+
 export type ParsedContent = z.infer<typeof contentSchema>;
+export type ParsedProblemResult = z.infer<typeof problemResultSchema>;
 
 export const problemOutputSchema: OutputSchema = {
   name: "problem_response",

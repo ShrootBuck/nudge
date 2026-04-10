@@ -12,8 +12,10 @@ export function Navbar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: Depends on pathname to close the menu on route changes.
   useEffect(() => {
+    if (!pathname) {
+      return;
+    }
     setMobileOpen(false);
   }, [pathname]);
 
@@ -42,6 +44,7 @@ export function Navbar() {
                 <Link
                   key={link.href}
                   href={link.href}
+                  aria-current={isActive ? "page" : undefined}
                   className={cn(
                     "rounded-full px-3.5 py-1.5 text-sm font-medium transition",
                     isActive
@@ -69,6 +72,8 @@ export function Navbar() {
             <button
               type="button"
               onClick={() => setMobileOpen(!mobileOpen)}
+              aria-expanded={mobileOpen}
+              aria-controls="site-mobile-nav"
               className="inline-flex size-8 items-center justify-center rounded-full border border-border/60 bg-background/60 text-muted-foreground transition hover:border-foreground/15 hover:text-foreground sm:hidden"
               aria-label="Toggle menu"
             >
@@ -83,7 +88,10 @@ export function Navbar() {
       </div>
 
       {mobileOpen && (
-        <div className="border-b border-border/50 bg-background/80 backdrop-blur-xl sm:hidden">
+        <div
+          id="site-mobile-nav"
+          className="border-b border-border/50 bg-background/80 backdrop-blur-xl sm:hidden"
+        >
           <div className="mx-auto max-w-6xl space-y-1 px-4 pb-4 pt-2">
             {NAV_LINKS.map((link) => {
               const isActive =
@@ -95,6 +103,7 @@ export function Navbar() {
                 <Link
                   key={link.href}
                   href={link.href}
+                  aria-current={isActive ? "page" : undefined}
                   className={cn(
                     "block rounded-xl px-3.5 py-2.5 text-sm font-medium transition",
                     isActive

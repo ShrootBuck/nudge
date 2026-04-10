@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState, useTransition } from "react";
+import { useId, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cfProblemUrl, cn, ratingTone } from "@/lib/utils";
@@ -109,6 +109,7 @@ export function ReportSection({ problemId }: { problemId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [submitted, setSubmitted] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const panelId = useId();
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -143,6 +144,8 @@ export function ReportSection({ problemId }: { problemId: string }) {
       <button
         type="button"
         onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-controls={panelId}
         className="flex w-full cursor-pointer items-center justify-between gap-4 px-5 py-4 text-left sm:px-6"
       >
         <div className="flex min-w-0 items-center gap-4">
@@ -164,7 +167,7 @@ export function ReportSection({ problemId }: { problemId: string }) {
         <ChevronIcon open={open} />
       </button>
 
-      <AnimatedCollapse open={open}>
+      <AnimatedCollapse open={open} id={panelId}>
         <div className="border-t border-border/60 px-5 pb-5 pt-4 sm:px-6">
           {submitted ? (
             <div className="flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
@@ -232,6 +235,7 @@ export function ReviewSection({
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
   const review = reviewState(reviewStatus);
+  const panelId = useId();
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -304,6 +308,8 @@ export function ReviewSection({
       <button
         type="button"
         onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-controls={panelId}
         className="flex w-full cursor-pointer items-center justify-between gap-4 px-5 py-4 text-left sm:px-6"
       >
         <div className="flex min-w-0 items-center gap-4">
@@ -334,7 +340,7 @@ export function ReviewSection({
         </div>
       </button>
 
-      <AnimatedCollapse open={open}>
+      <AnimatedCollapse open={open} id={panelId}>
         <div className="border-t border-border/60 px-5 pb-5 pt-4 sm:px-6">
           <form
             onSubmit={handleSubmit}

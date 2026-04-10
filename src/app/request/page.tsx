@@ -49,7 +49,7 @@ export default function RequestPage() {
               <div>
                 <label
                   htmlFor="problem"
-                  className="block text-sm font-medium text-foreground mb-1.5"
+                  className="mb-1.5 block text-sm font-medium text-foreground"
                 >
                   Problem ID or URL
                 </label>
@@ -62,10 +62,29 @@ export default function RequestPage() {
               </div>
 
               {state?.error && (
-                <div className="text-sm text-destructive">{state.error}</div>
+                <div
+                  role="alert"
+                  className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200"
+                >
+                  {state.error}
+                </div>
               )}
               {state?.message && (
-                <div className="text-sm text-green-500">{state.message}</div>
+                <output
+                  aria-live="polite"
+                  className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200"
+                >
+                  <p>{state.message}</p>
+                  {state.problemHref ? (
+                    <Link
+                      href={state.problemHref}
+                      className="mt-2 inline-flex items-center gap-2 font-medium text-emerald-100 underline decoration-emerald-400/40 underline-offset-4 transition hover:decoration-emerald-200"
+                    >
+                      Open the problem page
+                      <ArrowUpRight className="size-3.5" />
+                    </Link>
+                  ) : null}
+                </output>
               )}
 
               <SubmitButton />
