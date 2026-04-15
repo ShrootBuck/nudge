@@ -13,6 +13,7 @@ import { connection } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { completedContentWhere, problemWhere } from "@/lib/problem-pipeline-db";
 import { ratingTone } from "@/lib/utils";
+import { LuckyButton } from "./lucky-button";
 import { ProblemFilters } from "./problem-filters";
 
 const PAGE_SIZE = 50;
@@ -174,6 +175,10 @@ export default async function Home({
                 hints, a clean editorial, and the full C++ write-up once you
                 actually want it.
               </p>
+
+              <div className="mt-6">
+                <LuckyButton />
+              </div>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
