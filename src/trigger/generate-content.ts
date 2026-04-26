@@ -160,7 +160,10 @@ export const generateBatchContent = task({
 
     const modelConfig = await getActiveModelConfig();
     const provider = getProvider(modelConfig.provider);
-    const effortPlan = buildEffortPlanForProvider(modelConfig.provider);
+    const effortPlan = buildEffortPlanForProvider(
+      modelConfig.provider,
+      modelConfig.effort,
+    );
     const selectedEffort = effortPlan[0];
 
     logger.info(

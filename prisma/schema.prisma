@@ -105,6 +105,7 @@ model ProviderModel {
   modelId     String
   displayName String
   isActive    Boolean @default(false)
+  effort      String?
 
   createdAt DateTime @default(now())
 

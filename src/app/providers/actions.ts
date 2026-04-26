@@ -11,6 +11,7 @@ export type ProviderModel = {
   modelId: string;
   displayName: string;
   isActive: boolean;
+  effort: string | null;
 };
 
 export async function listProviderModels(): Promise<ProviderModel[]> {
@@ -24,6 +25,7 @@ export async function listProviderModels(): Promise<ProviderModel[]> {
     modelId: c.modelId,
     displayName: c.displayName,
     isActive: c.isActive,
+    effort: c.effort,
   }));
 }
 
@@ -75,6 +77,7 @@ export async function addModelConfig(
     provider: string;
     modelId: string;
     displayName: string;
+    effort?: string | null;
   },
 ) {
   const denied = auth(password);
@@ -110,12 +113,15 @@ export async function addModelConfig(
 
   const isFirst = count === 0;
 
+  const effort = data.effort?.trim() || null;
+
   const created = await prisma.providerModel.create({
     data: {
       provider,
       modelId,
       displayName,
       isActive: isFirst,
+      effort,
     },
   });
 

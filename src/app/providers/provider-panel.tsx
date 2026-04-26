@@ -12,6 +12,7 @@ import {
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { getEffortOptions } from "@/lib/ai/effort";
 import { cn } from "@/lib/utils";
 import {
   addModelConfig,
@@ -21,6 +22,11 @@ import {
 } from "./actions";
 
 const PROVIDER_OPTIONS = ["anthropic", "openai"] as const;
+
+function getEffortLabel(effort: string | null | undefined): string {
+  if (!effort) return "default";
+  return effort;
+}
 
 type Feedback =
   | { kind: "error"; message: string }
@@ -207,6 +213,11 @@ function ConfigCard({
             <p className="mt-0.5 font-mono text-xs text-muted-foreground">
               {config.provider}/{config.modelId}
             </p>
+            {config.effort && (
+              <p className="mt-1 font-mono text-[10px] text-muted-foreground/70">
+                effort: {getEffortLabel(config.effort)}
+              </p>
+            )}
           </div>
         </div>
 
@@ -260,7 +271,10 @@ function AddConfigForm({
   const [provider, setProvider] = useState<string>("anthropic");
   const [modelId, setModelId] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [effort, setEffort] = useState("");
   const [isPending, startTransition] = useTransition();
+
+  const effortOptions = getEffortOptions(provider);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -277,6 +291,7 @@ function AddConfigForm({
             provider,
             modelId,
             displayName,
+            effort,
           });
 
           if (result.success) {
@@ -286,10 +301,12 @@ function AddConfigForm({
               modelId: modelId.trim(),
               displayName: displayName.trim(),
               isActive: result.isActive,
+              effort: effort || null,
             });
             setProvider("anthropic");
             setModelId("");
             setDisplayName("");
+            setEffort("");
             setOpen(false);
           } else {
             onError(result.error);
@@ -340,6 +357,7 @@ function AddConfigForm({
               value={provider}
               onChange={(e) => {
                 setProvider(e.target.value);
+                setEffort("");
               }}
               className={`${inputClass} appearance-none pr-10`}
             >
@@ -384,6 +402,32 @@ function AddConfigForm({
             className={inputClass}
           />
         </div>
+        {effortOptions && (
+          <div>
+            <label
+              htmlFor="new-effort"
+              className="mb-1.5 block text-xs font-semibold tracking-[0.18em] text-muted-foreground uppercase"
+            >
+              Effort
+            </label>
+            <div className="relative">
+              <select
+                id="new-effort"
+                value={effort}
+                onChange={(e) => setEffort(e.target.value)}
+                className={`${inputClass} appearance-none pr-10`}
+              >
+                <option value="">Default</option>
+                {effortOptions.map((option) => (
+                  <option key={option} value={option}>
+                    {getEffortLabel(option)}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="mt-5 flex items-center gap-2">
