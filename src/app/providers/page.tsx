@@ -5,7 +5,7 @@ import { listProviderModels } from "./actions";
 import { ProviderPanel } from "./provider-panel";
 
 export const metadata: Metadata = {
-  title: "Provider | Nudge",
+  title: "Providers",
   description: "Manage AI model providers for content generation.",
 };
 

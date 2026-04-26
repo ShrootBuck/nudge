@@ -9,7 +9,7 @@ import {
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "About | Nudge",
+  title: "About",
   description:
     "Learn how Nudge uses AI to generate progressive hints and editorials for competitive programming problems.",
 };

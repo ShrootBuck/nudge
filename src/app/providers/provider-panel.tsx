@@ -246,7 +246,9 @@ function AddConfigForm({
   const [provider, setProvider] = useState<string>("anthropic");
   const [modelId, setModelId] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [effort, setEffort] = useState("");
+  const [effort, setEffort] = useState(
+    getEffortOptions("anthropic")?.[0] ?? "",
+  );
   const [isPending, startTransition] = useTransition();
 
   const effortOptions = getEffortOptions(provider);
@@ -284,7 +286,7 @@ function AddConfigForm({
             setProvider("anthropic");
             setModelId("");
             setDisplayName("");
-            setEffort("");
+            setEffort(getEffortOptions("anthropic")?.[0] ?? "");
             setOpen(false);
           } else {
             onError(result.error);
@@ -335,7 +337,7 @@ function AddConfigForm({
               value={provider}
               onChange={(e) => {
                 setProvider(e.target.value);
-                setEffort("");
+                setEffort(getEffortOptions(e.target.value)?.[0] ?? "");
               }}
               className={`${inputClass} appearance-none pr-10`}
             >
@@ -395,7 +397,6 @@ function AddConfigForm({
                 onChange={(e) => setEffort(e.target.value)}
                 className={`${inputClass} appearance-none pr-10`}
               >
-                <option value="">Default</option>
                 {effortOptions.map((option) => (
                   <option key={option} value={option}>
                     {getEffortLabel(option)}
@@ -414,7 +415,12 @@ function AddConfigForm({
           size="sm"
           variant="outline"
           disabled={
-            isPending || !password || !provider || !modelId || !displayName
+            isPending ||
+            !password ||
+            !provider ||
+            !modelId ||
+            !displayName ||
+            !effort
           }
           className="h-9 rounded-xl border-border/60 bg-background/55 px-4 text-xs shadow-sm hover:bg-background/75 disabled:bg-background/40"
         >

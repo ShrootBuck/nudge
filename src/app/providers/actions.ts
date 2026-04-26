@@ -1,5 +1,6 @@
 "use server";
 
+import { getEffortOptions, validateEffortForProvider } from "@/lib/ai/effort";
 import { sendAdminLog } from "@/lib/discord";
 import { DISCORD_COLORS } from "@/lib/discord-webhook";
 import { verifyAdminPassword } from "@/lib/env";
@@ -90,6 +91,18 @@ export async function addModelConfig(
     return { success: false, error: "All fields are required" } as const;
   }
 
+  const effortValidation = validateEffortForProvider(provider, data.effort);
+  if (!effortValidation.ok) {
+    return { success: false, error: effortValidation.error } as const;
+  }
+
+  if (getEffortOptions(provider) && !effortValidation.effort) {
+    return {
+      success: false,
+      error: "Effort is required for this provider",
+    } as const;
+  }
+
   if (provider !== "anthropic" && provider !== "openai") {
     return {
       success: false,
@@ -107,7 +120,7 @@ export async function addModelConfig(
   const isFirst = count === 0;
   const isOverwrite = existing !== null;
 
-  const effort = data.effort?.trim() || null;
+  const effort = effortValidation.effort;
 
   const result = await prisma.providerModel.upsert({
     where: { provider_modelId: { provider, modelId } },

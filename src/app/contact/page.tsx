@@ -2,7 +2,7 @@ import { ArrowUpRight, Bug, Mail, MessageCircle } from "lucide-react";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Contact | Nudge",
+  title: "Contact",
   description: "Get in touch with the Nudge team.",
 };
 
