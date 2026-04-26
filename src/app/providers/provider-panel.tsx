@@ -7,19 +7,13 @@ import {
   LoaderCircle,
   Plus,
   Power,
-  Trash2,
 } from "lucide-react";
 import { useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { getEffortOptions } from "@/lib/ai/effort";
 import { cn } from "@/lib/utils";
-import {
-  addModelConfig,
-  deleteModelConfig,
-  type ProviderModel,
-  setActiveModel,
-} from "./actions";
+import { addModelConfig, type ProviderModel, setActiveModel } from "./actions";
 
 const PROVIDER_OPTIONS = ["anthropic", "openai"] as const;
 
@@ -84,6 +78,14 @@ export function ProviderPanel({ initial }: { initial: ProviderModel[] }) {
         </p>
       )}
 
+      <div className="rounded-[1.75rem] border border-border/60 bg-card/50 p-4 backdrop-blur">
+        <p className="text-xs text-muted-foreground">
+          Adding a config with the same provider and model ID will overwrite the
+          existing one — no need to delete. Configurations are never truly
+          deleted to preserve display names on existing problems.
+        </p>
+      </div>
+
       <div className="space-y-3">
         {configs.map((cfg) => (
           <ConfigCard
@@ -96,10 +98,6 @@ export function ProviderPanel({ initial }: { initial: ProviderModel[] }) {
                 prev.map((c) => ({ ...c, isActive: c.id === id })),
               );
               showSuccess("Active model updated");
-            }}
-            onDeleted={(id) => {
-              setConfigs((prev) => prev.filter((c) => c.id !== id));
-              showSuccess("Configuration deleted");
             }}
           />
         ))}
@@ -114,9 +112,20 @@ export function ProviderPanel({ initial }: { initial: ProviderModel[] }) {
       <AddConfigForm
         password={password}
         onError={showError}
-        onAdded={(cfg) => {
-          setConfigs((prev) => [...prev, cfg]);
-          showSuccess("Configuration added");
+        onAdded={(cfg, overwrote) => {
+          if (overwrote) {
+            setConfigs((prev) =>
+              prev.map((c) =>
+                c.provider === cfg.provider && c.modelId === cfg.modelId
+                  ? cfg
+                  : c,
+              ),
+            );
+            showSuccess("Configuration updated");
+          } else {
+            setConfigs((prev) => [...prev, cfg]);
+            showSuccess("Configuration added");
+          }
         }}
       />
     </div>
@@ -128,13 +137,11 @@ function ConfigCard({
   password,
   onError,
   onActivated,
-  onDeleted,
 }: {
   config: ProviderModel;
   password: string;
   onError: (msg: string) => void;
   onActivated: (id: string) => void;
-  onDeleted: (id: string) => void;
 }) {
   const [isPending, startTransition] = useTransition();
 
@@ -154,27 +161,6 @@ function ConfigCard({
           }
         } catch {
           onError("Failed to activate the model");
-        }
-      })();
-    });
-  }
-
-  function handleDelete() {
-    if (!password) {
-      onError("Enter the admin password first");
-      return;
-    }
-    startTransition(() => {
-      void (async () => {
-        try {
-          const result = await deleteModelConfig(password, config.id);
-          if (result.success) {
-            onDeleted(config.id);
-          } else {
-            onError(result.error);
-          }
-        } catch {
-          onError("Failed to delete the configuration");
         }
       })();
     });
@@ -228,29 +214,18 @@ function ConfigCard({
               Active
             </span>
           ) : (
-            <>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={isPending || !password}
-                onClick={handleActivate}
-                className="h-9 rounded-xl border-emerald-500/20 bg-emerald-500/10 px-3.5 text-xs text-emerald-200 shadow-sm hover:bg-emerald-500/15 hover:text-emerald-100 disabled:border-emerald-500/10 disabled:bg-emerald-500/10 disabled:text-emerald-200/55"
-              >
-                {isPending ? (
-                  <LoaderCircle className="mr-1.5 size-3 animate-spin" />
-                ) : null}
-                Make active
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                disabled={isPending || !password}
-                onClick={handleDelete}
-                className="h-9 rounded-xl border-rose-500/20 bg-rose-500/10 px-3 text-xs text-rose-200 shadow-sm hover:bg-rose-500/15 hover:text-rose-100 disabled:border-rose-500/10 disabled:bg-rose-500/10 disabled:text-rose-200/55"
-              >
-                <Trash2 className="size-3" />
-              </Button>
-            </>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={isPending || !password}
+              onClick={handleActivate}
+              className="h-9 rounded-xl border-emerald-500/20 bg-emerald-500/10 px-3.5 text-xs text-emerald-200 shadow-sm hover:bg-emerald-500/15 hover:text-emerald-100 disabled:border-emerald-500/10 disabled:bg-emerald-500/10 disabled:text-emerald-200/55"
+            >
+              {isPending ? (
+                <LoaderCircle className="mr-1.5 size-3 animate-spin" />
+              ) : null}
+              Make active
+            </Button>
           )}
         </div>
       </div>
@@ -265,7 +240,7 @@ function AddConfigForm({
 }: {
   password: string;
   onError: (msg: string) => void;
-  onAdded: (cfg: ProviderModel) => void;
+  onAdded: (cfg: ProviderModel, overwrote: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [provider, setProvider] = useState<string>("anthropic");
@@ -295,14 +270,17 @@ function AddConfigForm({
           });
 
           if (result.success) {
-            onAdded({
-              id: result.id,
-              provider: provider.trim().toLowerCase(),
-              modelId: modelId.trim(),
-              displayName: displayName.trim(),
-              isActive: result.isActive,
-              effort: effort || null,
-            });
+            onAdded(
+              {
+                id: result.id,
+                provider: provider.trim().toLowerCase(),
+                modelId: modelId.trim(),
+                displayName: displayName.trim(),
+                isActive: result.isActive,
+                effort: effort || null,
+              },
+              result.overwrote,
+            );
             setProvider("anthropic");
             setModelId("");
             setDisplayName("");

@@ -104,63 +104,36 @@ export async function addModelConfig(
     prisma.providerModel.count(),
   ]);
 
-  if (existing) {
-    return {
-      success: false,
-      error: `Config for ${provider}/${modelId} already exists`,
-    } as const;
-  }
-
   const isFirst = count === 0;
+  const isOverwrite = existing !== null;
 
   const effort = data.effort?.trim() || null;
 
-  const created = await prisma.providerModel.create({
-    data: {
+  const result = await prisma.providerModel.upsert({
+    where: { provider_modelId: { provider, modelId } },
+    create: {
       provider,
       modelId,
       displayName,
       isActive: isFirst,
       effort,
     },
+    update: {
+      displayName,
+      effort,
+    },
   });
 
   await sendAdminLog({
-    title: "➕ Model Added",
+    title: isOverwrite ? "✏️ Model Updated" : "➕ Model Added",
     description: `**${displayName}**\n${provider}/${modelId}`,
     color: DISCORD_COLORS.violet,
   });
 
-  return { success: true, id: created.id, isActive: isFirst } as const;
-}
-
-export async function deleteModelConfig(password: string, configId: string) {
-  const denied = auth(password);
-  if (denied) return denied;
-
-  const config = await prisma.providerModel.findUnique({
-    where: { id: configId },
-  });
-
-  if (!config) {
-    return { success: false, error: "Config not found" } as const;
-  }
-
-  if (config.isActive) {
-    return {
-      success: false,
-      error:
-        "Cannot delete the active configuration. Switch to another model first.",
-    } as const;
-  }
-
-  await prisma.providerModel.delete({ where: { id: configId } });
-
-  await sendAdminLog({
-    title: "🗑️ Model Deleted",
-    description: `**${config.displayName}** (${config.provider}/${config.modelId})`,
-    color: DISCORD_COLORS.error,
-  });
-
-  return { success: true } as const;
+  return {
+    success: true,
+    id: result.id,
+    isActive: result.isActive,
+    overwrote: isOverwrite,
+  } as const;
 }
