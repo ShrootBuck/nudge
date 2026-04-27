@@ -1,6 +1,8 @@
 "use server";
 
+import { updateTag } from "next/cache";
 import { getEffortOptions, validateEffortForProvider } from "@/lib/ai/effort";
+import { PROVIDER_MODELS_TAG } from "@/lib/cache-tags";
 import { sendAdminLog } from "@/lib/discord";
 import { DISCORD_COLORS } from "@/lib/discord-webhook";
 import { verifyAdminPassword } from "@/lib/env";
@@ -62,6 +64,8 @@ export async function setActiveModel(password: string, configId: string) {
       data: { isActive: true },
     }),
   ]);
+
+  updateTag(PROVIDER_MODELS_TAG);
 
   await sendAdminLog({
     title: "🔄 Model Switched",
@@ -136,6 +140,8 @@ export async function addModelConfig(
       effort,
     },
   });
+
+  updateTag(PROVIDER_MODELS_TAG);
 
   await sendAdminLog({
     title: isOverwrite ? "✏️ Model Updated" : "➕ Model Added",

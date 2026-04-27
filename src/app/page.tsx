@@ -7,9 +7,10 @@ import {
   SearchX,
   Sparkles,
 } from "lucide-react";
+import { cacheLife, cacheTag } from "next/cache";
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { connection } from "next/server";
+import { PROBLEM_LIST_TAG } from "@/lib/cache-tags";
 import { prisma } from "@/lib/prisma";
 import { completedContentWhere, problemWhere } from "@/lib/problem-pipeline-db";
 import { ratingTone } from "@/lib/utils";
@@ -17,6 +18,7 @@ import { LuckyButton } from "./lucky-button";
 import { ProblemFilters } from "./problem-filters";
 
 const PAGE_SIZE = 50;
+
 function listableWhere(): Prisma.ProblemWhereInput {
   return problemWhere({
     AND: [
@@ -62,34 +64,15 @@ function formatProblemId(contestId: number, index: string) {
   return `${contestId}${index}`;
 }
 
-function reviewBadge(status: string) {
-  switch (status) {
-    case "VERIFIED":
-      return (
-        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-300 dark:text-emerald-200">
-          <BadgeCheck className="size-3" />
-          Verified
-        </span>
-      );
-    default:
-      return null;
-  }
-}
-
-export default async function Home({
-  searchParams,
+function buildProblemFilters({
+  query,
+  ratingParam,
+  tagParam,
 }: {
-  searchParams: Promise<Record<string, string | string[] | undefined>>;
+  query: string;
+  ratingParam: string;
+  tagParam: string;
 }) {
-  await connection();
-
-  const params = await searchParams;
-
-  const page = Math.max(1, Number(params.page) || 1);
-  const query = typeof params.q === "string" ? params.q.trim() : "";
-  const ratingParam = typeof params.rating === "string" ? params.rating : "";
-  const tagParam = typeof params.tag === "string" ? params.tag : "";
-
   const where: Prisma.ProblemWhereInput = {
     ...listableWhere(),
   };
@@ -117,6 +100,26 @@ export default async function Home({
     where.tags = { has: tagParam };
   }
 
+  return where;
+}
+
+async function getHomePageData({
+  page,
+  query,
+  ratingParam,
+  tagParam,
+}: {
+  page: number;
+  query: string;
+  ratingParam: string;
+  tagParam: string;
+}) {
+  "use cache";
+
+  cacheLife("minutes");
+  cacheTag(PROBLEM_LIST_TAG);
+
+  const where = buildProblemFilters({ query, ratingParam, tagParam });
   const [totalCount, verifiedCount] = await Promise.all([
     prisma.problem.count({ where }),
     prisma.problem.count({
@@ -126,10 +129,6 @@ export default async function Home({
 
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
   const safePage = totalCount === 0 ? 1 : Math.min(page, totalPages);
-
-  if (safePage !== page) {
-    redirect(buildPageUrl(params, safePage));
-  }
 
   const problems = await prisma.problem.findMany({
     where,
@@ -146,6 +145,53 @@ export default async function Home({
       reviewStatus: true,
     },
   });
+
+  return {
+    problems,
+    safePage,
+    totalCount,
+    totalPages,
+    verifiedCount,
+  };
+}
+
+function reviewBadge(status: string) {
+  switch (status) {
+    case "VERIFIED":
+      return (
+        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-300 dark:text-emerald-200">
+          <BadgeCheck className="size-3" />
+          Verified
+        </span>
+      );
+    default:
+      return null;
+  }
+}
+
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
+  const params = await searchParams;
+
+  const page = Math.max(1, Number(params.page) || 1);
+  const query = typeof params.q === "string" ? params.q.trim() : "";
+  const ratingParam = typeof params.rating === "string" ? params.rating : "";
+  const tagParam = typeof params.tag === "string" ? params.tag : "";
+
+  const { problems, safePage, totalCount, totalPages, verifiedCount } =
+    await getHomePageData({
+      page,
+      query,
+      ratingParam,
+      tagParam,
+    });
+
+  if (safePage !== page) {
+    redirect(buildPageUrl(params, safePage));
+  }
 
   const activeFilterCount = countActiveFilters({
     query,

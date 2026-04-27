@@ -1,10 +1,38 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import Link from "next/link";
+import Script from "next/script";
+import { Suspense } from "react";
 import { Footer } from "@/components/footer";
 import { Navbar } from "@/components/navbar";
-import { ThemeProvider } from "@/components/theme-provider";
 import { SITE_URL } from "@/lib/env";
+import { NAV_LINKS } from "@/lib/nav-links";
 import "./globals.css";
+
+const themeInitScript = `
+(() => {
+  const storageKey = "theme";
+  const root = document.documentElement;
+
+  function applyTheme(value) {
+    const resolved =
+      value === "light" || value === "dark"
+        ? value
+        : window.matchMedia("(prefers-color-scheme: dark)").matches
+          ? "dark"
+          : "light";
+
+    root.classList.toggle("dark", resolved === "dark");
+    root.style.colorScheme = resolved;
+  }
+
+  try {
+    applyTheme(window.localStorage.getItem(storageKey));
+  } catch {
+    applyTheme(null);
+  }
+})();
+`;
 
 const inter = Inter({
   variable: "--font-inter",
@@ -42,6 +70,43 @@ export const metadata: Metadata = {
   },
 };
 
+function NavbarFallback() {
+  return (
+    <header className="sticky top-0 z-50 w-full">
+      <div className="border-b border-border/50 bg-background/60 backdrop-blur-xl">
+        <nav className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
+          <Link
+            href="/"
+            className="flex items-center gap-2 text-lg font-semibold tracking-tight transition hover:opacity-80"
+          >
+            <span className="inline-flex size-7 items-center justify-center rounded-sm bg-foreground text-xs font-bold text-background">
+              N
+            </span>
+            Nudge
+          </Link>
+
+          <div className="hidden items-center gap-1 sm:flex">
+            {NAV_LINKS.map((link) => (
+              <Link
+                key={link.href}
+                href={link.href}
+                className="rounded-full px-3.5 py-1.5 text-sm font-medium text-muted-foreground transition hover:bg-foreground/[0.05] hover:text-foreground"
+              >
+                {link.label}
+              </Link>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <div className="size-8 rounded-full border border-border/60 bg-background/60" />
+            <div className="size-8 rounded-full border border-border/60 bg-background/60 sm:hidden" />
+          </div>
+        </nav>
+      </div>
+    </header>
+  );
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -54,20 +119,18 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="flex min-h-dvh flex-col">
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <div className="bg-orange-500/10 px-4 py-2 text-center text-sm font-medium text-orange-600 dark:bg-orange-500/20 dark:text-orange-400 border-b border-orange-500/20">
-            ⚠️ Heads up: This is experimental alpha software. Expect bugs and
-            breaking changes.
-          </div>
+        <Script id="theme-init" strategy="beforeInteractive">
+          {themeInitScript}
+        </Script>
+        <div className="border-b border-orange-500/20 bg-orange-500/10 px-4 py-2 text-center text-sm font-medium text-orange-600 dark:bg-orange-500/20 dark:text-orange-400">
+          ⚠️ Heads up: This is experimental alpha software. Expect bugs and
+          breaking changes.
+        </div>
+        <Suspense fallback={<NavbarFallback />}>
           <Navbar />
-          {children}
-          <Footer />
-        </ThemeProvider>
+        </Suspense>
+        {children}
+        <Footer />
       </body>
     </html>
   );

@@ -1,7 +1,6 @@
 "use client";
 
 import { Check, Copy, Download } from "lucide-react";
-import { useTheme } from "next-themes";
 import { useEffect, useRef, useState } from "react";
 import { codeToHtml } from "shiki";
 import { Button } from "@/components/ui/button";
@@ -27,13 +26,33 @@ export function CodeBlock({
   downloadFileName?: string;
   preHighlightedHtml?: PreHighlightedHtml;
 }) {
-  const { resolvedTheme } = useTheme();
+  const [prefersDark, setPrefersDark] = useState(false);
   const [html, setHtml] = useState<string | null>(null);
   const [copyState, setCopyState] = useState<CopyState>("idle");
   const copyResetTimeoutRef = useRef<number | null>(null);
   const fileName = downloadFileName ?? `snippet.${language}`;
-  const theme =
-    resolvedTheme === "light" ? SHIKI_LIGHT_THEME : SHIKI_DARK_THEME;
+  const theme = prefersDark ? SHIKI_DARK_THEME : SHIKI_LIGHT_THEME;
+
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const root = document.documentElement;
+    const updateTheme = () => {
+      setPrefersDark(root.classList.contains("dark"));
+    };
+    const observer = new MutationObserver(updateTheme);
+
+    updateTheme();
+    observer.observe(root, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+    media.addEventListener("change", updateTheme);
+
+    return () => {
+      observer.disconnect();
+      media.removeEventListener("change", updateTheme);
+    };
+  }, []);
 
   useEffect(() => {
     if (preHighlightedHtml) {

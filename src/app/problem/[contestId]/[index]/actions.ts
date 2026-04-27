@@ -1,5 +1,7 @@
 "use server";
 
+import { updateTag } from "next/cache";
+import { PROBLEM_LIST_TAG, problemTag } from "@/lib/cache-tags";
 import { sendAdminLog } from "@/lib/discord";
 import { DISCORD_COLORS } from "@/lib/discord-webhook";
 import { SITE_URL, verifyAdminPassword } from "@/lib/env";
@@ -42,6 +44,9 @@ export async function setProblemReviewStatus(
     where: { id: problemId },
     data: { reviewStatus },
   });
+
+  updateTag(PROBLEM_LIST_TAG);
+  updateTag(problemTag(problem.contestId, problem.index));
 
   const tag = `${problem.contestId}${problem.index}`;
   const link = `${SITE_URL}/problem/${problem.contestId}/${problem.index}`;
@@ -122,6 +127,9 @@ export async function queueRegeneration(problemId: string, password: string) {
       lastGenerationError: null,
     }),
   });
+
+  updateTag(PROBLEM_LIST_TAG);
+  updateTag(problemTag(problem.contestId, problem.index));
 
   const tag = `${problem.contestId}${problem.index}`;
   const link = `${SITE_URL}/problem/${problem.contestId}/${problem.index}`;

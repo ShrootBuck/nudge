@@ -1,3 +1,5 @@
+import { revalidateTag } from "next/cache";
+import { PROBLEM_LIST_TAG, problemTag } from "../../lib/cache-tags";
 import { prisma } from "../../lib/prisma";
 import {
   pipelineStateData,
@@ -12,30 +14,32 @@ export async function saveProblemContent(
   parsed: ParsedContent,
   model: ModelInfo,
 ) {
-  await prisma.$transaction([
-    prisma.hint.deleteMany({ where: { problemId } }),
-    prisma.editorial.deleteMany({ where: { problemId } }),
-    prisma.solution.deleteMany({ where: { problemId } }),
+  const updatedProblem = await prisma.$transaction(async (tx) => {
+    await tx.hint.deleteMany({ where: { problemId } });
+    await tx.editorial.deleteMany({ where: { problemId } });
+    await tx.solution.deleteMany({ where: { problemId } });
 
-    ...parsed.hints.map((hint) =>
-      prisma.hint.create({
-        data: {
-          problemId,
-          order: hint.order,
-          content: hint.content,
-        },
-      }),
-    ),
+    await Promise.all(
+      parsed.hints.map((hint) =>
+        tx.hint.create({
+          data: {
+            problemId,
+            order: hint.order,
+            content: hint.content,
+          },
+        }),
+      ),
+    );
 
-    prisma.editorial.create({
+    await tx.editorial.create({
       data: { problemId, content: parsed.editorial },
-    }),
+    });
 
-    prisma.solution.create({
+    await tx.solution.create({
       data: { problemId, content: parsed.solution },
-    }),
+    });
 
-    prisma.problem.update({
+    return tx.problem.update({
       where: { id: problemId },
       data: problemUpdateData({
         ...pipelineStateData("READY", "SUCCEEDED"),
@@ -45,6 +49,16 @@ export async function saveProblemContent(
         processingStartedAt: null,
         lastGenerationError: null,
       }),
-    }),
-  ]);
+      select: {
+        contestId: true,
+        index: true,
+      },
+    });
+  });
+
+  revalidateTag(PROBLEM_LIST_TAG, "max");
+  revalidateTag(
+    problemTag(updatedProblem.contestId, updatedProblem.index),
+    "max",
+  );
 }

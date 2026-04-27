@@ -1,7 +1,9 @@
 import type { Prisma } from "@prisma/client";
 import { logger, schedules, task, wait } from "@trigger.dev/sdk";
+import { revalidateTag } from "next/cache";
 import { type BatchRequest, getProvider } from "../lib/ai";
 import { buildEffortPlanForProvider } from "../lib/ai/effort";
+import { PROBLEM_LIST_TAG, problemTag } from "../lib/cache-tags";
 import { DISCORD_COLORS } from "../lib/discord-webhook";
 import { prisma } from "../lib/prisma";
 import {
@@ -70,23 +72,50 @@ function splitIntoChunks<T>(items: T[], chunkSize: number): T[][] {
   return chunks;
 }
 
+function revalidateProblems(
+  problems: Array<Pick<ProblemForBatch, "contestId" | "index">>,
+) {
+  if (problems.length === 0) {
+    return;
+  }
+
+  revalidateTag(PROBLEM_LIST_TAG, "max");
+  for (const problem of problems) {
+    revalidateTag(problemTag(problem.contestId, problem.index), "max");
+  }
+}
+
 async function markProblemsFailed(problemIds: string[], reason: string) {
   if (problemIds.length === 0) {
     return 0;
   }
 
-  const result = await prisma.problem.updateMany({
-    where: problemWhere({
-      id: { in: problemIds },
-      runState: { not: "SUCCEEDED" },
+  const [problems, result] = await prisma.$transaction([
+    prisma.problem.findMany({
+      where: problemWhere({
+        id: { in: problemIds },
+        runState: { not: "SUCCEEDED" },
+      }),
+      select: {
+        contestId: true,
+        index: true,
+      },
     }),
-    data: problemUpdateManyData({
-      ...pipelineStateData("READY", "FAILED"),
-      activeBatchId: null,
-      processingStartedAt: null,
-      lastGenerationError: reason,
+    prisma.problem.updateMany({
+      where: problemWhere({
+        id: { in: problemIds },
+        runState: { not: "SUCCEEDED" },
+      }),
+      data: problemUpdateManyData({
+        ...pipelineStateData("READY", "FAILED"),
+        activeBatchId: null,
+        processingStartedAt: null,
+        lastGenerationError: reason,
+      }),
     }),
-  });
+  ]);
+
+  revalidateProblems(problems);
 
   return result.count;
 }
@@ -402,6 +431,7 @@ export const generateBatchContent = task({
                   lastGenerationError: null,
                 }),
               });
+              revalidateProblems([problem]);
 
               await discordLog({
                 title: "🚫 Unsolvable Problem",
@@ -439,6 +469,7 @@ export const generateBatchContent = task({
                   lastGenerationError: reason,
                 }),
               });
+              revalidateProblems([problem]);
             }
           }
         }
@@ -510,6 +541,11 @@ export const generateBatchContent = task({
             }),
           });
         }),
+      );
+      revalidateProblems(
+        remainingIds
+          .map((id) => problemMap.get(id))
+          .filter((problem): problem is ProblemForBatch => Boolean(problem)),
       );
 
       failed += remainingIds.length;

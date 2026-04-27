@@ -1,4 +1,6 @@
 import { logger, schedules } from "@trigger.dev/sdk";
+import { revalidateTag } from "next/cache";
+import { PROBLEM_LIST_TAG, problemTag } from "../lib/cache-tags";
 import { DISCORD_COLORS } from "../lib/discord-webhook";
 import { fetchWithTimeout } from "../lib/http";
 import { prisma } from "../lib/prisma";
@@ -74,6 +76,7 @@ export const syncProblems = schedules.task({
     let updated = 0;
     let failed = 0;
     const batchSize = 100;
+    const touchedProblemTags = new Set<string>();
 
     for (let i = 0; i < problems.length; i += batchSize) {
       const batch = problems.slice(i, i + batchSize);
@@ -100,8 +103,15 @@ export const syncProblems = schedules.task({
               rating: p.rating ?? null,
               tags: p.tags,
             },
-            select: { createdAt: true, updatedAt: true },
+            select: {
+              contestId: true,
+              index: true,
+              createdAt: true,
+              updatedAt: true,
+            },
           });
+
+          touchedProblemTags.add(problemTag(result.contestId, result.index));
 
           // On insert, Prisma sets createdAt and updatedAt to the same value.
           return result.createdAt.getTime() === result.updatedAt.getTime()
@@ -125,6 +135,13 @@ export const syncProblems = schedules.task({
       logger.info(
         `Processed ${Math.min(i + batchSize, problems.length)}/${problems.length}`,
       );
+    }
+
+    if (created > 0 || updated > 0) {
+      revalidateTag(PROBLEM_LIST_TAG, "max");
+      for (const tag of touchedProblemTags) {
+        revalidateTag(tag, "max");
+      }
     }
 
     logger.info(

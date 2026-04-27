@@ -1,5 +1,6 @@
+import { cacheLife, cacheTag } from "next/cache";
 import { notFound } from "next/navigation";
-import { connection } from "next/server";
+import { PROVIDER_MODELS_TAG, problemTag } from "@/lib/cache-tags";
 import { prisma } from "@/lib/prisma";
 import { parseSolutionContent } from "@/lib/problem-solution";
 import {
@@ -10,21 +11,18 @@ import {
 import { ProblemContent } from "./problem-content";
 import type { ProblemView } from "./problem-view-types";
 
-export default async function ProblemPage({
-  params,
-}: {
-  params: Promise<{ contestId: string; index: string }>;
-}) {
-  await connection();
+async function getProblemView(
+  contestId: number,
+  index: string,
+): Promise<ProblemView | null> {
+  "use cache";
 
-  const { contestId, index } = await params;
-  const contestIdNum = Number.parseInt(contestId, 10);
-
-  if (Number.isNaN(contestIdNum)) notFound();
+  cacheLife("minutes");
+  cacheTag(problemTag(contestId, index), PROVIDER_MODELS_TAG);
 
   const problem = await prisma.problem.findUnique({
     where: {
-      contestId_index: { contestId: contestIdNum, index: index.toUpperCase() },
+      contestId_index: { contestId, index },
     },
     include: {
       hints: { orderBy: { order: "asc" } },
@@ -33,7 +31,7 @@ export default async function ProblemPage({
     },
   });
 
-  if (!problem) notFound();
+  if (!problem) return null;
 
   let modelDisplayName: string | null = null;
   if (problem.generatedByProvider && problem.generatedByModel) {
@@ -75,7 +73,7 @@ export default async function ProblemPage({
     }
   }
 
-  const viewProblem: ProblemView = {
+  return {
     id: problem.id,
     contestId: problem.contestId,
     index: problem.index,
@@ -89,11 +87,28 @@ export default async function ProblemPage({
     editorial: problem.editorial,
     solution: problem.solution
       ? {
-          ...problem.solution,
+          id: problem.solution.id,
+          content: problem.solution.content,
           preHighlightedHtml: preHighlightedSolutionHtml,
         }
       : null,
   };
+}
 
-  return <ProblemContent problem={viewProblem} />;
+export default async function ProblemPage({
+  params,
+}: {
+  params: Promise<{ contestId: string; index: string }>;
+}) {
+  const { contestId, index } = await params;
+  const contestIdNum = Number.parseInt(contestId, 10);
+  const normalizedIndex = index.toUpperCase();
+
+  if (Number.isNaN(contestIdNum)) notFound();
+
+  const problem = await getProblemView(contestIdNum, normalizedIndex);
+
+  if (!problem) notFound();
+
+  return <ProblemContent problem={problem} />;
 }
