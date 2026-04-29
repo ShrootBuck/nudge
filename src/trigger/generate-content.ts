@@ -1,8 +1,8 @@
 import type { Prisma } from "@prisma/client";
 import { logger, schedules, task, wait } from "@trigger.dev/sdk";
-import { revalidateTag } from "next/cache";
 import { type BatchRequest, getProvider } from "../lib/ai";
 import { buildEffortPlanForProvider } from "../lib/ai/effort";
+import { safeRevalidateTag } from "../lib/cache-revalidate";
 import { PROBLEM_LIST_TAG, problemTag } from "../lib/cache-tags";
 import { DISCORD_COLORS } from "../lib/discord-webhook";
 import { prisma } from "../lib/prisma";
@@ -79,9 +79,9 @@ function revalidateProblems(
     return;
   }
 
-  revalidateTag(PROBLEM_LIST_TAG, "max");
+  safeRevalidateTag(PROBLEM_LIST_TAG, "max");
   for (const problem of problems) {
-    revalidateTag(problemTag(problem.contestId, problem.index), "max");
+    safeRevalidateTag(problemTag(problem.contestId, problem.index), "max");
   }
 }
 

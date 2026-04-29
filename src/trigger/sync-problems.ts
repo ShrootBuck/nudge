@@ -1,5 +1,5 @@
 import { logger, schedules } from "@trigger.dev/sdk";
-import { revalidateTag } from "next/cache";
+import { safeRevalidateTag } from "../lib/cache-revalidate";
 import { PROBLEM_LIST_TAG, problemTag } from "../lib/cache-tags";
 import { DISCORD_COLORS } from "../lib/discord-webhook";
 import { fetchWithTimeout } from "../lib/http";
@@ -138,9 +138,9 @@ export const syncProblems = schedules.task({
     }
 
     if (created > 0 || updated > 0) {
-      revalidateTag(PROBLEM_LIST_TAG, "max");
+      safeRevalidateTag(PROBLEM_LIST_TAG, "max");
       for (const tag of touchedProblemTags) {
-        revalidateTag(tag, "max");
+        safeRevalidateTag(tag, "max");
       }
     }
 

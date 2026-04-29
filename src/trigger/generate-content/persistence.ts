@@ -1,4 +1,4 @@
-import { revalidateTag } from "next/cache";
+import { safeRevalidateTag } from "../../lib/cache-revalidate";
 import { PROBLEM_LIST_TAG, problemTag } from "../../lib/cache-tags";
 import { prisma } from "../../lib/prisma";
 import {
@@ -56,8 +56,8 @@ export async function saveProblemContent(
     });
   });
 
-  revalidateTag(PROBLEM_LIST_TAG, "max");
-  revalidateTag(
+  safeRevalidateTag(PROBLEM_LIST_TAG, "max");
+  safeRevalidateTag(
     problemTag(updatedProblem.contestId, updatedProblem.index),
     "max",
   );
