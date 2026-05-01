@@ -12,7 +12,7 @@ import { discordLog } from "./discord-log";
 export const autoQueueMostRequested = schedules.task({
   id: "auto-queue-most-requested",
   cron: {
-    pattern: "0 0 * * *",
+    pattern: "59 23 * * *",
     timezone: "America/Phoenix",
   },
   run: async () => {
