@@ -57,7 +57,7 @@ export default function AboutPage() {
               icon={Brain}
               step="2"
               title="AI generation"
-              description="Anthropic's biggest, latest Claude model generates five progressive hints, a clean editorial, and a full C++ solution via the Batch API."
+              description="A state-of-the-art LLM generates five progressive hints, a clean editorial, and a full C++ solution via the Batch API."
             />
             <StepCard
               icon={BookOpenText}

@@ -20,12 +20,11 @@ export default function ContactPage() {
             </span>
 
             <h1 className="mt-5 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
-              Have a question, idea, or found a bug?
+              Have a question, idea, or bug?
             </h1>
 
             <p className="mt-4 max-w-2xl text-base/7 text-muted-foreground sm:text-lg/8">
               Nudge is open source and community feedback is always welcome.
-              Here&apos;s how to reach us.
             </p>
           </div>
         </section>
@@ -34,14 +33,14 @@ export default function ContactPage() {
           <ContactCard
             icon={Bug}
             title="Open an issue"
-            description="Found a bug or have a feature request? Open an issue on the GitHub repo and we'll take a look."
+            description="Found a bug or have a feature request? Open an issue on the GitHub repo and I'll take a look."
             href="https://github.com/ShrootBuck/nudge/issues"
             linkLabel="Go to Issues"
           />
           <ContactCard
             icon={Mail}
             title="Send an email"
-            description="For anything else, drop an email and I'll get back to you as soon as we can."
+            description="For anything else, drop an email and I'll get back to you as soon as I can."
             href="mailto:contact@zaydkrunz.com"
             linkLabel="contact@zaydkrunz.com"
           />

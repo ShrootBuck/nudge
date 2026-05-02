@@ -140,6 +140,18 @@
   html {
     @apply font-sans;
   }
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    @apply cursor-pointer;
+  }
+  button:not(:disabled):focus-visible,
+  [role="button"]:not(:disabled):focus-visible {
+    @apply outline-none ring-1 ring-ring/40;
+  }
+  button[aria-expanded]:not(:disabled):focus-visible,
+  [role="button"][aria-expanded]:not(:disabled):focus-visible {
+    @apply ring-0;
+  }
   ::selection {
     background: oklch(0.74 0.09 92 / 0.35);
   }

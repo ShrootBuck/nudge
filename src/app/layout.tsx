@@ -122,10 +122,6 @@ export default function RootLayout({
         <Script id="theme-init" strategy="beforeInteractive">
           {themeInitScript}
         </Script>
-        <div className="border-b border-orange-500/20 bg-orange-500/10 px-4 py-2 text-center text-sm font-medium text-orange-600 dark:bg-orange-500/20 dark:text-orange-400">
-          ⚠️ Heads up: This is experimental alpha software. Expect bugs and
-          breaking changes.
-        </div>
         <Suspense fallback={<NavbarFallback />}>
           <Navbar />
         </Suspense>
