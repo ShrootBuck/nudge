@@ -24,8 +24,12 @@ export function buildPrompt(
   problem: PromptProblem,
   problemStatement?: string | null,
 ) {
-  const ratingStr = problem.rating ? ` (rated ${problem.rating})` : "";
+  const ratingStr = problem.rating != null ? ` (rated ${problem.rating})` : "";
   const tagsStr = problem.tags.length > 0 ? problem.tags.join(", ") : "none";
+  const ratingMetadata =
+    problem.rating != null
+      ? `${problem.rating} (Codeforces difficulty rating)`
+      : "unknown / unrated";
 
   let statementSection = "";
   if (problemStatement) {
@@ -33,9 +37,16 @@ export function buildPrompt(
   }
 
   return `Generate content for Codeforces problem ${problem.contestId}${problem.index}: "${problem.name}"${ratingStr}.
-Tags: ${tagsStr}
 
-Problem URL: ${cfProblemUrl(problem.contestId, problem.index)}${statementSection}
+Known problem metadata:
+- Contest ID: ${problem.contestId}
+- Index: ${problem.index}
+- Name: ${problem.name}
+- Rating: ${ratingMetadata}
+- Tags: ${tagsStr}
+- Problem URL: ${cfProblemUrl(problem.contestId, problem.index)}
+
+Use the rating and tags as extra signal about intended difficulty and likely techniques. They are hints from Codeforces metadata, not a substitute for solving the actual statement, so don't blindly force a tagged technique if the statement points somewhere else.${statementSection}
 Please generate:
 1. Five progressive hints (from a gentle nudge in hint 1, to a dead giveaway in hint 5).
 2. A killer editorial that breaks down the solution strategy, key observations, and complexity analysis.
