@@ -1,9 +1,10 @@
 "use client";
 
-import { Menu, X } from "lucide-react";
+import { Menu, Search, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { CommandMenu } from "@/components/command-menu";
 import { GitHubIcon } from "@/components/github-icon";
 import { NAV_LINKS } from "@/lib/nav-links";
 import { cn } from "@/lib/utils";
@@ -11,6 +12,7 @@ import { cn } from "@/lib/utils";
 export function Navbar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
 
   useEffect(() => {
     if (!pathname) {
@@ -59,6 +61,19 @@ export function Navbar() {
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCommandOpen(true)}
+              className="flex items-center gap-2 rounded-full border border-border/60 bg-background/60 px-3 py-1.5 text-sm text-muted-foreground transition hover:border-foreground/15 hover:text-foreground"
+              aria-label="Search problems"
+            >
+              <Search className="size-3.5" />
+              <span className="hidden sm:inline-block">Search...</span>
+              <kbd className="hidden pointer-events-none h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex">
+                <span className="text-xs">⌘</span>K
+              </kbd>
+            </button>
+
             <a
               href="https://github.com/ShrootBuck/nudge"
               target="_blank"
@@ -118,6 +133,7 @@ export function Navbar() {
           </div>
         </div>
       )}
+      <CommandMenu open={commandOpen} setOpen={setCommandOpen} />
     </header>
   );
 }
