@@ -20,6 +20,7 @@ export type ProblemView = {
   reviewStatus: ReviewStatus;
   runState: RunState;
   modelDisplayName: string | null;
+  modelEffort: string | null;
   hints: { id: string; order: number; content: string }[];
   editorial: { id: string; content: string } | null;
   solution: {

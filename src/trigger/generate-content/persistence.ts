@@ -7,7 +7,7 @@ import {
 } from "../../lib/problem-pipeline-db";
 import type { ParsedContent } from "./content-schema";
 
-export type ModelInfo = { provider: string; modelId: string };
+export type ModelInfo = { provider: string; modelId: string; effort?: string };
 
 export async function saveProblemContent(
   problemId: string,
@@ -45,6 +45,7 @@ export async function saveProblemContent(
         ...pipelineStateData("READY", "SUCCEEDED"),
         generatedByProvider: model.provider,
         generatedByModel: model.modelId,
+        generatedByEffort: model.effort ?? null,
         activeBatchId: null,
         processingStartedAt: null,
         lastGenerationError: null,

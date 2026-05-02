@@ -253,6 +253,7 @@ export const generateBatchContent = task({
     const modelInfo: ModelInfo = {
       provider: modelConfig.provider,
       modelId: modelConfig.modelId,
+      effort: selectedEffort,
     };
 
     logger.info(

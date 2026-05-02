@@ -34,6 +34,7 @@ async function getProblemView(
   if (!problem) return null;
 
   let modelDisplayName: string | null = null;
+  let modelEffort: string | null = null;
   if (problem.generatedByProvider && problem.generatedByModel) {
     const config = await prisma.providerModel.findUnique({
       where: {
@@ -45,6 +46,7 @@ async function getProblemView(
       select: { displayName: true },
     });
     modelDisplayName = config?.displayName ?? problem.generatedByModel;
+    modelEffort = problem.generatedByEffort ?? null;
   }
 
   let preHighlightedSolutionHtml: { light: string; dark: string } | null = null;
@@ -83,6 +85,7 @@ async function getProblemView(
     reviewStatus: problem.reviewStatus,
     runState: problem.runState,
     modelDisplayName,
+    modelEffort,
     hints: problem.hints,
     editorial: problem.editorial,
     solution: problem.solution

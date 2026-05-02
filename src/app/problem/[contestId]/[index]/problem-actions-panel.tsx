@@ -67,6 +67,7 @@ export function ProblemMetaRow({
         <span className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/70 px-3 py-1.5 text-xs text-muted-foreground">
           <Sparkles className="size-3" />
           {problem.modelDisplayName}
+          {problem.modelEffort ? ` (${problem.modelEffort})` : null}
         </span>
       )}
     </>
