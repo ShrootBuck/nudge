@@ -9,7 +9,7 @@ import {
 } from "../lib/problem-pipeline-db";
 import { discordLog } from "./discord-log";
 
-const AUTO_QUEUE_LIMIT = 10;
+const AUTO_QUEUE_LIMIT = 3;
 
 export const autoQueueMostRequested = schedules.task({
   id: "auto-queue-most-requested",
