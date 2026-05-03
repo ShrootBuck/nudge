@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowUpRight, FileQuestion } from "lucide-react";
+import { ArrowUpRight, ClipboardList } from "lucide-react";
 import Link from "next/link";
 import { useActionState } from "react";
 import { useFormStatus } from "react-dom";
@@ -28,7 +28,7 @@ export default function RequestPage() {
 
           <div className="relative">
             <span className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 py-1 text-xs font-medium tracking-wide text-muted-foreground shadow-sm">
-              <FileQuestion className="size-3.5" />
+              <ClipboardList className="size-3.5" />
               Request a problem
             </span>
 
@@ -72,9 +72,9 @@ export default function RequestPage() {
               {state?.message && (
                 <output
                   aria-live="polite"
-                  className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200"
+                  className="flex w-full flex-col gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200"
                 >
-                  <p>{state.message}</p>
+                  <span>{state.message}</span>
                   {state.problemHref ? (
                     <Link
                       href={state.problemHref}

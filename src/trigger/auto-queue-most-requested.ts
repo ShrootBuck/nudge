@@ -70,7 +70,9 @@ export const autoQueueMostRequested = schedules.task({
 
     return {
       queued: problems.length,
-      problems: problems.map((problem) => `${problem.contestId}${problem.index}`),
+      problems: problems.map(
+        (problem) => `${problem.contestId}${problem.index}`,
+      ),
     };
   },
 });

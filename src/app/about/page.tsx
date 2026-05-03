@@ -3,8 +3,8 @@ import {
   BookOpenText,
   Brain,
   Cpu,
+  Info,
   Lightbulb,
-  Sparkles,
 } from "lucide-react";
 import type { Metadata } from "next";
 
@@ -23,7 +23,7 @@ export default function AboutPage() {
 
           <div className="relative">
             <span className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 py-1 text-xs font-medium tracking-wide text-muted-foreground shadow-sm">
-              <Sparkles className="size-3.5" />
+              <Info className="size-3.5" />
               About the project
             </span>
 
