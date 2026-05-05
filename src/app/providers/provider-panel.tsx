@@ -17,8 +17,15 @@ import { addModelConfig, type ProviderModel, setActiveModel } from "./actions";
 
 const PROVIDER_OPTIONS = ["anthropic", "moonshot", "openai"] as const;
 
-function getEffortLabel(effort: string | null | undefined): string {
+function getEffortLabel(
+  effort: string | null | undefined,
+  provider?: string,
+): string {
   if (!effort) return "default";
+  if (provider === "moonshot") {
+    if (effort === "enabled") return "reasoning";
+    if (effort === "disabled") return "non-reasoning";
+  }
   return effort;
 }
 
@@ -201,7 +208,7 @@ function ConfigCard({
             </p>
             {config.effort && (
               <p className="mt-1 font-mono text-[10px] text-muted-foreground/70">
-                effort: {getEffortLabel(config.effort)}
+                effort: {getEffortLabel(config.effort, config.provider)}
               </p>
             )}
           </div>
@@ -399,7 +406,7 @@ function AddConfigForm({
               >
                 {effortOptions.map((option) => (
                   <option key={option} value={option}>
-                    {getEffortLabel(option)}
+                    {getEffortLabel(option, provider)}
                   </option>
                 ))}
               </select>
