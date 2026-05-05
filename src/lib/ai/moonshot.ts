@@ -59,21 +59,61 @@ function schemaPrompt(outputSchema: OutputSchema) {
   return `Return only a JSON object matching this schema. Do not wrap it in Markdown or include explanatory text.\n\nSchema name: ${outputSchema.name}\nSchema description: ${outputSchema.description}\nJSON Schema:\n${JSON.stringify(outputSchema.schema, null, 2)}`;
 }
 
-function toMoonshotUserContent(req: BatchRequest) {
+async function fetchImageAsBase64DataUri(url: string): Promise<string | null> {
+  try {
+    const response = await fetch(url, { redirect: "follow" });
+    if (!response.ok) {
+      console.warn(`Image fetch failed for ${url}: ${response.status}`);
+      return null;
+    }
+
+    const contentType =
+      response.headers.get("content-type") || "application/octet-stream";
+    const arrayBuffer = await response.arrayBuffer();
+    const base64 = Buffer.from(arrayBuffer).toString("base64");
+
+    return `data:${contentType};base64,${base64}`;
+  } catch (error) {
+    console.warn(`Image fetch error for ${url}:`, error);
+    return null;
+  }
+}
+
+async function toMoonshotUserContent(req: BatchRequest) {
   if (typeof req.userPrompt === "string") {
     return req.userPrompt;
   }
 
-  return req.userPrompt.map((item) => {
-    if (item.type === "text") {
-      return { type: "text" as const, text: item.text ?? "" };
-    }
+  const content = await Promise.all(
+    req.userPrompt.map(async (item) => {
+      if (item.type === "text") {
+        return { type: "text" as const, text: item.text ?? "" };
+      }
 
-    return {
-      type: "image_url" as const,
-      image_url: item.image_url ? { url: item.image_url.url } : undefined,
-    };
-  });
+      if (item.type === "image_url" && item.image_url?.url) {
+        const dataUri = await fetchImageAsBase64DataUri(item.image_url.url);
+        if (dataUri) {
+          return {
+            type: "image_url" as const,
+            image_url: { url: dataUri },
+          };
+        }
+
+        // Fallback: keep original URL. Moonshot will fail this specific
+        // request, but it won't bring down the whole batch.
+        console.warn(
+          `Failed to convert image to base64, falling back to URL: ${item.image_url.url}`,
+        );
+      }
+
+      return {
+        type: "image_url" as const,
+        image_url: item.image_url ? { url: item.image_url.url } : undefined,
+      };
+    }),
+  );
+
+  return content;
 }
 
 function parseBatchLine(line: string): BatchResult {
@@ -167,22 +207,28 @@ export class MoonshotProvider implements AIProvider {
   ): Promise<string> {
     const parsedEffort = parseMoonshotEffort(effort);
 
-    const jsonlLines = requests.map((req) =>
-      JSON.stringify({
-        custom_id: req.customId,
-        method: "POST",
-        url: "/v1/chat/completions",
-        body: {
-          model: modelId,
-          messages: [
-            { role: "system", content: req.systemPrompt },
-            { role: "system", content: schemaPrompt(req.outputSchema) },
-            { role: "user", content: toMoonshotUserContent(req) },
-          ],
-          response_format: { type: "json_object" },
-          max_tokens: 128000,
-          thinking: { type: parsedEffort },
-        },
+    const jsonlLines = await Promise.all(
+      requests.map(async (req) => {
+        const userContent = await toMoonshotUserContent(req);
+        return JSON.stringify({
+          custom_id: req.customId,
+          method: "POST",
+          url: "/v1/chat/completions",
+          body: {
+            model: modelId,
+            messages: [
+              { role: "system", content: req.systemPrompt },
+              { role: "system", content: schemaPrompt(req.outputSchema) },
+              { role: "user", content: userContent },
+            ],
+            response_format: { type: "json_object" },
+            // Kimi K2.6 has a 256K context window. Default max_tokens is 32K.
+            // We push this to 200K to give thinking + output as much room as
+            // possible without exceeding the total context budget.
+            max_tokens: 200000,
+            thinking: { type: parsedEffort },
+          },
+        });
       }),
     );
 
