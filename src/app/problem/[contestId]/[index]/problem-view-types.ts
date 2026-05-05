@@ -60,7 +60,10 @@ export function resolveProblemRunState(problem: {
   return problem.runState;
 }
 
-export function generationState(status: RunState): GenerationState {
+export function generationState(
+  status: RunState,
+  reviewStatus?: ReviewStatus,
+): GenerationState {
   switch (status) {
     case "RUNNING":
       return {
@@ -73,6 +76,18 @@ export function generationState(status: RunState): GenerationState {
         animate: true,
       };
     case "FAILED":
+      if (reviewStatus === "UNSOLVABLE") {
+        return {
+          icon: Ban,
+          label: "Unsolvable",
+          description:
+            "The active model reported that it cannot solve this problem reliably. It is parked until someone manually queues regeneration.",
+          className:
+            "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-200",
+          animate: false,
+        };
+      }
+
       return {
         icon: ShieldAlert,
         label: "Generation failed",

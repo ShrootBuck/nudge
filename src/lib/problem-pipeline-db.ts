@@ -44,12 +44,14 @@ export function readyToRunWhere(maxAttempts: number): Prisma.ProblemWhereInput {
     generationAttempts: { lt: maxAttempts },
     queueState: "READY",
     runState: { in: ["IDLE", "FAILED"] },
+    reviewStatus: { not: "UNSOLVABLE" },
   });
 }
 
 export function backlogWhere(): Prisma.ProblemWhereInput {
   return problemWhere({
     queueState: "BACKLOG",
+    reviewStatus: { not: "UNSOLVABLE" },
   });
 }
 

@@ -39,7 +39,7 @@ export function ProblemContentBody({ problem }: { problem: ProblemView }) {
   const resolvedRunState = resolveProblemRunState(problem);
   const hasContent = resolvedRunState === "SUCCEEDED";
 
-  const state = generationState(resolvedRunState);
+  const state = generationState(resolvedRunState, problem.reviewStatus);
   const StateIcon = state.icon;
 
   const review = reviewState(problem.reviewStatus);

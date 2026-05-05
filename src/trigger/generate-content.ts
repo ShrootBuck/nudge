@@ -205,6 +205,7 @@ export const generateBatchContent = task({
         id: { in: payload.problemIds },
         queueState: "READY",
         runState: { in: ["IDLE", "FAILED"] },
+        reviewStatus: { not: "UNSOLVABLE" },
       }),
       select: {
         id: true,
@@ -425,11 +426,11 @@ export const generateBatchContent = task({
               await prisma.problem.update({
                 where: { id: result.customId },
                 data: problemUpdateData({
-                  ...pipelineStateData("READY", "SUCCEEDED"),
+                  ...pipelineStateData("BACKLOG", "FAILED"),
                   reviewStatus: "UNSOLVABLE",
                   activeBatchId: null,
                   processingStartedAt: null,
-                  lastGenerationError: null,
+                  lastGenerationError: reason,
                 }),
               });
               revalidateProblems([problem]);
