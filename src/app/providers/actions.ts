@@ -107,10 +107,14 @@ export async function addModelConfig(
     } as const;
   }
 
-  if (provider !== "anthropic" && provider !== "openai") {
+  if (
+    provider !== "anthropic" &&
+    provider !== "moonshot" &&
+    provider !== "openai"
+  ) {
     return {
       success: false,
-      error: `Unsupported provider "${provider}". Supported providers: anthropic, openai`,
+      error: `Unsupported provider "${provider}". Supported providers: anthropic, moonshot, openai`,
     } as const;
   }
 

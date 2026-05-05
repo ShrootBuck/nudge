@@ -15,7 +15,7 @@ import { getEffortOptions } from "@/lib/ai/effort";
 import { cn } from "@/lib/utils";
 import { addModelConfig, type ProviderModel, setActiveModel } from "./actions";
 
-const PROVIDER_OPTIONS = ["anthropic", "openai"] as const;
+const PROVIDER_OPTIONS = ["anthropic", "moonshot", "openai"] as const;
 
 function getEffortLabel(effort: string | null | undefined): string {
   if (!effort) return "default";
@@ -362,7 +362,7 @@ function AddConfigForm({
             id="new-model-id"
             value={modelId}
             onChange={(e) => setModelId(e.target.value)}
-            placeholder="claude-opus-4-6"
+            placeholder="kimi-k2.6"
             className={inputClass}
           />
         </div>
@@ -378,7 +378,7 @@ function AddConfigForm({
             id="new-display-name"
             value={displayName}
             onChange={(e) => setDisplayName(e.target.value)}
-            placeholder="Claude Opus 4.6"
+            placeholder="Kimi K2.6"
             className={inputClass}
           />
         </div>

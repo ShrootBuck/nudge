@@ -8,8 +8,11 @@ export const OPENAI_EFFORT_ORDER = [
   "none",
 ] as const;
 
+export const MOONSHOT_EFFORT_ORDER = ["enabled", "disabled"] as const;
+
 const EFFORT_ORDER_BY_PROVIDER = {
   anthropic: ANTHROPIC_EFFORT_ORDER,
+  moonshot: MOONSHOT_EFFORT_ORDER,
   openai: OPENAI_EFFORT_ORDER,
 } as const;
 
