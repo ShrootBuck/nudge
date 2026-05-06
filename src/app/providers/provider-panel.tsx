@@ -427,7 +427,7 @@ function AddConfigForm({
             !provider ||
             !modelId ||
             !displayName ||
-            !effort
+            (effortOptions ? !effort : false)
           }
           className="h-9 rounded-xl border-border/60 bg-background/55 px-4 text-xs shadow-sm hover:bg-background/75 disabled:bg-background/40"
         >

@@ -1,4 +1,10 @@
-export const ANTHROPIC_EFFORT_ORDER = ["max", "high", "medium", "low"] as const;
+export const ANTHROPIC_EFFORT_ORDER = [
+  "max",
+  "xhigh",
+  "high",
+  "medium",
+  "low",
+] as const;
 
 export const OPENAI_EFFORT_ORDER = [
   "xhigh",

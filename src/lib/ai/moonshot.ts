@@ -227,7 +227,7 @@ export class MoonshotProvider implements AIProvider {
             // Kimi K2.6 has a 256K context window. Default max_tokens is 32K.
             // We push this to 200K to give thinking + output as much room as
             // possible without exceeding the total context budget.
-            max_tokens: 200000,
+            max_completion_tokens: 200000,
             thinking: { type: parsedEffort },
           },
         });

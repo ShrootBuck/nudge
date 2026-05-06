@@ -8,9 +8,10 @@ import type {
 } from "./types";
 
 const ANTHROPIC_OUTPUT_300K_BETA = "output-300k-2026-03-24";
-const ANTHROPIC_BATCH_MAX_TOKENS = 300000;
+const ANTHROPIC_DEFAULT_MAX_TOKENS = 64000;
+const ANTHROPIC_EXTENDED_OUTPUT_MAX_TOKENS = 300000;
 
-type AnthropicEffort = "low" | "medium" | "high" | "max";
+type AnthropicEffort = "low" | "medium" | "high" | "xhigh" | "max";
 
 function parseAnthropicEffort(
   effort: string | undefined,
@@ -26,13 +27,34 @@ function parseAnthropicEffort(
     throw new Error(validation.error);
   }
 
-  if (validation.effort === "max" && !modelId.includes("opus-4-6")) {
+  if (validation.effort === "max") {
+    if (
+      !modelId.includes("opus-4-7") &&
+      !modelId.includes("opus-4-6") &&
+      !modelId.includes("sonnet-4-6") &&
+      !modelId.includes("mythos")
+    ) {
+      throw new Error(
+        `Effort "max" is only supported on Claude Opus 4.7, Opus 4.6, Sonnet 4.6, or Mythos Preview (model: ${modelId}).`,
+      );
+    }
+  }
+
+  if (validation.effort === "xhigh" && !modelId.includes("opus-4-7")) {
     throw new Error(
-      `Effort "max" is only supported on Claude Opus 4.6 (model: ${modelId}).`,
+      `Effort "xhigh" is only supported on Claude Opus 4.7 (model: ${modelId}).`,
     );
   }
 
   return validation.effort as AnthropicEffort;
+}
+
+function shouldUseExtendedOutput(modelId: string) {
+  return (
+    modelId.includes("opus-4-7") ||
+    modelId.includes("opus-4-6") ||
+    modelId.includes("sonnet-4-6")
+  );
 }
 
 function enforceStructuredSchema(
@@ -87,6 +109,12 @@ export class AnthropicProvider implements AIProvider {
     effort?: string,
   ): Promise<string> {
     const parsedEffort = parseAnthropicEffort(effort, modelId);
+    const useExtendedOutput = shouldUseExtendedOutput(modelId);
+    const maxTokens = useExtendedOutput
+      ? ANTHROPIC_EXTENDED_OUTPUT_MAX_TOKENS
+      : ANTHROPIC_DEFAULT_MAX_TOKENS;
+    const defaultEffort = "high" as const;
+    const chosenEffort = parsedEffort ?? defaultEffort;
 
     const batch = await this.getClient().messages.batches.create(
       {
@@ -94,7 +122,7 @@ export class AnthropicProvider implements AIProvider {
           custom_id: req.customId,
           params: {
             model: modelId,
-            max_tokens: ANTHROPIC_BATCH_MAX_TOKENS,
+            max_tokens: maxTokens,
             thinking: {
               type: "adaptive" as const,
             },
@@ -115,12 +143,15 @@ export class AnthropicProvider implements AIProvider {
                             },
                           };
                         }
-                        return { type: "text" as const, text: item.text || "" };
+                        return {
+                          type: "text" as const,
+                          text: item.text || "",
+                        };
                       }),
               },
             ],
             output_config: {
-              ...(parsedEffort ? { effort: parsedEffort } : {}),
+              effort: chosenEffort,
               format: {
                 type: "json_schema" as const,
                 schema: enforceStructuredSchema(req.outputSchema.schema),
@@ -129,11 +160,9 @@ export class AnthropicProvider implements AIProvider {
           },
         })),
       },
-      {
-        headers: {
-          "anthropic-beta": ANTHROPIC_OUTPUT_300K_BETA,
-        },
-      },
+      useExtendedOutput
+        ? { headers: { "anthropic-beta": ANTHROPIC_OUTPUT_300K_BETA } }
+        : undefined,
     );
 
     return batch.id;
