@@ -1,6 +1,7 @@
 import { AnthropicProvider } from "./anthropic";
 import { MoonshotProvider } from "./moonshot";
 import { OpenAIProvider } from "./openai";
+import { XAIProvider } from "./xai";
 import type { AIProvider } from "./types";
 
 const providers = new Map<string, AIProvider>();
@@ -12,6 +13,7 @@ function register(provider: AIProvider) {
 register(new AnthropicProvider());
 register(new OpenAIProvider());
 register(new MoonshotProvider());
+register(new XAIProvider());
 
 export function getProvider(providerId: string): AIProvider {
   const provider = providers.get(providerId);

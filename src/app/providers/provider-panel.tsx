@@ -15,7 +15,7 @@ import { getEffortOptions } from "@/lib/ai/effort";
 import { cn } from "@/lib/utils";
 import { addModelConfig, type ProviderModel, setActiveModel } from "./actions";
 
-const PROVIDER_OPTIONS = ["anthropic", "moonshot", "openai"] as const;
+const PROVIDER_OPTIONS = ["anthropic", "moonshot", "openai", "xai"] as const;
 
 function getEffortLabel(
   effort: string | null | undefined,

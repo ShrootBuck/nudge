@@ -6,7 +6,6 @@ import type {
   BatchRequest,
   BatchResult,
   BatchStatus,
-  OutputSchema,
 } from "./types";
 
 type MoonshotEffort = "enabled" | "disabled";
@@ -53,10 +52,6 @@ function formatMoonshotBatchError(
   return error.code
     ? `${error.code}: ${error.message ?? fallback}`
     : (error.message ?? fallback);
-}
-
-function schemaPrompt(outputSchema: OutputSchema) {
-  return `Return only a JSON object matching this schema. Do not wrap it in Markdown or include explanatory text.\n\nSchema name: ${outputSchema.name}\nSchema description: ${outputSchema.description}\nJSON Schema:\n${JSON.stringify(outputSchema.schema, null, 2)}`;
 }
 
 async function fetchImageAsBase64DataUri(url: string): Promise<string | null> {
@@ -218,10 +213,17 @@ export class MoonshotProvider implements AIProvider {
             model: modelId,
             messages: [
               { role: "system", content: req.systemPrompt },
-              { role: "system", content: schemaPrompt(req.outputSchema) },
               { role: "user", content: userContent },
             ],
-            response_format: { type: "json_object" },
+            response_format: {
+              type: "json_schema",
+              json_schema: {
+                name: req.outputSchema.name,
+                description: req.outputSchema.description,
+                schema: req.outputSchema.schema,
+                strict: true,
+              },
+            },
             // Kimi K2.6 has a 256K context window. Default max_tokens is 32K.
             // We push this to 200K to give thinking + output as much room as
             // possible without exceeding the total context budget.
