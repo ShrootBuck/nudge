@@ -1,5 +1,8 @@
 import { prisma } from "./prisma";
 
+export const OPENAI_PROVIDER_ID = "openai";
+export const OPENAI_AUTO_QUEUE_DAILY_TOKEN_LIMIT = 200_000;
+
 function getUTCDateString(date = new Date()): string {
   return date.toISOString().split("T")[0];
 }

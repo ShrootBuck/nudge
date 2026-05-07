@@ -1,8 +1,8 @@
 import { AnthropicProvider } from "./anthropic";
 import { MoonshotProvider } from "./moonshot";
 import { OpenAIProvider } from "./openai";
-import { XAIProvider } from "./xai";
 import type { AIProvider } from "./types";
+import { XAIProvider } from "./xai";
 
 const providers = new Map<string, AIProvider>();
 

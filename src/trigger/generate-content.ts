@@ -1,7 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { logger, schedules, task, wait } from "@trigger.dev/sdk";
 import { type BatchRequest, getProvider } from "../lib/ai";
-import { addDailyTokenUsage } from "../lib/usage-tracker";
 import { buildEffortPlanForProvider } from "../lib/ai/effort";
 import { safeRevalidateTag } from "../lib/cache-revalidate";
 import { PROBLEM_LIST_TAG, problemTag } from "../lib/cache-tags";
@@ -16,6 +15,7 @@ import {
   problemWhere,
   readyToRunWhere,
 } from "../lib/problem-pipeline-db";
+import { addDailyTokenUsage } from "../lib/usage-tracker";
 import { discordLog } from "./discord-log";
 import {
   problemOutputSchema,
@@ -413,15 +413,15 @@ export const generateBatchContent = task({
           }
 
           try {
-            if (result.status !== "succeeded" || !result.output) {
-              throw new Error(result.error ?? "Unknown provider error");
-            }
-
             if (result.tokensUsed && result.tokensUsed > 0) {
               await addDailyTokenUsage(modelInfo.provider, result.tokensUsed);
               logger.info(
                 `Tracked ${result.tokensUsed} tokens for problem ${label}`,
               );
+            }
+
+            if (result.status !== "succeeded" || !result.output) {
+              throw new Error(result.error ?? "Unknown provider error");
             }
 
             const outputData = problemResultSchema.parse(result.output);
@@ -595,7 +595,7 @@ export const generateBatchContent = task({
 export const generateContentScheduler = schedules.task({
   id: "generate-content-scheduler",
   cron: {
-    pattern: "0 0 * * *",
+    pattern: "5 * * * *",
     timezone: "America/Phoenix",
   },
   run: async () => {
@@ -624,7 +624,7 @@ export const generateContentScheduler = schedules.task({
     );
 
     await discordLog({
-      title: "📅 Daily Generation Triggered",
+      title: "📅 Generation Triggered",
       description: `**${problems.length}** ready problems queued across **${chunks.length}** batch${chunks.length === 1 ? "" : "es"}\n${toBatchSample(problems)}`,
       color: DISCORD_COLORS.indigo,
     });

@@ -146,9 +146,11 @@ function parseBatchLine(line: string): BatchResult {
       customId: result.custom_id,
       status: "failed",
       error: formatOpenAIBatchError(responseBody.error, "Unknown error"),
+      tokensUsed: responseBody.usage?.total_tokens,
     };
   }
 
+  const tokensUsed = responseBody.usage?.total_tokens;
   const jsonString = extractOutputText(responseBody);
 
   if (jsonString) {
@@ -157,13 +159,14 @@ function parseBatchLine(line: string): BatchResult {
         customId: result.custom_id,
         status: "succeeded",
         output: JSON.parse(jsonString),
-        tokensUsed: responseBody.usage?.total_tokens,
+        tokensUsed,
       };
     } catch (error) {
       return {
         customId: result.custom_id,
         status: "failed",
         error: `Invalid JSON output: ${error instanceof Error ? error.message : String(error)}`,
+        tokensUsed,
       };
     }
   }
@@ -177,6 +180,7 @@ function parseBatchLine(line: string): BatchResult {
       status: "failed",
       error:
         "Response incomplete (max_output_tokens): likely exhausted reasoning/output budget before final JSON",
+      tokensUsed,
     };
   }
 
@@ -184,6 +188,7 @@ function parseBatchLine(line: string): BatchResult {
     customId: result.custom_id,
     status: "failed",
     error: `No text content in response output${responseBody.status ? ` (status ${responseBody.status})` : ""}`,
+    tokensUsed,
   };
 }
 

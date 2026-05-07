@@ -151,7 +151,7 @@ export class AnthropicProvider implements AIProvider {
               },
             ],
             output_config: {
-              effort: chosenEffort as any,
+              effort: chosenEffort,
               format: {
                 type: "json_schema" as const,
                 schema: enforceStructuredSchema(req.outputSchema.schema),

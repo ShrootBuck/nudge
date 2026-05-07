@@ -1,5 +1,10 @@
 import { getRequiredEnv } from "../env";
-import type { AIProvider, BatchRequest, BatchResult, BatchStatus } from "./types";
+import type {
+  AIProvider,
+  BatchRequest,
+  BatchResult,
+  BatchStatus,
+} from "./types";
 
 type XAIBatchState = {
   num_requests: number;
@@ -152,7 +157,6 @@ export class XAIProvider implements AIProvider {
     requests: BatchRequest[],
     _effort?: string,
   ): Promise<string> {
-
     const jsonlLines = await Promise.all(
       requests.map(async (req) => {
         const userContent = await toXAIUserContent(req);
