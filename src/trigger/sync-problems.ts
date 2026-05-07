@@ -37,6 +37,11 @@ function isValidProblem(problem: CFProblem) {
   );
 }
 
+function tagsEqual(a: string[], b: string[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((v, i) => v === b[i]);
+}
+
 export const syncProblems = schedules.task({
   id: "sync-problems",
   cron: {
@@ -71,9 +76,10 @@ export const syncProblems = schedules.task({
     const problems = data.result.problems.filter(isValidProblem);
     logger.info(`Fetched ${problems.length} valid problems from Codeforces`);
 
-    // Process in batches to avoid excessive concurrent upserts.
+    // Process in batches to avoid excessive concurrent DB operations.
     let created = 0;
     let updated = 0;
+    let unchanged = 0;
     let failed = 0;
     const batchSize = 100;
     const touchedProblemTags = new Set<string>();
@@ -81,52 +87,89 @@ export const syncProblems = schedules.task({
     for (let i = 0; i < problems.length; i += batchSize) {
       const batch = problems.slice(i, i + batchSize);
 
+      // Fetch existing problems for this batch in a single query.
+      const existingProblems = await prisma.problem.findMany({
+        where: {
+          OR: batch.map((p) => ({
+            contestId: p.contestId,
+            index: p.index,
+          })),
+        },
+        select: {
+          contestId: true,
+          index: true,
+          name: true,
+          rating: true,
+          tags: true,
+        },
+      });
+
+      const existingMap = new Map(
+        existingProblems.map((p) => [`${p.contestId}-${p.index}`, p]),
+      );
+
       const results = await Promise.allSettled(
         batch.map(async (p) => {
-          const result = await prisma.problem.upsert({
-            where: {
-              contestId_index: {
+          const key = `${p.contestId}-${p.index}`;
+          const existing = existingMap.get(key);
+
+          if (!existing) {
+            const result = await prisma.problem.create({
+              data: {
+                ...problemCreateData(pipelineStateData("BACKLOG", "IDLE")),
                 contestId: p.contestId,
                 index: p.index,
+                name: p.name,
+                rating: p.rating ?? null,
+                tags: p.tags,
               },
-            },
-            update: {
-              name: p.name,
-              rating: p.rating ?? null,
-              tags: p.tags,
-            },
-            create: {
-              ...problemCreateData(pipelineStateData("BACKLOG", "IDLE")),
-              contestId: p.contestId,
-              index: p.index,
-              name: p.name,
-              rating: p.rating ?? null,
-              tags: p.tags,
-            },
-            select: {
-              contestId: true,
-              index: true,
-              createdAt: true,
-              updatedAt: true,
-            },
-          });
+              select: {
+                contestId: true,
+                index: true,
+              },
+            });
+            touchedProblemTags.add(problemTag(result.contestId, result.index));
+            return "created" as const;
+          }
 
-          touchedProblemTags.add(problemTag(result.contestId, result.index));
+          const nameChanged = existing.name !== p.name;
+          const ratingChanged = existing.rating !== (p.rating ?? null);
+          const tagsChanged = !tagsEqual(existing.tags, p.tags);
 
-          // On insert, Prisma sets createdAt and updatedAt to the same value.
-          return result.createdAt.getTime() === result.updatedAt.getTime()
-            ? ("created" as const)
-            : ("updated" as const);
+          if (nameChanged || ratingChanged || tagsChanged) {
+            const result = await prisma.problem.update({
+              where: {
+                contestId_index: {
+                  contestId: p.contestId,
+                  index: p.index,
+                },
+              },
+              data: {
+                name: p.name,
+                rating: p.rating ?? null,
+                tags: p.tags,
+              },
+              select: {
+                contestId: true,
+                index: true,
+              },
+            });
+            touchedProblemTags.add(problemTag(result.contestId, result.index));
+            return "updated" as const;
+          }
+
+          return "unchanged" as const;
         }),
       );
 
       for (const r of results) {
         if (r.status === "fulfilled") {
           if (r.value === "created") created++;
-          else updated++;
+          else if (r.value === "updated") updated++;
+          else unchanged++;
         } else {
           failed++;
-          logger.error("Problem upsert failed", {
+          logger.error("Problem sync failed", {
             error: String(r.reason),
           });
         }
@@ -145,7 +188,7 @@ export const syncProblems = schedules.task({
     }
 
     logger.info(
-      `Sync complete: ${created} created, ${updated} updated, ${failed} failed`,
+      `Sync complete: ${created} created, ${updated} updated, ${unchanged} unchanged, ${failed} failed`,
     );
 
     await discordLog({
@@ -158,6 +201,7 @@ export const syncProblems = schedules.task({
       fields: [
         { name: "New", value: `${created}`, inline: true },
         { name: "Updated", value: `${updated}`, inline: true },
+        { name: "Unchanged", value: `${unchanged}`, inline: true },
         ...(failed > 0
           ? [{ name: "Failed", value: `${failed}`, inline: true }]
           : []),
@@ -168,6 +212,6 @@ export const syncProblems = schedules.task({
       throw new Error(`Problem sync completed with ${failed} failed upserts`);
     }
 
-    return { created, updated, total: problems.length, failed };
+    return { created, updated, unchanged, total: problems.length, failed };
   },
 });
