@@ -39,6 +39,9 @@ type OpenAIBatchLine = {
       } | null;
       output_text?: string;
       output?: OpenAIBatchOutputItem[];
+      usage?: {
+        total_tokens?: number;
+      } | null;
     } | null;
   } | null;
 };
@@ -154,6 +157,7 @@ function parseBatchLine(line: string): BatchResult {
         customId: result.custom_id,
         status: "succeeded",
         output: JSON.parse(jsonString),
+        tokensUsed: responseBody.usage?.total_tokens,
       };
     } catch (error) {
       return {

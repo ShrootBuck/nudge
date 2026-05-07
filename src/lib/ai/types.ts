@@ -22,6 +22,7 @@ export interface BatchResult {
   status: "succeeded" | "failed";
   output?: unknown;
   error?: string;
+  tokensUsed?: number;
 }
 
 export type BatchStatus = "processing" | "ended" | "failed";
