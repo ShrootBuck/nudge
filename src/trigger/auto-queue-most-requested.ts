@@ -7,49 +7,17 @@ import {
   problemUpdateData,
   problemWhere,
 } from "../lib/problem-pipeline-db";
-import {
-  getDailyTokenUsage,
-  OPENAI_AUTO_QUEUE_DAILY_TOKEN_LIMIT,
-  OPENAI_PROVIDER_ID,
-} from "../lib/usage-tracker";
 import { discordLog } from "./discord-log";
-import { getActiveModelConfig } from "./generate-content/model-config";
 
 const AUTO_QUEUE_LIMIT = 1;
 
 export const autoQueueMostRequested = schedules.task({
   id: "auto-queue-most-requested",
   cron: {
-    pattern: "0 * * * *",
+    pattern: "0 */3 * * *",
     timezone: "America/Phoenix",
   },
   run: async () => {
-    const modelConfig = await getActiveModelConfig();
-
-    if (modelConfig.provider !== OPENAI_PROVIDER_ID) {
-      logger.info(
-        `Active provider is "${modelConfig.provider}", not OpenAI. Skipping free-token auto-queue.`,
-      );
-      return {
-        queued: 0,
-        reason: "active_provider_not_openai",
-        provider: modelConfig.provider,
-      };
-    }
-
-    const tokensUsed = await getDailyTokenUsage(OPENAI_PROVIDER_ID);
-
-    if (tokensUsed >= OPENAI_AUTO_QUEUE_DAILY_TOKEN_LIMIT) {
-      logger.info(
-        `OpenAI token usage (${tokensUsed}) is at or above the daily limit (${OPENAI_AUTO_QUEUE_DAILY_TOKEN_LIMIT}). Skipping auto-queue.`,
-      );
-      return { queued: 0, reason: "daily_token_limit_reached" };
-    }
-
-    logger.info(
-      `OpenAI token usage: ${tokensUsed} / ${OPENAI_AUTO_QUEUE_DAILY_TOKEN_LIMIT}. Proceeding to queue up to ${AUTO_QUEUE_LIMIT} problem(s).`,
-    );
-
     const problems = await prisma.problem.findMany({
       where: problemWhere(backlogWhere()),
       select: {

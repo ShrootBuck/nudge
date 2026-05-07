@@ -15,7 +15,6 @@ import {
   problemWhere,
   readyToRunWhere,
 } from "../lib/problem-pipeline-db";
-import { addDailyTokenUsage } from "../lib/usage-tracker";
 import { discordLog } from "./discord-log";
 import {
   problemOutputSchema,
@@ -413,13 +412,6 @@ export const generateBatchContent = task({
           }
 
           try {
-            if (result.tokensUsed && result.tokensUsed > 0) {
-              await addDailyTokenUsage(modelInfo.provider, result.tokensUsed);
-              logger.info(
-                `Tracked ${result.tokensUsed} tokens for problem ${label}`,
-              );
-            }
-
             if (result.status !== "succeeded" || !result.output) {
               throw new Error(result.error ?? "Unknown provider error");
             }
