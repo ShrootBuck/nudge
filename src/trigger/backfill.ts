@@ -1,5 +1,7 @@
 import type { Prisma } from "@prisma/client";
-import { logger, task } from "@trigger.dev/sdk";
+import { logger, schedules, task } from "@trigger.dev/sdk";
+import { safeRevalidateTag } from "../lib/cache-revalidate";
+import { PROBLEM_LIST_TAG, problemTag } from "../lib/cache-tags";
 import { DISCORD_COLORS } from "../lib/discord-webhook";
 import { prisma } from "../lib/prisma";
 import {
@@ -18,6 +20,10 @@ interface BackfillPayload {
   contestIdMax?: number;
   tags?: string[];
   limit?: number;
+}
+
+function randomSkip(count: number) {
+  return Math.floor(Math.random() * count);
 }
 
 export const backfill = task({
@@ -130,5 +136,96 @@ export const backfill = task({
     });
 
     return { queued: selectedIds.length };
+  },
+});
+
+export const queueRandomProblem = schedules.task({
+  id: "queue-random-problem",
+  cron: {
+    pattern: "0 */6 * * *",
+    timezone: "America/Phoenix",
+  },
+  run: async () => {
+    const where: Prisma.ProblemWhereInput = {
+      ...backlogWhere(),
+      runState: "IDLE",
+      editorial: null,
+      solution: null,
+      hints: { none: {} },
+    };
+
+    const candidateCount = await prisma.problem.count({
+      where: problemWhere(where),
+    });
+
+    if (candidateCount === 0) {
+      logger.info("No random backlog problem available to queue");
+      return { queued: 0, problemId: null };
+    }
+
+    const problem = await prisma.problem.findFirst({
+      where: problemWhere(where),
+      orderBy: problemOrderBy([{ id: "asc" }]),
+      skip: randomSkip(candidateCount),
+      select: {
+        id: true,
+        contestId: true,
+        index: true,
+        name: true,
+        rating: true,
+      },
+    });
+
+    if (!problem) {
+      logger.warn("Random backlog problem disappeared before selection");
+      return { queued: 0, problemId: null };
+    }
+
+    const result = await prisma.problem.updateMany({
+      where: problemWhere({
+        id: problem.id,
+        queueState: "BACKLOG",
+        runState: "IDLE",
+        reviewStatus: { not: "UNSOLVABLE" },
+      }),
+      data: problemUpdateManyData({
+        ...pipelineStateData("READY", "IDLE"),
+        activeBatchId: null,
+        processingStartedAt: null,
+        lastGenerationError: null,
+      }),
+    });
+
+    if (result.count === 0) {
+      logger.warn("Random backlog problem was already queued before update", {
+        problemId: problem.id,
+      });
+      return { queued: 0, problemId: null };
+    }
+
+    const label = `${problem.contestId}${problem.index}`;
+
+    safeRevalidateTag(PROBLEM_LIST_TAG, "max");
+    safeRevalidateTag(problemTag(problem.contestId, problem.index), "max");
+
+    logger.info(`Queued random problem ${label} for generation`, {
+      problemId: problem.id,
+      rating: problem.rating,
+    });
+
+    await discordLog({
+      title: "🎲 Random Problem Queued",
+      description: `**${label} — ${problem.name}** marked ready for generation.`,
+      color: DISCORD_COLORS.orange,
+      fields: [
+        {
+          name: "Rating",
+          value: `${problem.rating ?? "unrated"}`,
+          inline: true,
+        },
+      ],
+    });
+
+    return { queued: 1, problemId: problem.id };
   },
 });
