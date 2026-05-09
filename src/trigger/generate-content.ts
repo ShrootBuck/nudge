@@ -587,7 +587,7 @@ export const generateBatchContent = task({
 export const generateContentScheduler = schedules.task({
   id: "generate-content-scheduler",
   cron: {
-    pattern: "5 * * * *",
+    pattern: "0 * * * *",
     timezone: "America/Phoenix",
   },
   run: async () => {

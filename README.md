@@ -78,7 +78,7 @@ bunx trigger dev
 This connects to Trigger.dev and registers the scheduled tasks:
 
 - **`sync-problems`** — daily Codeforces sync (midnight MST)
-- **`generate-content-scheduler`** — hourly batch generation (5 minutes past the hour, MST)
+- **`generate-content-scheduler`** — hourly batch generation (top of the hour, MST)
 - **`generation-state-watchdog`** — daily stale-batch recovery (48h threshold)
 - **`report-digest`** — daily Discord digest of user-reported issues
 - **`backfill`** — manually triggered, queues backlog problems by rating/tag filters
