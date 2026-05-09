@@ -1,22 +1,13 @@
-import { logger, schedules } from "@trigger.dev/sdk";
+import { logger, task } from "@trigger.dev/sdk";
 import { DISCORD_COLORS } from "../lib/discord-webhook";
 import { prisma } from "../lib/prisma";
-import {
-  backlogWhere,
-  pipelineStateData,
-  problemUpdateData,
-  problemWhere,
-} from "../lib/problem-pipeline-db";
+import { backlogWhere, problemWhere } from "../lib/problem-pipeline-db";
 import { discordLog } from "./discord-log";
 
 const AUTO_QUEUE_LIMIT = 1;
 
-export const autoQueueMostRequested = schedules.task({
+export const autoQueueMostRequested = task({
   id: "auto-queue-most-requested",
-  cron: {
-    pattern: "0 */3 * * *",
-    timezone: "America/Phoenix",
-  },
   run: async () => {
     const problems = await prisma.problem.findMany({
       where: problemWhere(backlogWhere()),
@@ -40,36 +31,26 @@ export const autoQueueMostRequested = schedules.task({
     const queuedProblems: Array<{ label: string; requestedCount: number }> = [];
 
     for (const problem of problems) {
-      await prisma.problem.update({
-        where: { id: problem.id },
-        data: problemUpdateData({
-          ...pipelineStateData("READY", "IDLE"),
-          activeBatchId: null,
-          processingStartedAt: null,
-          lastGenerationError: null,
-        }),
-      });
-
       const label = `${problem.contestId}${problem.index}`;
       queuedProblems.push({ label, requestedCount: problem.requestedCount });
-      logger.info(`Auto-queued backlog problem ${label}`, {
+      logger.info(`Auto-queue disabled; leaving ${label} in BACKLOG`, {
         requestedCount: problem.requestedCount,
       });
     }
 
     await discordLog({
-      title: `🤖 Auto-Queued ${queuedProblems.length} Most Requested`,
+      title: "🚫 Auto-Queue Disabled",
       description: queuedProblems
         .map(
           ({ label, requestedCount }, index) =>
             `${index + 1}. **${label}** (requested count: **${requestedCount}**)`,
         )
         .join("\n"),
-      color: DISCORD_COLORS.violet,
+      color: DISCORD_COLORS.warning,
     });
 
     return {
-      queued: problems.length,
+      queued: 0,
       problems: problems.map(
         (problem) => `${problem.contestId}${problem.index}`,
       ),
