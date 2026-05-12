@@ -80,6 +80,8 @@ void setIO() {
     cin.tie(nullptr);
 }
 
-int main() { setIO(); }
+int main() {
+    setIO();
+}
 \`\`\``;
 }
