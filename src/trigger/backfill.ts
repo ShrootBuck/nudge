@@ -22,10 +22,6 @@ interface BackfillPayload {
   limit?: number;
 }
 
-function randomSkip(count: number) {
-  return Math.floor(Math.random() * count);
-}
-
 export const backfill = task({
   id: "backfill",
   run: async (payload: BackfillPayload) => {
@@ -142,7 +138,7 @@ export const backfill = task({
 export const queueRandomProblem = schedules.task({
   id: "queue-random-problem",
   cron: {
-    pattern: "0 */6 * * *",
+    pattern: "55 23 * * *",
     timezone: "America/Phoenix",
   },
   run: async () => {
@@ -154,19 +150,9 @@ export const queueRandomProblem = schedules.task({
       hints: { none: {} },
     };
 
-    const candidateCount = await prisma.problem.count({
-      where: problemWhere(where),
-    });
-
-    if (candidateCount === 0) {
-      logger.info("No random backlog problem available to queue");
-      return { queued: 0, problemId: null };
-    }
-
     const problem = await prisma.problem.findFirst({
       where: problemWhere(where),
-      orderBy: problemOrderBy([{ id: "asc" }]),
-      skip: randomSkip(candidateCount),
+      orderBy: problemOrderBy([{ requestedCount: "desc" }]),
       select: {
         id: true,
         contestId: true,
@@ -177,7 +163,7 @@ export const queueRandomProblem = schedules.task({
     });
 
     if (!problem) {
-      logger.warn("Random backlog problem disappeared before selection");
+      logger.info("No backlog problem available to queue");
       return { queued: 0, problemId: null };
     }
 
@@ -197,7 +183,7 @@ export const queueRandomProblem = schedules.task({
     });
 
     if (result.count === 0) {
-      logger.warn("Random backlog problem was already queued before update", {
+      logger.warn("Backlog problem was already queued before update", {
         problemId: problem.id,
       });
       return { queued: 0, problemId: null };
@@ -208,13 +194,13 @@ export const queueRandomProblem = schedules.task({
     safeRevalidateTag(PROBLEM_LIST_TAG, "max");
     safeRevalidateTag(problemTag(problem.contestId, problem.index), "max");
 
-    logger.info(`Queued random problem ${label} for generation`, {
+    logger.info(`Queued problem ${label} for generation`, {
       problemId: problem.id,
       rating: problem.rating,
     });
 
     await discordLog({
-      title: "🎲 Random Problem Queued",
+      title: "📅 Daily Problem Queued",
       description: `**${label} — ${problem.name}** marked ready for generation.`,
       color: DISCORD_COLORS.orange,
       fields: [
