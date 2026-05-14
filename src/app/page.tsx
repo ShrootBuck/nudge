@@ -13,9 +13,11 @@ import { redirect } from "next/navigation";
 import { PROBLEM_LIST_TAG } from "@/lib/cache-tags";
 import { prisma } from "@/lib/prisma";
 import { completedContentWhere, problemWhere } from "@/lib/problem-pipeline-db";
+import { getAvailableProblemTags } from "@/lib/problem-read-cache";
 import { ratingTone } from "@/lib/utils";
 import { LuckyButton } from "./lucky-button";
 import { ProblemFilters } from "./problem-filters";
+import { MAX_RATING, MIN_RATING } from "./rating-constants";
 
 const PAGE_SIZE = 50;
 
@@ -26,6 +28,29 @@ function listableWhere(): Prisma.ProblemWhereInput {
       { reviewStatus: { notIn: ["UNSOLVABLE", "INCORRECT"] } },
     ],
   });
+}
+
+function parseTagsParam(value: string | string[] | undefined): string[] {
+  if (!value) return [];
+  const raw = Array.isArray(value) ? value.join(",") : value;
+  return Array.from(
+    new Set(
+      raw
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean),
+    ),
+  ).sort((a, b) => a.localeCompare(b));
+}
+
+function parseRatingBound(
+  value: string | string[] | undefined,
+  fallback: number,
+): number {
+  if (typeof value !== "string") return fallback;
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(MAX_RATING, Math.max(MIN_RATING, Math.round(n)));
 }
 
 function buildPageUrl(
@@ -50,14 +75,20 @@ function buildPageUrl(
 
 function countActiveFilters({
   query,
-  rating,
-  tag,
+  tags,
+  minRating,
+  maxRating,
 }: {
   query: string;
-  rating: string;
-  tag: string;
+  tags: string[];
+  minRating: number;
+  maxRating: number;
 }) {
-  return [query, rating, tag].filter(Boolean).length;
+  let count = 0;
+  if (query) count += 1;
+  if (tags.length > 0) count += 1;
+  if (minRating !== MIN_RATING || maxRating !== MAX_RATING) count += 1;
+  return count;
 }
 
 function formatProblemId(contestId: number, index: string) {
@@ -66,12 +97,14 @@ function formatProblemId(contestId: number, index: string) {
 
 function buildProblemFilters({
   query,
-  ratingParam,
-  tagParam,
+  tags,
+  minRating,
+  maxRating,
 }: {
   query: string;
-  ratingParam: string;
-  tagParam: string;
+  tags: string[];
+  minRating: number;
+  maxRating: number;
 }) {
   const where: Prisma.ProblemWhereInput = {
     ...listableWhere(),
@@ -89,15 +122,12 @@ function buildProblemFilters({
     }
   }
 
-  if (ratingParam) {
-    const [min, max] = ratingParam.split("-").map(Number);
-    if (!Number.isNaN(min) && !Number.isNaN(max)) {
-      where.rating = { gte: min, lte: max };
-    }
+  if (minRating !== MIN_RATING || maxRating !== MAX_RATING) {
+    where.rating = { gte: minRating, lte: maxRating };
   }
 
-  if (tagParam) {
-    where.tags = { has: tagParam };
+  if (tags.length > 0) {
+    where.tags = { hasSome: tags };
   }
 
   return where;
@@ -106,20 +136,22 @@ function buildProblemFilters({
 async function getHomePageData({
   page,
   query,
-  ratingParam,
-  tagParam,
+  tags,
+  minRating,
+  maxRating,
 }: {
   page: number;
   query: string;
-  ratingParam: string;
-  tagParam: string;
+  tags: string[];
+  minRating: number;
+  maxRating: number;
 }) {
   "use cache";
 
-  cacheLife("minutes");
+  cacheLife("days");
   cacheTag(PROBLEM_LIST_TAG);
 
-  const where = buildProblemFilters({ query, ratingParam, tagParam });
+  const where = buildProblemFilters({ query, tags, minRating, maxRating });
   const [totalCount, verifiedCount] = await Promise.all([
     prisma.problem.count({ where }),
     prisma.problem.count({
@@ -178,16 +210,20 @@ export default async function Home({
 
   const page = Math.max(1, Number(params.page) || 1);
   const query = typeof params.q === "string" ? params.q.trim() : "";
-  const ratingParam = typeof params.rating === "string" ? params.rating : "";
-  const tagParam = typeof params.tag === "string" ? params.tag : "";
+  const tags = parseTagsParam(params.tags ?? params.tag);
+  let minRating = parseRatingBound(params.minRating, MIN_RATING);
+  let maxRating = parseRatingBound(params.maxRating, MAX_RATING);
+  if (minRating > maxRating) {
+    [minRating, maxRating] = [maxRating, minRating];
+  }
 
-  const { problems, safePage, totalCount, totalPages, verifiedCount } =
-    await getHomePageData({
-      page,
-      query,
-      ratingParam,
-      tagParam,
-    });
+  const [
+    { problems, safePage, totalCount, totalPages, verifiedCount },
+    availableTags,
+  ] = await Promise.all([
+    getHomePageData({ page, query, tags, minRating, maxRating }),
+    getAvailableProblemTags(),
+  ]);
 
   if (safePage !== page) {
     redirect(buildPageUrl(params, safePage));
@@ -195,8 +231,9 @@ export default async function Home({
 
   const activeFilterCount = countActiveFilters({
     query,
-    rating: ratingParam,
-    tag: tagParam,
+    tags,
+    minRating,
+    maxRating,
   });
 
   return (
@@ -251,8 +288,10 @@ export default async function Home({
         <section className="mt-6 rounded-[1.75rem] border border-border/70 bg-card/75 p-4 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] backdrop-blur sm:p-6">
           <ProblemFilters
             query={query}
-            ratingFilter={ratingParam}
-            tagFilter={tagParam}
+            tags={tags}
+            minRating={minRating}
+            maxRating={maxRating}
+            availableTags={availableTags}
             totalCount={totalCount}
           />
         </section>
@@ -275,7 +314,7 @@ export default async function Home({
                 <SearchX className="size-5" />
               </div>
               <div className="text-sm text-muted-foreground">
-                {query || ratingParam || tagParam
+                {activeFilterCount
                   ? "No problems match your filters."
                   : "No problems available yet. Check back soon."}
               </div>

@@ -1,8 +1,6 @@
 import { Cpu } from "lucide-react";
 import type { Metadata } from "next";
-import { cacheLife, cacheTag } from "next/cache";
-import { PROVIDER_MODELS_TAG } from "@/lib/cache-tags";
-import { prisma } from "@/lib/prisma";
+import { getCachedProviderModels } from "@/lib/provider-model-cache";
 import { ProviderPanel } from "./provider-panel";
 
 export const metadata: Metadata = {
@@ -11,22 +9,7 @@ export const metadata: Metadata = {
 };
 
 export default async function ProviderPage() {
-  "use cache";
-
-  cacheLife("hours");
-  cacheTag(PROVIDER_MODELS_TAG);
-
-  const configs = await prisma.providerModel.findMany({
-    orderBy: [{ isActive: "desc" }, { createdAt: "desc" }],
-  });
-  const initial = configs.map((config) => ({
-    id: config.id,
-    provider: config.provider,
-    modelId: config.modelId,
-    displayName: config.displayName,
-    isActive: config.isActive,
-    effort: config.effort,
-  }));
+  const initial = await getCachedProviderModels();
 
   return (
     <main className="min-h-screen pb-16">

@@ -7,6 +7,7 @@ import { sendAdminLog } from "@/lib/discord";
 import { DISCORD_COLORS } from "@/lib/discord-webhook";
 import { verifyAdminPassword } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
+import { getCachedProviderModels } from "@/lib/provider-model-cache";
 
 export type ProviderModel = {
   id: string;
@@ -18,18 +19,7 @@ export type ProviderModel = {
 };
 
 export async function listProviderModels(): Promise<ProviderModel[]> {
-  const configs = await prisma.providerModel.findMany({
-    orderBy: [{ isActive: "desc" }, { createdAt: "desc" }],
-  });
-
-  return configs.map((c) => ({
-    id: c.id,
-    provider: c.provider,
-    modelId: c.modelId,
-    displayName: c.displayName,
-    isActive: c.isActive,
-    effort: c.effort,
-  }));
+  return getCachedProviderModels();
 }
 
 function auth(password: string) {

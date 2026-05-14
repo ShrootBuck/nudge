@@ -17,7 +17,7 @@ async function getProblemView(
 ): Promise<ProblemView | null> {
   "use cache";
 
-  cacheLife("minutes");
+  cacheLife("days");
   cacheTag(problemTag(contestId, index), PROVIDER_MODELS_TAG);
 
   const problem = await prisma.problem.findUnique({
