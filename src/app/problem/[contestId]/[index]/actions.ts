@@ -118,7 +118,7 @@ export async function queueRegeneration(problemId: string, password: string) {
   await prisma.problem.update({
     where: { id: problemId },
     data: problemUpdateData({
-      ...pipelineStateData("READY", "IDLE"),
+      ...pipelineStateData("IDLE"),
       generationAttempts: 0,
       reviewStatus: "UNREVIEWED",
       requestedCount: 1,

@@ -42,7 +42,7 @@ export async function saveProblemContent(
     return tx.problem.update({
       where: { id: problemId },
       data: problemUpdateData({
-        ...pipelineStateData("READY", "SUCCEEDED"),
+        ...pipelineStateData("SUCCEEDED"),
         generatedByDisplayName: model.displayName,
         generationStartedAt: null,
         lastGenerationError: null,

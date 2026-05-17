@@ -1,4 +1,4 @@
-import type { Prisma, QueueState, RunState } from "@prisma/client";
+import type { Prisma, RunState } from "@prisma/client";
 
 export function problemWhere<T extends Prisma.ProblemWhereInput>(input: T): T {
   return input;
@@ -32,17 +32,15 @@ export function problemSelect<T extends Prisma.ProblemSelect>(input: T): T {
   return input;
 }
 
-export function pipelineStateData(queueState: QueueState, runState: RunState) {
+export function pipelineStateData(runState: RunState) {
   return {
-    queueState,
     runState,
-  } satisfies Pick<Prisma.ProblemCreateInput, "queueState" | "runState">;
+  } satisfies Pick<Prisma.ProblemCreateInput, "runState">;
 }
 
 export function readyToRunWhere(maxAttempts: number): Prisma.ProblemWhereInput {
   return problemWhere({
     generationAttempts: { lt: maxAttempts },
-    queueState: "READY",
     runState: { in: ["IDLE", "FAILED"] },
     reviewStatus: { not: "UNSOLVABLE" },
   });
@@ -50,7 +48,7 @@ export function readyToRunWhere(maxAttempts: number): Prisma.ProblemWhereInput {
 
 export function backlogWhere(): Prisma.ProblemWhereInput {
   return problemWhere({
-    queueState: "BACKLOG",
+    runState: "IDLE",
     reviewStatus: { not: "UNSOLVABLE" },
   });
 }

@@ -10,7 +10,6 @@ import {
   problemOrderBy,
   problemUpdateData,
   problemWhere,
-  readyToRunWhere,
 } from "../lib/problem-pipeline-db";
 import { discordLog } from "./discord-log";
 import {
@@ -82,9 +81,11 @@ async function incrementDailyTokens(dateKey: string, tokens: number) {
 }
 
 async function fetchNextProblem(): Promise<ProblemForGeneration | null> {
-  const where: Prisma.ProblemWhereInput = readyToRunWhere(
-    MAX_GENERATION_ATTEMPTS,
-  );
+  const where: Prisma.ProblemWhereInput = {
+    generationAttempts: { lt: MAX_GENERATION_ATTEMPTS },
+    runState: { in: ["IDLE", "FAILED"] },
+    reviewStatus: { not: "UNSOLVABLE" },
+  };
 
   return prisma.problem.findFirst({
     where: problemWhere(where),
@@ -130,7 +131,7 @@ async function recoverStaleGenerations() {
   const result = await prisma.problem.updateMany({
     where: problemWhere({ id: { in: staleIds }, runState: "RUNNING" }),
     data: problemUpdateData({
-      ...pipelineStateData("READY", "FAILED"),
+      ...pipelineStateData("FAILED"),
       generationStartedAt: null,
       lastGenerationError: `Generation exceeded ${STALE_GENERATION_THRESHOLD_HOURS}h without completion`,
     }),
@@ -192,13 +193,12 @@ export const generateContentScheduler = schedules.task({
       const updated = await prisma.problem.updateMany({
         where: problemWhere({
           id: problem.id,
-          queueState: "READY",
           runState: { in: ["IDLE", "FAILED"] },
           generationAttempts: { lt: MAX_GENERATION_ATTEMPTS },
           reviewStatus: { not: "UNSOLVABLE" },
         }),
         data: problemUpdateData({
-          ...pipelineStateData("READY", "RUNNING"),
+          ...pipelineStateData("RUNNING"),
           generationAttempts: { increment: 1 },
           generationStartedAt: new Date(),
           lastGenerationError: null,
@@ -260,7 +260,7 @@ export const generateContentScheduler = schedules.task({
           await prisma.problem.update({
             where: { id: problem.id },
             data: problemUpdateData({
-              ...pipelineStateData("BACKLOG", "FAILED"),
+              ...pipelineStateData("FAILED"),
               reviewStatus: "UNSOLVABLE",
               generationStartedAt: null,
               lastGenerationError: reason,
@@ -292,7 +292,7 @@ export const generateContentScheduler = schedules.task({
         await prisma.problem.update({
           where: { id: problem.id },
           data: problemUpdateData({
-            ...pipelineStateData("READY", "FAILED"),
+            ...pipelineStateData("FAILED"),
             generationStartedAt: null,
             lastGenerationError: reason,
           }),

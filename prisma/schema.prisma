@@ -6,11 +6,6 @@ datasource db {
   provider = "postgresql"
 }
 
-enum QueueState {
-  BACKLOG
-  READY
-}
-
 enum RunState {
   IDLE
   RUNNING
@@ -33,7 +28,6 @@ model Problem {
   rating    Int?
   tags      String[]
 
-  queueState          QueueState   @default(BACKLOG)
   runState            RunState     @default(IDLE)
   generationAttempts  Int          @default(0)
   reviewStatus        ReviewStatus @default(UNREVIEWED)
@@ -52,7 +46,7 @@ model Problem {
   updatedAt DateTime @updatedAt
 
   @@unique([contestId, index])
-  @@index([queueState, runState, generationAttempts])
+  @@index([runState, generationAttempts])
   @@index([runState, generationStartedAt])
   @@index([requestedCount, updatedAt])
 }

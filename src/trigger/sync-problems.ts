@@ -116,7 +116,7 @@ export const syncProblems = schedules.task({
           if (!existing) {
             const result = await prisma.problem.create({
               data: {
-                ...problemCreateData(pipelineStateData("BACKLOG", "IDLE")),
+                ...problemCreateData(pipelineStateData("IDLE")),
                 contestId: p.contestId,
                 index: p.index,
                 name: p.name,
