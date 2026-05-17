@@ -152,7 +152,10 @@ export const queueRandomProblem = schedules.task({
 
     const problem = await prisma.problem.findFirst({
       where: problemWhere(where),
-      orderBy: problemOrderBy([{ requestedCount: "desc" }]),
+      orderBy: problemOrderBy([
+        { requestedCount: "desc" },
+        { createdAt: "desc" },
+      ]),
       select: {
         id: true,
         contestId: true,
