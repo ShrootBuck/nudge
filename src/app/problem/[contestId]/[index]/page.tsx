@@ -1,6 +1,6 @@
 import { cacheLife, cacheTag } from "next/cache";
 import { notFound } from "next/navigation";
-import { PROVIDER_MODELS_TAG, problemTag } from "@/lib/cache-tags";
+import { problemTag } from "@/lib/cache-tags";
 import { prisma } from "@/lib/prisma";
 import { parseSolutionContent } from "@/lib/problem-solution";
 import {
@@ -18,7 +18,7 @@ async function getProblemView(
   "use cache";
 
   cacheLife("days");
-  cacheTag(problemTag(contestId, index), PROVIDER_MODELS_TAG);
+  cacheTag(problemTag(contestId, index));
 
   const problem = await prisma.problem.findUnique({
     where: {
@@ -33,21 +33,7 @@ async function getProblemView(
 
   if (!problem) return null;
 
-  let modelDisplayName: string | null = null;
-  let modelEffort: string | null = null;
-  if (problem.generatedByProvider && problem.generatedByModel) {
-    const config = await prisma.providerModel.findUnique({
-      where: {
-        provider_modelId: {
-          provider: problem.generatedByProvider,
-          modelId: problem.generatedByModel,
-        },
-      },
-      select: { displayName: true },
-    });
-    modelDisplayName = config?.displayName ?? problem.generatedByModel;
-    modelEffort = problem.generatedByEffort ?? null;
-  }
+  const modelDisplayName = problem.generatedByDisplayName ?? null;
 
   let preHighlightedSolutionHtml: { light: string; dark: string } | null = null;
 
@@ -85,7 +71,6 @@ async function getProblemView(
     reviewStatus: problem.reviewStatus,
     runState: problem.runState,
     modelDisplayName,
-    modelEffort,
     hints: problem.hints,
     editorial: problem.editorial,
     solution: problem.solution

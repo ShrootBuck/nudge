@@ -129,6 +129,8 @@ export async function requestProblem(_prevState: unknown, formData: FormData) {
         },
         data: {
           requestedCount: { increment: 1 },
+          queueState: "READY",
+          ...(problem.runState === "IDLE" ? { runState: "IDLE" } : {}),
         },
       });
 

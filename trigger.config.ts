@@ -4,7 +4,7 @@ export default defineConfig({
   project: process.env.TRIGGER_PROJECT_REF ?? "",
   dirs: ["./src/trigger"],
   runtime: "bun",
-  maxDuration: 300,
+  maxDuration: 3600,
   retries: {
     enabledInDev: false,
     default: {

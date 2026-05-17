@@ -38,7 +38,7 @@ export default function RequestPage() {
 
             <p className="mt-4 max-w-2xl text-base/7 text-muted-foreground sm:text-lg/8">
               Enter a Codeforces problem ID or URL to request it. Highly
-              requested problems are prioritized during backfill.
+              requested problems are prioritized during hourly generation.
             </p>
           </div>
         </section>

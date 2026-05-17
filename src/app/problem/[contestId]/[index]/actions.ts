@@ -122,8 +122,7 @@ export async function queueRegeneration(problemId: string, password: string) {
       generationAttempts: 0,
       reviewStatus: "UNREVIEWED",
       requestedCount: 1,
-      activeBatchId: null,
-      processingStartedAt: null,
+      generationStartedAt: null,
       lastGenerationError: null,
     }),
   });

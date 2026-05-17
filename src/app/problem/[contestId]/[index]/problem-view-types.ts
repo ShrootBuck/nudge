@@ -20,7 +20,6 @@ export type ProblemView = {
   reviewStatus: ReviewStatus;
   runState: RunState;
   modelDisplayName: string | null;
-  modelEffort: string | null;
   hints: { id: string; order: number; content: string }[];
   editorial: { id: string; content: string } | null;
   solution: {
@@ -70,7 +69,7 @@ export function generationState(
         icon: LoaderCircle,
         label: "Generation in progress",
         description:
-          "The batch is still cooking. Hints, editorial, and solution will appear after collection completes.",
+          "Generation is still cooking. Hints, editorial, and solution will appear after it completes.",
         className:
           "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-200",
         animate: true,

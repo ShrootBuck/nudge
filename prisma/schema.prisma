@@ -38,13 +38,10 @@ model Problem {
   generationAttempts  Int          @default(0)
   reviewStatus        ReviewStatus @default(UNREVIEWED)
   requestedCount      Int          @default(0)
-  activeBatchId       String?
-  processingStartedAt DateTime?
+  generationStartedAt DateTime?
   lastGenerationError String?      @db.Text
 
-  generatedByProvider String?
-  generatedByModel    String?
-  generatedByEffort   String?
+  generatedByDisplayName String?
 
   hints     Hint[]
   editorial Editorial?
@@ -56,6 +53,7 @@ model Problem {
 
   @@unique([contestId, index])
   @@index([queueState, runState, generationAttempts])
+  @@index([runState, generationStartedAt])
   @@index([requestedCount, updatedAt])
 }
 
@@ -100,17 +98,9 @@ model Report {
   createdAt DateTime @default(now())
 }
 
-model ProviderModel {
-  id          String  @id @default(cuid())
-  provider    String
-  modelId     String
-  displayName String
-  isActive    Boolean @default(false)
-  effort      String?
-
+model DailyTokenUsage {
+  date      String   @id
+  tokens    Int      @default(0)
   createdAt DateTime @default(now())
-
-  @@unique([provider, modelId])
+  updatedAt DateTime @updatedAt
 }
-
-
