@@ -38,21 +38,6 @@ export function pipelineStateData(runState: RunState) {
   } satisfies Pick<Prisma.ProblemCreateInput, "runState">;
 }
 
-export function readyToRunWhere(maxAttempts: number): Prisma.ProblemWhereInput {
-  return problemWhere({
-    generationAttempts: { lt: maxAttempts },
-    runState: { in: ["IDLE", "FAILED"] },
-    reviewStatus: { not: "UNSOLVABLE" },
-  });
-}
-
-export function backlogWhere(): Prisma.ProblemWhereInput {
-  return problemWhere({
-    runState: "IDLE",
-    reviewStatus: { not: "UNSOLVABLE" },
-  });
-}
-
 export function completedContentWhere(): Prisma.ProblemWhereInput {
   return problemWhere({
     runState: "SUCCEEDED",

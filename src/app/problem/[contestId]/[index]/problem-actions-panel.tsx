@@ -413,7 +413,9 @@ export function ReviewSection({
                     pendingStatus === "REGENERATE" && "animate-spin",
                   )}
                 />
-                {pendingStatus === "REGENERATE" ? "Queuing..." : "Regenerate"}
+                {pendingStatus === "REGENERATE"
+                  ? "Requesting..."
+                  : "Regenerate"}
               </Button>
             </div>
           </form>

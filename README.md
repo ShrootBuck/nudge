@@ -18,8 +18,8 @@ Most editorial sites give you the whole answer or nothing. Nudge sits in between
 
 All content is AI-generated using the OpenAI Responses API, then stored in Postgres and served through a Next.js frontend. Problems are synced from the Codeforces API automatically.
 
-1. **Sync** — A daily Trigger.dev scheduled task pulls every problem from the Codeforces API and upserts them into Postgres as backlog.
-2. **Generate** — An hourly scheduler runs synchronous OpenAI generations for ready problems, prioritized by request count and recency.
+1. **Sync** — A daily Trigger.dev scheduled task pulls every problem from the Codeforces API and upserts them into Postgres.
+2. **Generate** — An hourly scheduler runs synchronous OpenAI generations for eligible unsolved problems, prioritized by request count and recency.
 3. **Serve** — Next.js renders the problem list with filtering by rating, tag, and search. Each problem page has collapsible hint panels so you control exactly how much you see.
 4. **Report** — Users can flag incorrect content. A daily digest sends new reports to Discord via webhook for human verification.
 

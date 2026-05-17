@@ -184,7 +184,7 @@ export const generateContentScheduler = schedules.task({
 
       const problem = await fetchNextProblem();
       if (!problem) {
-        logger.info("No ready problems to generate content for");
+        logger.info("No eligible problems to generate content for");
         break;
       }
 

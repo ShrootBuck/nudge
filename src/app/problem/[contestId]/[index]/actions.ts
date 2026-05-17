@@ -133,8 +133,8 @@ export async function queueRegeneration(problemId: string, password: string) {
   const tag = `${problem.contestId}${problem.index}`;
   const link = `${SITE_URL}/problem/${problem.contestId}/${problem.index}`;
   await sendAdminLog({
-    title: "🔁 Regeneration Queued",
-    description: `**[${tag} — ${problem.name}](${link})**\nAttempt counter reset, will be picked up by next generation run.`,
+    title: "🔁 Regeneration Requested",
+    description: `**[${tag} — ${problem.name}](${link})**\nAttempt counter reset; it will be picked up by the next generation run.`,
     color: DISCORD_COLORS.violet,
   });
 
