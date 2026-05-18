@@ -148,6 +148,19 @@ export const generateContentScheduler = schedules.task({
     timezone: "UTC",
   },
   run: async () => {
+    if (true) {
+      logger.warn("Generation schedule disabled via kill switch", {
+        env: "GENERATION_KILL_SWITCH",
+      });
+      return {
+        processed: 0,
+        tokensUsed: 0,
+        totalTokens: 0,
+        recovered: 0,
+        stopReason: "kill_switch",
+      };
+    }
+
     const recovered = await recoverStaleGenerations();
     const dateKey = utcDateKey();
     let totalTokens = await getDailyTokenUsage(dateKey);
