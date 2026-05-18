@@ -148,7 +148,8 @@ export const generateContentScheduler = schedules.task({
     timezone: "UTC",
   },
   run: async () => {
-    if (true) {
+    const killSwitch = true;
+    if (killSwitch) {
       logger.warn("Generation schedule disabled via kill switch", {
         env: "GENERATION_KILL_SWITCH",
       });
