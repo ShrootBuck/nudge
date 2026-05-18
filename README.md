@@ -76,7 +76,7 @@ bunx trigger dev
 This connects to Trigger.dev and registers the scheduled tasks:
 
 - **`sync-problems`** — daily Codeforces sync (midnight MST)
-- **`generate-content-scheduler`** — hourly synchronous generation (top of the hour, UTC)
+- **`generate-content-scheduler`** — hourly synchronous OpenAI generation (one problem per hour, top of the hour UTC)
 - **`report-digest`** — daily Discord digest of user-reported issues
 
 Or, you know, use the [live website](https://nudge.zaydkrunz.com)
