@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { OutputSchema } from "../../lib/openai";
+import type { OutputSchema } from "../../lib/ai";
 
 const hintSchema = z.object({
   order: z.number().int().min(1).max(5),

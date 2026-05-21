@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useId, useState, useTransition } from "react";
+import { useId, useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cfProblemUrl, cn, ratingTone } from "@/lib/utils";
@@ -227,7 +227,9 @@ export function ReviewSection({
   reviewStatus: ReviewStatus;
 }) {
   const [open, setOpen] = useState(false);
-  const [password, setPassword] = useState("");
+  const [hasPassword, setHasPassword] = useState(false);
+  const passwordRef = useRef("");
+  const passwordInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [pendingStatus, setPendingStatus] = useState<
     ReviewOutcome | "REGENERATE" | null
@@ -251,12 +253,16 @@ export function ReviewSection({
         try {
           const result = await setProblemReviewStatus(
             problemId,
-            password,
+            passwordRef.current,
             nextStatus,
           );
 
           if (result.success) {
-            setPassword("");
+            passwordRef.current = "";
+            if (passwordInputRef.current) {
+              passwordInputRef.current.value = "";
+            }
+            setHasPassword(false);
             setOpen(false);
             router.refresh();
           } else {
@@ -278,10 +284,17 @@ export function ReviewSection({
     startTransition(() => {
       void (async () => {
         try {
-          const result = await queueRegeneration(problemId, password);
+          const result = await queueRegeneration(
+            problemId,
+            passwordRef.current,
+          );
 
           if (result.success) {
-            setPassword("");
+            passwordRef.current = "";
+            if (passwordInputRef.current) {
+              passwordInputRef.current.value = "";
+            }
+            setHasPassword(false);
             setOpen(false);
             router.refresh();
           } else {
@@ -356,8 +369,16 @@ export function ReviewSection({
               <Input
                 id="review-password"
                 type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                ref={passwordInputRef}
+                defaultValue=""
+                onChange={(e) => {
+                  const val = e.target.value;
+                  passwordRef.current = val;
+                  const hasVal = val.length > 0;
+                  if (hasVal !== hasPassword) {
+                    setHasPassword(hasVal);
+                  }
+                }}
                 placeholder="Review password"
                 className="h-10 rounded-xl border-border/50 bg-background/65 px-4 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] placeholder:text-muted-foreground/70 focus-visible:border-foreground/15 focus-visible:ring-0 focus-visible:outline-none"
               />
@@ -368,7 +389,7 @@ export function ReviewSection({
                 type="submit"
                 size="sm"
                 variant="outline"
-                disabled={isPending || !password}
+                disabled={isPending || !hasPassword}
                 className="h-10 w-full rounded-xl border-emerald-500/20 bg-emerald-500/10 px-4 text-emerald-200 shadow-sm hover:bg-emerald-500/15 hover:text-emerald-100 disabled:border-emerald-500/10 disabled:bg-emerald-500/10 disabled:text-emerald-200/55 sm:w-auto"
               >
                 {pendingStatus === "VERIFIED"
@@ -379,7 +400,7 @@ export function ReviewSection({
                 type="button"
                 size="sm"
                 variant="outline"
-                disabled={isPending || !password}
+                disabled={isPending || !hasPassword}
                 className="h-10 w-full rounded-xl border-rose-500/20 bg-rose-500/10 px-4 text-rose-200 shadow-sm hover:bg-rose-500/15 hover:text-rose-100 disabled:border-rose-500/10 disabled:bg-rose-500/10 disabled:text-rose-200/55 sm:w-auto"
                 onClick={() => handleReview("INCORRECT")}
               >
@@ -391,7 +412,7 @@ export function ReviewSection({
                 type="button"
                 size="sm"
                 variant="outline"
-                disabled={isPending || !password}
+                disabled={isPending || !hasPassword}
                 className="h-10 w-full rounded-xl border-amber-500/20 bg-amber-500/10 px-4 text-amber-200 shadow-sm hover:bg-amber-500/15 hover:text-amber-100 disabled:border-amber-500/10 disabled:bg-amber-500/10 disabled:text-amber-200/55 sm:w-auto"
                 onClick={() => handleReview("UNSOLVABLE")}
               >
@@ -403,7 +424,7 @@ export function ReviewSection({
                 type="button"
                 variant="outline"
                 size="sm"
-                disabled={isPending || !password}
+                disabled={isPending || !hasPassword}
                 className="h-10 w-full rounded-xl border-border/60 bg-background/55 px-4 text-foreground/80 shadow-sm hover:bg-background/75 hover:text-foreground disabled:bg-background/40 sm:w-auto"
                 onClick={handleRegenerate}
               >

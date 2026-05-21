@@ -1,9 +1,9 @@
 import type { Prisma } from "@prisma/client";
 import { logger, schedules, task } from "@trigger.dev/sdk";
+import { generateStructuredResponse } from "../lib/ai";
 import { safeRevalidateTag } from "../lib/cache-revalidate";
 import { PROBLEM_LIST_TAG, problemTag } from "../lib/cache-tags";
 import { DISCORD_COLORS } from "../lib/discord-webhook";
-import { generateStructuredResponse } from "../lib/openai";
 import { prisma } from "../lib/prisma";
 import {
   pipelineStateData,
@@ -254,7 +254,7 @@ export const generateContentScheduler = schedules.task({
       });
 
       if (!response.outputText.trim()) {
-        throw new Error("OpenAI response missing output text");
+        throw new Error("Provider response missing output text");
       }
 
       const parsed = JSON.parse(response.outputText);
@@ -416,7 +416,7 @@ export const generateContentTask = task({
       });
 
       if (!response.outputText.trim()) {
-        throw new Error("OpenAI response missing output text");
+        throw new Error("Provider response missing output text");
       }
 
       const parsed = JSON.parse(response.outputText);
