@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { logger, schedules, task } from "@trigger.dev/sdk";
-import { generateStructuredResponse } from "../lib/ai";
+import { activeModelProfile, generateStructuredResponse } from "../lib/ai";
 import { safeRevalidateTag } from "../lib/cache-revalidate";
 import { PROBLEM_LIST_TAG, problemTag } from "../lib/cache-tags";
 import { DISCORD_COLORS } from "../lib/discord-webhook";
@@ -20,9 +20,7 @@ import { saveProblemContent } from "./generate-content/persistence";
 import { fetchProblemStatement } from "./generate-content/problem-statement";
 import { buildPrompt, SYSTEM_PROMPT } from "./generate-content/prompt";
 
-const MODEL_ID = "gpt-5.5-2026-04-23";
-const MODEL_EFFORT = "high";
-const MODEL_DISPLAY_NAME = "GPT-5.5";
+const MODEL_DISPLAY_NAME = activeModelProfile.displayName;
 const DAILY_TOKEN_LIMIT = 200_000;
 const MAX_GENERATION_ATTEMPTS = 3;
 const STALE_GENERATION_THRESHOLD_HOURS = 6;
@@ -246,8 +244,6 @@ export const generateContentScheduler = schedules.task({
       logger.info(`Running generation for ${label}`);
 
       const response = await generateStructuredResponse({
-        model: MODEL_ID,
-        effort: MODEL_EFFORT,
         systemPrompt: SYSTEM_PROMPT,
         userPrompt,
         outputSchema: problemOutputSchema,
@@ -278,7 +274,7 @@ export const generateContentScheduler = schedules.task({
             reviewStatus: "UNSOLVABLE",
             generationStartedAt: null,
             lastGenerationError: reason,
-            generatedByDisplayName: `${MODEL_DISPLAY_NAME} (${MODEL_EFFORT})`,
+            generatedByDisplayName: MODEL_DISPLAY_NAME,
           }),
         });
 
@@ -291,7 +287,7 @@ export const generateContentScheduler = schedules.task({
         });
       } else {
         await saveProblemContent(problem.id, outputData, {
-          displayName: `${MODEL_DISPLAY_NAME} (${MODEL_EFFORT})`,
+          displayName: MODEL_DISPLAY_NAME,
         });
       }
 
@@ -315,7 +311,7 @@ export const generateContentScheduler = schedules.task({
     if (processed > 0) {
       await discordLog({
         title: "⏱️ Hourly Generation Complete",
-        description: `Processed **1** problem using ${MODEL_DISPLAY_NAME} (${MODEL_EFFORT}).`,
+        description: `Processed a problem using ${MODEL_DISPLAY_NAME}.`,
         color: DISCORD_COLORS.info,
         fields: [
           { name: "Tokens used", value: `${tokensUsed}`, inline: true },
@@ -408,8 +404,6 @@ export const generateContentTask = task({
       logger.info(`Running on-demand generation for ${label}`);
 
       const response = await generateStructuredResponse({
-        model: MODEL_ID,
-        effort: MODEL_EFFORT,
         systemPrompt: SYSTEM_PROMPT,
         userPrompt,
         outputSchema: problemOutputSchema,
@@ -439,7 +433,7 @@ export const generateContentTask = task({
             reviewStatus: "UNSOLVABLE",
             generationStartedAt: null,
             lastGenerationError: reason,
-            generatedByDisplayName: `${MODEL_DISPLAY_NAME} (${MODEL_EFFORT})`,
+            generatedByDisplayName: MODEL_DISPLAY_NAME,
           }),
         });
 
@@ -452,7 +446,7 @@ export const generateContentTask = task({
         });
       } else {
         await saveProblemContent(problem.id, outputData, {
-          displayName: `${MODEL_DISPLAY_NAME} (${MODEL_EFFORT})`,
+          displayName: MODEL_DISPLAY_NAME,
         });
       }
 
@@ -476,7 +470,7 @@ export const generateContentTask = task({
     if (processed > 0) {
       await discordLog({
         title: "⚡ On-Demand Generation Complete",
-        description: `Processed **1** problem using ${MODEL_DISPLAY_NAME} (${MODEL_EFFORT}).`,
+        description: `Processed a problem using ${MODEL_DISPLAY_NAME}.`,
         color: DISCORD_COLORS.info,
         fields: [
           { name: "Tokens used", value: `${tokensUsed}`, inline: true },

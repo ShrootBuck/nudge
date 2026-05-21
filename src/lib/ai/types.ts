@@ -19,15 +19,41 @@ export type StructuredResponse = {
 };
 
 export type GenerateOptions = {
-  model: string;
-  effort?: "high" | "medium" | "low" | string;
   systemPrompt: string;
   userPrompt: UserPromptInput;
   outputSchema: OutputSchema;
 };
 
-export interface LLMProvider {
-  generateStructuredResponse(
-    options: GenerateOptions,
-  ): Promise<StructuredResponse>;
-}
+export type OpenRouterMessage = {
+  role: "system" | "user" | "assistant";
+  content:
+    | string
+    | Array<
+        | { type: "text"; text: string }
+        | { type: "image_url"; image_url: { url: string } }
+      >;
+};
+
+/** OpenRouter chat completion request — each model profile fills this differently. */
+export type OpenRouterChatRequest = Record<string, unknown> & {
+  model: string;
+  messages: OpenRouterMessage[];
+};
+
+export type OpenRouterChatResponse = {
+  id: string;
+  choices: Array<{
+    message?: {
+      content?: string | null;
+    };
+  }>;
+  usage?: {
+    total_tokens?: number;
+  };
+};
+
+export type ModelProfile = {
+  id: string;
+  displayName: string;
+  buildRequest: (options: GenerateOptions) => OpenRouterChatRequest;
+};

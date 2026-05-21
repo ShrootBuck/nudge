@@ -12,5 +12,4 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 - Use Bun only (`bun`, `bunx`). Do not use npm.
 - Keep AI integrations on current APIs only. No legacy shims/fallback paths.
-- OpenAI generation must use Responses/Batches (`/v1/responses`), not Chat Completions.
-- Anthropic generation must use Messages/Batches with current `output_config` + effort controls.
+- All LLM generation goes through OpenRouter.

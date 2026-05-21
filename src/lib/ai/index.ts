@@ -1,45 +1,31 @@
-import { OpenAIProvider } from "./providers/openai";
-import type { GenerateOptions, LLMProvider, StructuredResponse } from "./types";
-
-// Registry of available providers
-const providers: Record<string, LLMProvider> = {
-  openai: new OpenAIProvider(),
-};
-
-// Map models to their default providers if not explicitly specified
-function getProviderNameForModel(model: string): string {
-  if (model.startsWith("claude-")) {
-    return "anthropic";
-  }
-  // Default to openai for now (handles gpt-* and others)
-  return "openai";
-}
-
-/**
- * Get an LLM provider by name.
- */
-export function getProvider(name: string): LLMProvider {
-  const provider = providers[name.toLowerCase()];
-  if (!provider) {
-    throw new Error(`LLM Provider '${name}' is not registered or supported.`);
-  }
-  return provider;
-}
-
-/**
- * Main entrypoint for generating structured responses.
- * Resolves the appropriate provider based on options or environment variables.
- */
-export async function generateStructuredResponse(
-  options: GenerateOptions & { provider?: string },
-): Promise<StructuredResponse> {
-  const providerName =
-    options.provider ||
-    process.env.LLM_PROVIDER ||
-    getProviderNameForModel(options.model);
-
-  const provider = getProvider(providerName);
-  return provider.generateStructuredResponse(options);
-}
+import {
+  activeModelProfile,
+  modelProfiles,
+  resolveModelProfile,
+} from "./models";
+import { createChatCompletion, extractMessageContent } from "./openrouter";
+import type { GenerateOptions, StructuredResponse } from "./types";
 
 export * from "./types";
+export { activeModelProfile, modelProfiles, resolveModelProfile };
+export type { ModelProfileId } from "./models";
+
+export async function generateStructuredResponse(
+  options: GenerateOptions,
+  profile = activeModelProfile,
+): Promise<StructuredResponse> {
+  const body = profile.buildRequest(options);
+  const result = await createChatCompletion(body);
+
+  const outputText = extractMessageContent(result.choices[0]?.message?.content);
+
+  if (!outputText) {
+    throw new Error("OpenRouter response missing message content");
+  }
+
+  return {
+    outputText,
+    tokensUsed: result.usage?.total_tokens ?? null,
+    responseId: result.id,
+  };
+}
