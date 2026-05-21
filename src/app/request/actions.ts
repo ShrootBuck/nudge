@@ -2,6 +2,7 @@
 
 import type { RunState } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { generateContentTask } from "@/trigger/generate-content";
 
 const MAX_REQUESTED_COUNT = 2_000_000_000;
 
@@ -86,6 +87,7 @@ function isCompletedRunState(runState: RunState) {
 
 export async function requestProblem(_prevState: unknown, formData: FormData) {
   const input = toProblemInput(formData.get("problem"));
+  const adminPassword = toProblemInput(formData.get("adminPassword"));
   if (!input) {
     return { error: "Please provide a problem." };
   }
@@ -119,6 +121,17 @@ export async function requestProblem(_prevState: unknown, formData: FormData) {
         return {
           message: "This problem is already solved and available on Nudge!",
           problemHref: `/problem/${contestId}/${index}`,
+        };
+      }
+
+      if (adminPassword && adminPassword === process.env.ADMIN_PASSWORD) {
+        await generateContentTask.trigger({
+          problemId: problem.id,
+          adminBypass: true,
+        });
+
+        return {
+          message: `Admin bypass activated! Generation for ${contestId}${index} started immediately.`,
         };
       }
 

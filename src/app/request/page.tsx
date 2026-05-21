@@ -1,8 +1,8 @@
 "use client";
 
-import { ArrowUpRight, ClipboardList } from "lucide-react";
+import { ArrowUpRight, ClipboardList, Lock } from "lucide-react";
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { useFormStatus } from "react-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,12 +19,24 @@ function SubmitButton() {
 
 export default function RequestPage() {
   const [state, formAction] = useActionState(requestProblem, null);
+  const [showAdmin, setShowAdmin] = useState(false);
 
   return (
     <main className="min-h-screen pb-16">
       <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
         <section className="relative overflow-hidden rounded-[2rem] border border-border/70 bg-card/80 p-6 shadow-[0_28px_70px_-40px_rgba(15,23,42,0.45)] backdrop-blur sm:p-10">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.12),transparent_32%),radial-gradient(circle_at_85%_15%,rgba(245,158,11,0.16),transparent_28%)]" />
+
+          <div className="absolute right-4 top-4 sm:right-6 sm:top-6 z-10">
+            <button
+              type="button"
+              onClick={() => setShowAdmin((prev) => !prev)}
+              className="text-foreground/10 transition-colors hover:text-foreground/40"
+              aria-label="Admin bypass"
+            >
+              <Lock className="size-4" />
+            </button>
+          </div>
 
           <div className="relative">
             <span className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 py-1 text-xs font-medium tracking-wide text-muted-foreground shadow-sm">
@@ -60,6 +72,23 @@ export default function RequestPage() {
                   required
                 />
               </div>
+
+              {showAdmin && (
+                <div className="animate-in fade-in slide-in-from-top-2">
+                  <label
+                    htmlFor="adminPassword"
+                    className="mb-1.5 block text-sm font-medium text-foreground"
+                  >
+                    Admin Password
+                  </label>
+                  <Input
+                    id="adminPassword"
+                    name="adminPassword"
+                    type="password"
+                    placeholder="Bypass queuing"
+                  />
+                </div>
+              )}
 
               {state?.error && (
                 <div
