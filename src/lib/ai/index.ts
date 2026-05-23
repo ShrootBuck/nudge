@@ -1,31 +1,23 @@
+import { getActiveOpenRouterPreset } from "./generation-config";
 import {
-  activeModelProfile,
-  modelProfiles,
-  resolveModelProfile,
-} from "./models";
-import { createChatCompletion, extractMessageContent } from "./openrouter";
+  buildOpenRouterChatRequest,
+  createChatCompletion,
+  extractStructuredResponse,
+  fetchGenerationMetadataBestEffort,
+} from "./openrouter";
 import type { GenerateOptions, StructuredResponse } from "./types";
 
+export * from "./generation-config";
+export * from "./openrouter-presets";
 export * from "./types";
-export { activeModelProfile, modelProfiles, resolveModelProfile };
-export type { ModelProfileId } from "./models";
 
 export async function generateStructuredResponse(
   options: GenerateOptions,
-  profile = activeModelProfile,
 ): Promise<StructuredResponse> {
-  const body = profile.buildRequest(options);
+  const preset = await getActiveOpenRouterPreset();
+  const body = buildOpenRouterChatRequest(options, preset);
   const result = await createChatCompletion(body);
+  const metadata = await fetchGenerationMetadataBestEffort(result.id);
 
-  const outputText = extractMessageContent(result.choices[0]?.message?.content);
-
-  if (!outputText) {
-    throw new Error("OpenRouter response missing message content");
-  }
-
-  return {
-    outputText,
-    tokensUsed: result.usage?.total_tokens ?? null,
-    responseId: result.id,
-  };
+  return extractStructuredResponse(result, preset, metadata);
 }

@@ -7,12 +7,24 @@ import {
 } from "../../lib/problem-pipeline-db";
 import type { ParsedContent } from "./content-schema";
 
-export type ModelInfo = { displayName: string };
+export type GenerationAuditInfo = {
+  displayName: string;
+  presetSlug: string;
+  responseId: string;
+  resolvedModel: string | null;
+  promptTokens: number | null;
+  completionTokens: number | null;
+  totalTokens: number | null;
+  costCredits: number | null;
+  finishReason: string | null;
+  nativeFinishReason: string | null;
+  providerName: string | null;
+};
 
 export async function saveProblemContent(
   problemId: string,
   parsed: ParsedContent,
-  model: ModelInfo,
+  generation: GenerationAuditInfo,
 ) {
   const updatedProblem = await prisma.$transaction(async (tx) => {
     await tx.hint.deleteMany({ where: { problemId } });
@@ -43,7 +55,17 @@ export async function saveProblemContent(
       where: { id: problemId },
       data: problemUpdateData({
         ...pipelineStateData("SUCCEEDED"),
-        generatedByDisplayName: model.displayName,
+        generatedByDisplayName: generation.displayName,
+        generatedByPresetSlug: generation.presetSlug,
+        generatedByModel: generation.resolvedModel,
+        generationResponseId: generation.responseId,
+        generationPromptTokens: generation.promptTokens,
+        generationCompletionTokens: generation.completionTokens,
+        generationTotalTokens: generation.totalTokens,
+        generationCostCredits: generation.costCredits,
+        generationFinishReason: generation.finishReason,
+        generationNativeFinishReason: generation.nativeFinishReason,
+        generationProviderName: generation.providerName,
         generationStartedAt: null,
         lastGenerationError: null,
       }),

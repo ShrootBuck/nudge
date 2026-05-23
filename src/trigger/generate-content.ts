@@ -1,6 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { logger, schedules, task } from "@trigger.dev/sdk";
-import { activeModelProfile, generateStructuredResponse } from "../lib/ai";
+import { generateStructuredResponse, type StructuredResponse } from "../lib/ai";
 import { safeRevalidateTag } from "../lib/cache-revalidate";
 import { PROBLEM_LIST_TAG, problemTag } from "../lib/cache-tags";
 import { DISCORD_COLORS } from "../lib/discord-webhook";
@@ -16,11 +16,13 @@ import {
   problemOutputSchema,
   problemResultSchema,
 } from "./generate-content/content-schema";
-import { saveProblemContent } from "./generate-content/persistence";
+import {
+  type GenerationAuditInfo,
+  saveProblemContent,
+} from "./generate-content/persistence";
 import { fetchProblemStatement } from "./generate-content/problem-statement";
 import { buildPrompt, SYSTEM_PROMPT } from "./generate-content/prompt";
 
-const MODEL_DISPLAY_NAME = activeModelProfile.displayName;
 const DAILY_TOKEN_LIMIT = 200_000;
 const MAX_GENERATION_ATTEMPTS = 3;
 const STALE_GENERATION_THRESHOLD_HOURS = 6;
@@ -42,6 +44,61 @@ function toProblemLabel(
   problem: Pick<ProblemForGeneration, "contestId" | "index">,
 ) {
   return `${problem.contestId}${problem.index}`;
+}
+
+function toGenerationDisplayName(response: StructuredResponse) {
+  return response.presetLabel;
+}
+
+function toGenerationAuditInfo(
+  response: StructuredResponse,
+): GenerationAuditInfo {
+  return {
+    displayName: toGenerationDisplayName(response),
+    presetSlug: response.presetSlug,
+    responseId: response.responseId,
+    resolvedModel: response.resolvedModel,
+    promptTokens: response.promptTokens,
+    completionTokens: response.completionTokens,
+    totalTokens: response.totalTokens,
+    costCredits: response.costCredits,
+    finishReason: response.finishReason,
+    nativeFinishReason: response.nativeFinishReason,
+    providerName: response.providerName,
+  };
+}
+
+function generationAuditData(
+  response: StructuredResponse,
+): Pick<
+  Prisma.ProblemUpdateInput,
+  | "generatedByDisplayName"
+  | "generatedByPresetSlug"
+  | "generatedByModel"
+  | "generationResponseId"
+  | "generationPromptTokens"
+  | "generationCompletionTokens"
+  | "generationTotalTokens"
+  | "generationCostCredits"
+  | "generationFinishReason"
+  | "generationNativeFinishReason"
+  | "generationProviderName"
+> {
+  const audit = toGenerationAuditInfo(response);
+
+  return {
+    generatedByDisplayName: audit.displayName,
+    generatedByPresetSlug: audit.presetSlug,
+    generatedByModel: audit.resolvedModel,
+    generationResponseId: audit.responseId,
+    generationPromptTokens: audit.promptTokens,
+    generationCompletionTokens: audit.completionTokens,
+    generationTotalTokens: audit.totalTokens,
+    generationCostCredits: audit.costCredits,
+    generationFinishReason: audit.finishReason,
+    generationNativeFinishReason: audit.nativeFinishReason,
+    generationProviderName: audit.providerName,
+  };
 }
 
 function revalidateProblems(
@@ -223,6 +280,7 @@ export const generateContentScheduler = schedules.task({
 
     let processed = 0;
     let tokensUsed = 0;
+    let processedPresetLabel: string | null = null;
 
     try {
       const statement = await fetchProblemStatement(
@@ -248,6 +306,7 @@ export const generateContentScheduler = schedules.task({
         userPrompt,
         outputSchema: problemOutputSchema,
       });
+      processedPresetLabel = response.presetLabel;
 
       if (!response.outputText.trim()) {
         throw new Error("Provider response missing output text");
@@ -255,7 +314,7 @@ export const generateContentScheduler = schedules.task({
 
       const parsed = JSON.parse(response.outputText);
       const outputData = problemResultSchema.parse(parsed);
-      const usedTokens = response.tokensUsed ?? 0;
+      const usedTokens = response.totalTokens ?? 0;
 
       if (usedTokens > 0) {
         await incrementDailyTokens(dateKey, usedTokens);
@@ -274,7 +333,7 @@ export const generateContentScheduler = schedules.task({
             reviewStatus: "UNSOLVABLE",
             generationStartedAt: null,
             lastGenerationError: reason,
-            generatedByDisplayName: MODEL_DISPLAY_NAME,
+            ...generationAuditData(response),
           }),
         });
 
@@ -286,9 +345,11 @@ export const generateContentScheduler = schedules.task({
           color: DISCORD_COLORS.error,
         });
       } else {
-        await saveProblemContent(problem.id, outputData, {
-          displayName: MODEL_DISPLAY_NAME,
-        });
+        await saveProblemContent(
+          problem.id,
+          outputData,
+          toGenerationAuditInfo(response),
+        );
       }
 
       processed = 1;
@@ -311,7 +372,7 @@ export const generateContentScheduler = schedules.task({
     if (processed > 0) {
       await discordLog({
         title: "⏱️ Hourly Generation Complete",
-        description: `Processed a problem using ${MODEL_DISPLAY_NAME}.`,
+        description: `Processed a problem using ${processedPresetLabel ?? "the active OpenRouter preset"}.`,
         color: DISCORD_COLORS.info,
         fields: [
           { name: "Tokens used", value: `${tokensUsed}`, inline: true },
@@ -383,6 +444,7 @@ export const generateContentTask = task({
 
     let processed = 0;
     let tokensUsed = 0;
+    let processedPresetLabel: string | null = null;
 
     try {
       const statement = await fetchProblemStatement(
@@ -408,6 +470,7 @@ export const generateContentTask = task({
         userPrompt,
         outputSchema: problemOutputSchema,
       });
+      processedPresetLabel = response.presetLabel;
 
       if (!response.outputText.trim()) {
         throw new Error("Provider response missing output text");
@@ -415,7 +478,7 @@ export const generateContentTask = task({
 
       const parsed = JSON.parse(response.outputText);
       const outputData = problemResultSchema.parse(parsed);
-      const usedTokens = response.tokensUsed ?? 0;
+      const usedTokens = response.totalTokens ?? 0;
 
       if (usedTokens > 0) {
         await incrementDailyTokens(dateKey, usedTokens);
@@ -433,7 +496,7 @@ export const generateContentTask = task({
             reviewStatus: "UNSOLVABLE",
             generationStartedAt: null,
             lastGenerationError: reason,
-            generatedByDisplayName: MODEL_DISPLAY_NAME,
+            ...generationAuditData(response),
           }),
         });
 
@@ -445,9 +508,11 @@ export const generateContentTask = task({
           color: DISCORD_COLORS.error,
         });
       } else {
-        await saveProblemContent(problem.id, outputData, {
-          displayName: MODEL_DISPLAY_NAME,
-        });
+        await saveProblemContent(
+          problem.id,
+          outputData,
+          toGenerationAuditInfo(response),
+        );
       }
 
       processed = 1;
@@ -470,7 +535,7 @@ export const generateContentTask = task({
     if (processed > 0) {
       await discordLog({
         title: "⚡ On-Demand Generation Complete",
-        description: `Processed a problem using ${MODEL_DISPLAY_NAME}.`,
+        description: `Processed a problem using ${processedPresetLabel ?? "the active OpenRouter preset"}.`,
         color: DISCORD_COLORS.info,
         fields: [
           { name: "Tokens used", value: `${tokensUsed}`, inline: true },

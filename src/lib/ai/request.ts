@@ -73,8 +73,3 @@ export function buildMessages(
     { role: "user", content: toUserContent(userPrompt) },
   ];
 }
-
-export const structuredOutputDefaults = {
-  provider: { require_parameters: true },
-  plugins: [{ id: "response-healing" }],
-} as const;
