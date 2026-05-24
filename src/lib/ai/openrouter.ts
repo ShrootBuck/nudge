@@ -29,8 +29,15 @@ export function buildOpenRouterChatRequest(
     model: toOpenRouterPresetModel(preset.slug),
     messages: buildMessages(options.systemPrompt, options.userPrompt),
     response_format: toResponseFormat(options.outputSchema),
+    provider: {
+      require_parameters: ["response_format"],
+    },
   };
 }
+
+const CHAT_COMPLETION_TIMEOUT_MS = 120_000;
+const GENERATION_METADATA_TIMEOUT_MS = 10_000;
+const GENERATION_METADATA_DELAY_MS = 1_500;
 
 export async function createChatCompletion(
   body: OpenRouterChatRequest,
@@ -42,6 +49,7 @@ export async function createChatCompletion(
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
+    signal: AbortSignal.timeout(CHAT_COMPLETION_TIMEOUT_MS),
   });
 
   if (!response.ok) {
@@ -54,6 +62,10 @@ export async function createChatCompletion(
   return response.json() as Promise<OpenRouterChatResponse>;
 }
 
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function fetchGenerationMetadata(
   responseId: string,
 ): Promise<OpenRouterGenerationMetadata["data"] | null> {
@@ -64,6 +76,7 @@ async function fetchGenerationMetadata(
     headers: {
       Authorization: `Bearer ${getOpenRouterApiKey()}`,
     },
+    signal: AbortSignal.timeout(GENERATION_METADATA_TIMEOUT_MS),
   });
 
   if (!response.ok) {
@@ -81,6 +94,17 @@ export async function fetchGenerationMetadataBestEffort(
   responseId: string,
 ): Promise<OpenRouterGenerationMetadata["data"] | null> {
   try {
+    // The /generation endpoint is eventually consistent — give OpenRouter
+    // time to persist the metadata before the first attempt.
+    await delay(GENERATION_METADATA_DELAY_MS);
+
+    const first = await fetchGenerationMetadata(responseId);
+    if (first !== null) {
+      return first;
+    }
+
+    // Single retry: metadata may not have been written yet.
+    await delay(GENERATION_METADATA_DELAY_MS);
     return await fetchGenerationMetadata(responseId);
   } catch (error) {
     console.warn(

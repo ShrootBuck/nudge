@@ -30,6 +30,22 @@ export function toStrictJsonSchema(
     );
   }
 
+  if (Array.isArray(copy.oneOf)) {
+    copy.oneOf = copy.oneOf.map((s) =>
+      toStrictJsonSchema(s as Record<string, unknown>),
+    );
+  }
+
+  if (copy.$defs && typeof copy.$defs === "object") {
+    const defs = copy.$defs as Record<string, Record<string, unknown>>;
+    copy.$defs = Object.fromEntries(
+      Object.entries(defs).map(([key, value]) => [
+        key,
+        toStrictJsonSchema(value),
+      ]),
+    );
+  }
+
   return copy;
 }
 

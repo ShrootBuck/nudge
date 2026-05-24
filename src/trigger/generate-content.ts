@@ -248,8 +248,6 @@ export const generateContentScheduler = schedules.task({
       };
     }
 
-    const label = toProblemLabel(problem);
-
     const updated = await prisma.problem.updateMany({
       where: problemWhere({
         id: problem.id,
@@ -282,92 +280,11 @@ export const generateContentScheduler = schedules.task({
     let tokensUsed = 0;
     let processedPresetLabel: string | null = null;
 
-    try {
-      const statement = await fetchProblemStatement(
-        problem.contestId,
-        problem.index,
-      );
-      const textPrompt = buildPrompt(problem, statement?.html);
-      const userPrompt =
-        statement?.images && statement.images.length > 0
-          ? [
-              { type: "text" as const, text: textPrompt },
-              ...statement.images.map((url) => ({
-                type: "image_url" as const,
-                image_url: { url },
-              })),
-            ]
-          : textPrompt;
-
-      logger.info(`Running generation for ${label}`);
-
-      const response = await generateStructuredResponse({
-        systemPrompt: SYSTEM_PROMPT,
-        userPrompt,
-        outputSchema: problemOutputSchema,
-      });
-      processedPresetLabel = response.presetLabel;
-
-      if (!response.outputText.trim()) {
-        throw new Error("Provider response missing output text");
-      }
-
-      const parsed = JSON.parse(response.outputText);
-      const outputData = problemResultSchema.parse(parsed);
-      const usedTokens = response.totalTokens ?? 0;
-
-      if (usedTokens > 0) {
-        await incrementDailyTokens(dateKey, usedTokens);
-        totalTokens += usedTokens;
-        tokensUsed += usedTokens;
-      }
-
-      if (outputData.status === "unsolvable") {
-        const reason = outputData.reason;
-        logger.warn(`Problem ${label} reported as unsolvable: ${reason}`);
-
-        await prisma.problem.update({
-          where: { id: problem.id },
-          data: problemUpdateData({
-            ...pipelineStateData("FAILED"),
-            reviewStatus: "UNSOLVABLE",
-            generationStartedAt: null,
-            lastGenerationError: reason,
-            ...generationAuditData(response),
-          }),
-        });
-
-        revalidateProblems([problem]);
-
-        await discordLog({
-          title: "🚫 Unsolvable Problem",
-          description: `Model reported that problem **${label}** cannot be solved.\n**Reason:** ${reason}`,
-          color: DISCORD_COLORS.error,
-        });
-      } else {
-        await saveProblemContent(
-          problem.id,
-          outputData,
-          toGenerationAuditInfo(response),
-        );
-      }
-
-      processed = 1;
-    } catch (error) {
-      const reason = `Generation failed for ${label}: ${toErrorMessage(error)}`;
-      logger.error(reason);
-
-      await prisma.problem.update({
-        where: { id: problem.id },
-        data: problemUpdateData({
-          ...pipelineStateData("FAILED"),
-          generationStartedAt: null,
-          lastGenerationError: reason,
-        }),
-      });
-
-      revalidateProblems([problem]);
-    }
+    const result = await executeGeneration(problem, dateKey);
+    processed = result.processed;
+    tokensUsed = result.tokensUsed;
+    processedPresetLabel = result.presetLabel;
+    totalTokens += tokensUsed;
 
     if (processed > 0) {
       await discordLog({
@@ -414,7 +331,6 @@ export const generateContentTask = task({
     }
 
     const dateKey = utcDateKey();
-    const label = toProblemLabel(problem);
 
     const whereClause = payload.adminBypass
       ? problemWhere({ id: problem.id })
@@ -442,108 +358,129 @@ export const generateContentTask = task({
       return { processed: 0, tokensUsed: 0 };
     }
 
-    let processed = 0;
-    let tokensUsed = 0;
-    let processedPresetLabel: string | null = null;
+    const result = await executeGeneration(problem, dateKey);
 
-    try {
-      const statement = await fetchProblemStatement(
-        problem.contestId,
-        problem.index,
-      );
-      const textPrompt = buildPrompt(problem, statement?.html);
-      const userPrompt =
-        statement?.images && statement.images.length > 0
-          ? [
-              { type: "text" as const, text: textPrompt },
-              ...statement.images.map((url) => ({
-                type: "image_url" as const,
-                image_url: { url },
-              })),
-            ]
-          : textPrompt;
-
-      logger.info(`Running on-demand generation for ${label}`);
-
-      const response = await generateStructuredResponse({
-        systemPrompt: SYSTEM_PROMPT,
-        userPrompt,
-        outputSchema: problemOutputSchema,
-      });
-      processedPresetLabel = response.presetLabel;
-
-      if (!response.outputText.trim()) {
-        throw new Error("Provider response missing output text");
-      }
-
-      const parsed = JSON.parse(response.outputText);
-      const outputData = problemResultSchema.parse(parsed);
-      const usedTokens = response.totalTokens ?? 0;
-
-      if (usedTokens > 0) {
-        await incrementDailyTokens(dateKey, usedTokens);
-        tokensUsed += usedTokens;
-      }
-
-      if (outputData.status === "unsolvable") {
-        const reason = outputData.reason;
-        logger.warn(`Problem ${label} reported as unsolvable: ${reason}`);
-
-        await prisma.problem.update({
-          where: { id: problem.id },
-          data: problemUpdateData({
-            ...pipelineStateData("FAILED"),
-            reviewStatus: "UNSOLVABLE",
-            generationStartedAt: null,
-            lastGenerationError: reason,
-            ...generationAuditData(response),
-          }),
-        });
-
-        revalidateProblems([problem]);
-
-        await discordLog({
-          title: "🚫 Unsolvable Problem",
-          description: `Model reported that problem **${label}** cannot be solved.\n**Reason:** ${reason}`,
-          color: DISCORD_COLORS.error,
-        });
-      } else {
-        await saveProblemContent(
-          problem.id,
-          outputData,
-          toGenerationAuditInfo(response),
-        );
-      }
-
-      processed = 1;
-    } catch (error) {
-      const reason = `Generation failed for ${label}: ${toErrorMessage(error)}`;
-      logger.error(reason);
-
-      await prisma.problem.update({
-        where: { id: problem.id },
-        data: problemUpdateData({
-          ...pipelineStateData("FAILED"),
-          generationStartedAt: null,
-          lastGenerationError: reason,
-        }),
-      });
-
-      revalidateProblems([problem]);
-    }
-
-    if (processed > 0) {
+    if (result.processed > 0) {
       await discordLog({
         title: "⚡ On-Demand Generation Complete",
-        description: `Processed a problem using ${processedPresetLabel ?? "the active OpenRouter preset"}.`,
+        description: `Processed a problem using ${result.presetLabel ?? "the active OpenRouter preset"}.`,
         color: DISCORD_COLORS.info,
         fields: [
-          { name: "Tokens used", value: `${tokensUsed}`, inline: true },
+          { name: "Tokens used", value: `${result.tokensUsed}`, inline: true },
           { name: "UTC date", value: dateKey, inline: true },
         ],
       });
     }
 
-    return { processed, tokensUsed };
+    return { processed: result.processed, tokensUsed: result.tokensUsed };
   },
 });
+
+// ---------------------------------------------------------------------------
+// Shared generation flow used by both the scheduler and on-demand tasks.
+// ---------------------------------------------------------------------------
+
+type GenerationResult = {
+  processed: number;
+  tokensUsed: number;
+  presetLabel: string | null;
+};
+
+async function executeGeneration(
+  problem: ProblemForGeneration,
+  dateKey: string,
+): Promise<GenerationResult> {
+  const label = toProblemLabel(problem);
+
+  let processed = 0;
+  let tokensUsed = 0;
+  let presetLabel: string | null = null;
+
+  try {
+    const statement = await fetchProblemStatement(
+      problem.contestId,
+      problem.index,
+    );
+    const textPrompt = buildPrompt(problem, statement?.html);
+    const userPrompt =
+      statement?.images && statement.images.length > 0
+        ? [
+            { type: "text" as const, text: textPrompt },
+            ...statement.images.map((url) => ({
+              type: "image_url" as const,
+              image_url: { url },
+            })),
+          ]
+        : textPrompt;
+
+    logger.info(`Running generation for ${label}`);
+
+    const response = await generateStructuredResponse({
+      systemPrompt: SYSTEM_PROMPT,
+      userPrompt,
+      outputSchema: problemOutputSchema,
+    });
+    presetLabel = response.presetLabel;
+
+    if (!response.outputText.trim()) {
+      throw new Error("Provider response missing output text");
+    }
+
+    const parsed = JSON.parse(response.outputText);
+    const outputData = problemResultSchema.parse(parsed);
+    const usedTokens = response.totalTokens ?? 0;
+
+    if (usedTokens > 0) {
+      await incrementDailyTokens(dateKey, usedTokens);
+      tokensUsed += usedTokens;
+    }
+
+    if (outputData.status === "unsolvable") {
+      const reason = outputData.reason;
+      logger.warn(`Problem ${label} reported as unsolvable: ${reason}`);
+
+      await prisma.problem.update({
+        where: { id: problem.id },
+        data: problemUpdateData({
+          ...pipelineStateData("FAILED"),
+          reviewStatus: "UNSOLVABLE",
+          generationStartedAt: null,
+          lastGenerationError: reason,
+          ...generationAuditData(response),
+        }),
+      });
+
+      revalidateProblems([problem]);
+
+      await discordLog({
+        title: "🚫 Unsolvable Problem",
+        description: `Model reported that problem **${label}** cannot be solved.\n**Reason:** ${reason}`,
+        color: DISCORD_COLORS.error,
+      });
+    } else {
+      await saveProblemContent(
+        problem.id,
+        outputData,
+        toGenerationAuditInfo(response),
+      );
+    }
+
+    processed = 1;
+  } catch (error) {
+    const reason = `Generation failed for ${label}: ${toErrorMessage(error)}`;
+    logger.error(reason);
+
+    await prisma.problem.update({
+      where: { id: problem.id },
+      data: problemUpdateData({
+        ...pipelineStateData("FAILED"),
+        generationStartedAt: null,
+        lastGenerationError: reason,
+      }),
+    });
+
+    revalidateProblems([problem]);
+  }
+
+  return { processed, tokensUsed, presetLabel };
+}
