@@ -12,7 +12,7 @@ function SubmitButton() {
   const { pending } = useFormStatus();
   return (
     <Button type="submit" disabled={pending} className="w-full">
-      {pending ? "Requesting..." : "Request Problem"}
+      {pending ? "Starting..." : "Generate Problem"}
     </Button>
   );
 }
@@ -49,8 +49,8 @@ export default function RequestPage() {
             </h1>
 
             <p className="mt-4 max-w-2xl text-base/7 text-muted-foreground sm:text-lg/8">
-              Enter a Codeforces problem ID or URL to request it. Highly
-              requested problems are prioritized during hourly generation.
+              Enter a Codeforces problem ID or URL, then use admin bypass to
+              start generation immediately.
             </p>
           </div>
         </section>
@@ -85,7 +85,7 @@ export default function RequestPage() {
                     id="adminPassword"
                     name="adminPassword"
                     type="password"
-                    placeholder="Bypass queuing"
+                    placeholder="Start generation"
                   />
                 </div>
               )}

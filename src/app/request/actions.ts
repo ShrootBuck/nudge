@@ -1,12 +1,10 @@
 "use server";
 
 import type { RunState } from "@prisma/client";
-import { prisma } from "@/lib/prisma";
+import { ApiError } from "@trigger.dev/sdk";
 import { getOptionalEnv, verifyAdminPassword } from "@/lib/env";
-import { ApiError, tasks } from "@trigger.dev/sdk";
-import type { generateContentTask } from "@/trigger/generate-content";
-
-const MAX_REQUESTED_COUNT = 2_000_000_000;
+import { prisma } from "@/lib/prisma";
+import { triggerGenerateContentTask } from "@/lib/trigger-tasks";
 
 const PROBLEM_IDENTIFIER_PATTERN =
   /^(\d+)\s*(?:\/|\s)?\s*([A-Za-z][A-Za-z0-9]*)$/;
@@ -87,31 +85,16 @@ function isCompletedRunState(runState: RunState) {
   return runState === "SUCCEEDED";
 }
 
-async function incrementRequestedCount(problem: {
-  id: string;
-  runState: RunState;
-}) {
-  await prisma.problem.updateMany({
-    where: {
-      id: problem.id,
-      requestedCount: { lt: MAX_REQUESTED_COUNT },
-    },
-    data: {
-      requestedCount: { increment: 1 },
-      ...(problem.runState === "IDLE" ? { runState: "IDLE" } : {}),
-    },
-  });
-}
-
 function formatTriggerError(error: unknown) {
   if (error instanceof ApiError) {
     const status = error.status;
-    const baseMessage = error.message?.trim() || "Trigger.dev rejected the request";
+    const baseMessage =
+      error.message?.trim() || "Trigger.dev rejected the request";
     let hint = "";
 
     if (status === 422) {
       hint =
-        "This usually means the task is not deployed to this environment or the payload is invalid.";
+        "This usually means the task is not deployed to this environment, the request is locked to an old TRIGGER_VERSION, or the payload is invalid.";
     } else if (status === 401 || status === 403) {
       hint = "Check TRIGGER_SECRET_KEY and project access.";
     }
@@ -182,54 +165,48 @@ export async function requestProblem(_prevState: unknown, formData: FormData) {
         };
       }
 
-      if (adminPassword) {
-        const auth = verifyAdminPassword(adminPassword);
-        if (!auth.ok) {
-          return { error: auth.error };
-        }
-
-        if (!getOptionalEnv("TRIGGER_SECRET_KEY")) {
-          await incrementRequestedCount(problem);
-          return {
-            error:
-              "Trigger.dev is not configured on the server (missing TRIGGER_SECRET_KEY). Problem was queued instead.",
-          };
-        }
-
-        try {
-          await tasks.trigger<typeof generateContentTask>(
-            "generate-content-task",
-            {
-              problemId: problem.id,
-              adminBypass: true,
-            },
-          );
-
-          return {
-            message: `Admin bypass activated! Generation for ${contestId}${index} started immediately.`,
-          };
-        } catch (error) {
-          const details = formatTriggerError(error);
-          console.error("Admin bypass trigger failed", {
-            problemId: problem.id,
-            contestId,
-            index,
-            ...details.logContext,
-          });
-
-          await incrementRequestedCount(problem);
-
-          return {
-            error: `Admin bypass failed to start generation. ${details.userMessage} Problem was queued instead.`,
-          };
-        }
+      if (!adminPassword) {
+        return {
+          error:
+            "Automatic queueing is disabled right now. Use admin bypass to generate immediately.",
+        };
       }
 
-      await incrementRequestedCount(problem);
+      const auth = verifyAdminPassword(adminPassword);
+      if (!auth.ok) {
+        return { error: auth.error };
+      }
 
-      return {
-        message: `Problem ${contestId}${index} has been requested and prioritized!`,
-      };
+      if (!getOptionalEnv("TRIGGER_SECRET_KEY")) {
+        return {
+          error:
+            "Trigger.dev is not configured on the server (missing TRIGGER_SECRET_KEY).",
+        };
+      }
+
+      try {
+        await triggerGenerateContentTask({
+          problemId: problem.id,
+          adminBypass: true,
+        });
+
+        return {
+          message: `Admin bypass activated! Generation for ${contestId}${index} started immediately.`,
+        };
+      } catch (error) {
+        const details = formatTriggerError(error);
+        console.error("Admin bypass trigger failed", {
+          problemId: problem.id,
+          contestId,
+          index,
+          triggerVersion: process.env.TRIGGER_VERSION,
+          ...details.logContext,
+        });
+
+        return {
+          error: `Admin bypass failed to start generation. ${details.userMessage}`,
+        };
+      }
     }
 
     return {

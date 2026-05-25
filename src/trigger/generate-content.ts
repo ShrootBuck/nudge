@@ -1,5 +1,5 @@
 import type { Prisma } from "@prisma/client";
-import { logger, schedules, task } from "@trigger.dev/sdk";
+import { logger, task } from "@trigger.dev/sdk";
 import { generateStructuredResponse, type StructuredResponse } from "../lib/ai";
 import { safeRevalidateTag } from "../lib/cache-revalidate";
 import { PROBLEM_LIST_TAG, problemTag } from "../lib/cache-tags";
@@ -7,7 +7,6 @@ import { DISCORD_COLORS } from "../lib/discord-webhook";
 import { prisma } from "../lib/prisma";
 import {
   pipelineStateData,
-  problemOrderBy,
   problemUpdateData,
   problemWhere,
 } from "../lib/problem-pipeline-db";
@@ -23,9 +22,7 @@ import {
 import { fetchProblemStatement } from "./generate-content/problem-statement";
 import { buildPrompt, SYSTEM_PROMPT } from "./generate-content/prompt";
 
-const DAILY_TOKEN_LIMIT = 200_000;
 const MAX_GENERATION_ATTEMPTS = 3;
-const STALE_GENERATION_THRESHOLD_HOURS = 6;
 
 type ProblemForGeneration = {
   id: string;
@@ -109,15 +106,6 @@ function utcDateKey(date = new Date()) {
   return date.toISOString().slice(0, 10);
 }
 
-async function getDailyTokenUsage(dateKey: string) {
-  const record = await prisma.dailyTokenUsage.findUnique({
-    where: { date: dateKey },
-    select: { tokens: true },
-  });
-
-  return record?.tokens ?? 0;
-}
-
 async function incrementDailyTokens(dateKey: string, tokens: number) {
   await prisma.dailyTokenUsage.upsert({
     where: { date: dateKey },
@@ -125,179 +113,6 @@ async function incrementDailyTokens(dateKey: string, tokens: number) {
     update: { tokens: { increment: tokens } },
   });
 }
-
-async function fetchNextProblem(): Promise<ProblemForGeneration | null> {
-  const where: Prisma.ProblemWhereInput = {
-    generationAttempts: { lt: MAX_GENERATION_ATTEMPTS },
-    runState: { in: ["IDLE", "FAILED"] },
-    reviewStatus: { not: "UNSOLVABLE" },
-  };
-
-  return prisma.problem.findFirst({
-    where: problemWhere(where),
-    orderBy: problemOrderBy([
-      { requestedCount: "desc" },
-      { createdAt: "desc" },
-    ]),
-    select: {
-      id: true,
-      contestId: true,
-      index: true,
-      name: true,
-      rating: true,
-      tags: true,
-    },
-  });
-}
-
-async function recoverStaleGenerations() {
-  const staleBefore = new Date(
-    Date.now() - STALE_GENERATION_THRESHOLD_HOURS * 60 * 60 * 1000,
-  );
-
-  const staleProblems = await prisma.problem.findMany({
-    where: problemWhere({
-      runState: "RUNNING",
-      generationStartedAt: { lt: staleBefore },
-    }),
-    select: {
-      id: true,
-      contestId: true,
-      index: true,
-    },
-    take: 100,
-  });
-
-  if (staleProblems.length === 0) return 0;
-
-  const staleIds = staleProblems.map((problem) => problem.id);
-
-  const result = await prisma.problem.updateMany({
-    where: problemWhere({ id: { in: staleIds }, runState: "RUNNING" }),
-    data: problemUpdateData({
-      ...pipelineStateData("FAILED"),
-      generationStartedAt: null,
-      lastGenerationError: `Generation exceeded ${STALE_GENERATION_THRESHOLD_HOURS}h without completion`,
-    }),
-  });
-
-  revalidateProblems(staleProblems);
-  logger.warn(`Recovered ${result.count} stale generation run(s)`);
-
-  return result.count;
-}
-
-export const generateContentScheduler = schedules.task({
-  id: "generate-content-scheduler",
-  queue: { concurrencyLimit: 1 },
-  retry: { maxAttempts: 1 },
-  cron: {
-    pattern: "0 * * * *",
-    timezone: "UTC",
-  },
-  run: async () => {
-    const killSwitch = true;
-    if (killSwitch) {
-      logger.warn("Generation schedule disabled via kill switch", {
-        env: "GENERATION_KILL_SWITCH",
-      });
-      return {
-        processed: 0,
-        tokensUsed: 0,
-        totalTokens: 0,
-        recovered: 0,
-        stopReason: "kill_switch",
-      };
-    }
-
-    const recovered = await recoverStaleGenerations();
-    const dateKey = utcDateKey();
-    let totalTokens = await getDailyTokenUsage(dateKey);
-
-    if (totalTokens >= DAILY_TOKEN_LIMIT) {
-      logger.info("Daily token limit already reached", {
-        dateKey,
-        totalTokens,
-        limit: DAILY_TOKEN_LIMIT,
-      });
-      return {
-        processed: 0,
-        tokensUsed: 0,
-        totalTokens,
-        recovered,
-        stopReason: "daily_limit",
-      };
-    }
-
-    const problem = await fetchNextProblem();
-    if (!problem) {
-      logger.info("No eligible problems to generate content for");
-      return {
-        processed: 0,
-        tokensUsed: 0,
-        totalTokens,
-        recovered,
-        stopReason: "empty",
-      };
-    }
-
-    const updated = await prisma.problem.updateMany({
-      where: problemWhere({
-        id: problem.id,
-        runState: { in: ["IDLE", "FAILED"] },
-        generationAttempts: { lt: MAX_GENERATION_ATTEMPTS },
-        reviewStatus: { not: "UNSOLVABLE" },
-      }),
-      data: problemUpdateData({
-        ...pipelineStateData("RUNNING"),
-        generationAttempts: { increment: 1 },
-        generationStartedAt: new Date(),
-        lastGenerationError: null,
-      }),
-    });
-
-    if (updated.count === 0) {
-      logger.warn("Problem was already picked up for generation", {
-        problemId: problem.id,
-      });
-      return {
-        processed: 0,
-        tokensUsed: 0,
-        totalTokens,
-        recovered,
-        stopReason: "already_claimed",
-      };
-    }
-
-    let processed = 0;
-    let tokensUsed = 0;
-
-    const result = await executeGeneration(problem, dateKey);
-    processed = result.processed;
-    tokensUsed = result.tokensUsed;
-    totalTokens += tokensUsed;
-
-    if (processed > 0) {
-      await discordLog({
-        title: "⏱️ Hourly Generation Complete",
-        description: `Processed a problem using Kimi K2.6 (thinking).`,
-        color: DISCORD_COLORS.info,
-        fields: [
-          { name: "Tokens used", value: `${tokensUsed}`, inline: true },
-          { name: "UTC date", value: dateKey, inline: true },
-        ],
-      });
-    }
-
-    return {
-      processed,
-      tokensUsed,
-      totalTokens,
-      recovered,
-      stopReason: totalTokens >= DAILY_TOKEN_LIMIT ? "daily_limit" : "done",
-    };
-  },
-});
 
 export const generateContentTask = task({
   id: "generate-content-task",
@@ -337,6 +152,7 @@ export const generateContentTask = task({
       data: problemUpdateData({
         ...pipelineStateData("RUNNING"),
         generationAttempts: { increment: 1 },
+        ...(payload.adminBypass ? { reviewStatus: "UNREVIEWED" } : {}),
         generationStartedAt: new Date(),
         lastGenerationError: null,
       }),
@@ -368,7 +184,7 @@ export const generateContentTask = task({
 });
 
 // ---------------------------------------------------------------------------
-// Shared generation flow used by both the scheduler and on-demand tasks.
+// Shared generation flow for on-demand tasks.
 // ---------------------------------------------------------------------------
 
 type GenerationResult = {

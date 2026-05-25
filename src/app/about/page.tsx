@@ -50,8 +50,8 @@ export default function AboutPage() {
             <StepCard
               icon={Cpu}
               step="1"
-              title="Scrape & prioritize"
-              description="We pull completed problems from the Codeforces API and prioritize them for hourly Trigger.dev generation."
+              title="Scrape problems"
+              description="We pull completed problems from the Codeforces API and keep them ready for on-demand generation."
             />
             <StepCard
               icon={Brain}

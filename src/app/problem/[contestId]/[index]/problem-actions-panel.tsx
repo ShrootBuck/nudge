@@ -15,9 +15,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cfProblemUrl, cn, ratingTone } from "@/lib/utils";
 import {
-  queueRegeneration,
   reportProblem,
   setProblemReviewStatus,
+  triggerRegeneration,
 } from "./actions";
 import { AnimatedCollapse, ChevronIcon } from "./problem-cards";
 import {
@@ -284,7 +284,7 @@ export function ReviewSection({
     startTransition(() => {
       void (async () => {
         try {
-          const result = await queueRegeneration(
+          const result = await triggerRegeneration(
             problemId,
             passwordRef.current,
           );
@@ -301,7 +301,7 @@ export function ReviewSection({
             setError(result.error);
           }
         } catch {
-          setError("Regeneration request failed");
+          setError("Regeneration trigger failed");
         } finally {
           setPendingStatus(null);
         }
@@ -434,9 +434,7 @@ export function ReviewSection({
                     pendingStatus === "REGENERATE" && "animate-spin",
                   )}
                 />
-                {pendingStatus === "REGENERATE"
-                  ? "Requesting..."
-                  : "Regenerate"}
+                {pendingStatus === "REGENERATE" ? "Starting..." : "Regenerate"}
               </Button>
             </div>
           </form>

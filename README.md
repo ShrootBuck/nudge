@@ -19,7 +19,7 @@ Most editorial sites give you the whole answer or nothing. Nudge sits in between
 All content is AI-generated via OpenRouter, then stored in Postgres and served through a Next.js frontend. Problems are synced from the Codeforces API automatically.
 
 1. **Sync** — A daily Trigger.dev scheduled task pulls every problem from the Codeforces API and upserts them into Postgres.
-2. **Generate** — An hourly scheduler runs synchronous generations for eligible unsolved problems, prioritized by request count and recency.
+2. **Generate** — Admin-triggered Trigger.dev tasks run synchronous generations for selected problems.
 3. **Serve** — Next.js renders the problem list with filtering by rating, tag, and search. Each problem page has collapsible hint panels so you control exactly how much you see.
 4. **Report** — Users can flag incorrect content. A daily digest sends new reports to Discord via webhook for human verification.
 
@@ -73,10 +73,10 @@ bun dev
 bunx trigger dev
 ```
 
-This connects to Trigger.dev and registers the scheduled tasks:
+This connects to Trigger.dev and registers the background tasks:
 
 - **`sync-problems`** — daily Codeforces sync (midnight MST)
-- **`generate-content-scheduler`** — hourly synchronous generation (one problem per hour, top of the hour UTC)
+- **`generate-content-task`** — on-demand content generation
 - **`report-digest`** — daily Discord digest of user-reported issues
 
 Or, you know, use the [live website](https://nudge.zaydkrunz.com)
