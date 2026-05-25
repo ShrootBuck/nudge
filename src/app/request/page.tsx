@@ -74,7 +74,7 @@ export default function RequestPage() {
               </div>
 
               {showAdmin && (
-                <div className="animate-in fade-in slide-in-from-top-2">
+                <div>
                   <label
                     htmlFor="adminPassword"
                     className="mb-1.5 block text-sm font-medium text-foreground"
