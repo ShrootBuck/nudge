@@ -2,8 +2,8 @@
 
 import type { RunState } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { verifyAdminPassword } from "@/lib/env";
-import { tasks } from "@trigger.dev/sdk";
+import { getOptionalEnv, verifyAdminPassword } from "@/lib/env";
+import { ApiError, tasks } from "@trigger.dev/sdk";
 import type { generateContentTask } from "@/trigger/generate-content";
 
 const MAX_REQUESTED_COUNT = 2_000_000_000;
@@ -87,6 +87,62 @@ function isCompletedRunState(runState: RunState) {
   return runState === "SUCCEEDED";
 }
 
+async function incrementRequestedCount(problem: {
+  id: string;
+  runState: RunState;
+}) {
+  await prisma.problem.updateMany({
+    where: {
+      id: problem.id,
+      requestedCount: { lt: MAX_REQUESTED_COUNT },
+    },
+    data: {
+      requestedCount: { increment: 1 },
+      ...(problem.runState === "IDLE" ? { runState: "IDLE" } : {}),
+    },
+  });
+}
+
+function formatTriggerError(error: unknown) {
+  if (error instanceof ApiError) {
+    const status = error.status;
+    const baseMessage = error.message?.trim() || "Trigger.dev rejected the request";
+    let hint = "";
+
+    if (status === 422) {
+      hint =
+        "This usually means the task is not deployed to this environment or the payload is invalid.";
+    } else if (status === 401 || status === 403) {
+      hint = "Check TRIGGER_SECRET_KEY and project access.";
+    }
+
+    return {
+      userMessage: `${baseMessage}${status ? ` (status ${status})` : ""}${
+        hint ? ` ${hint}` : ""
+      }`,
+      logContext: {
+        status,
+        code: error.code,
+        type: error.type,
+        param: error.param,
+        error: error.error,
+      },
+    };
+  }
+
+  if (error instanceof Error) {
+    return {
+      userMessage: error.message || "Unexpected error",
+      logContext: { message: error.message, stack: error.stack },
+    };
+  }
+
+  return {
+    userMessage: "Unexpected error",
+    logContext: { error },
+  };
+}
+
 export async function requestProblem(_prevState: unknown, formData: FormData) {
   const input = toProblemInput(formData.get("problem"));
   const adminPassword = toProblemInput(formData.get("adminPassword"));
@@ -132,26 +188,44 @@ export async function requestProblem(_prevState: unknown, formData: FormData) {
           return { error: auth.error };
         }
 
-        await tasks.trigger<typeof generateContentTask>("generate-content-task", {
-          problemId: problem.id,
-          adminBypass: true,
-        });
+        if (!getOptionalEnv("TRIGGER_SECRET_KEY")) {
+          await incrementRequestedCount(problem);
+          return {
+            error:
+              "Trigger.dev is not configured on the server (missing TRIGGER_SECRET_KEY). Problem was queued instead.",
+          };
+        }
 
-        return {
-          message: `Admin bypass activated! Generation for ${contestId}${index} started immediately.`,
-        };
+        try {
+          await tasks.trigger<typeof generateContentTask>(
+            "generate-content-task",
+            {
+              problemId: problem.id,
+              adminBypass: true,
+            },
+          );
+
+          return {
+            message: `Admin bypass activated! Generation for ${contestId}${index} started immediately.`,
+          };
+        } catch (error) {
+          const details = formatTriggerError(error);
+          console.error("Admin bypass trigger failed", {
+            problemId: problem.id,
+            contestId,
+            index,
+            ...details.logContext,
+          });
+
+          await incrementRequestedCount(problem);
+
+          return {
+            error: `Admin bypass failed to start generation. ${details.userMessage} Problem was queued instead.`,
+          };
+        }
       }
 
-      await prisma.problem.updateMany({
-        where: {
-          id: problem.id,
-          requestedCount: { lt: MAX_REQUESTED_COUNT },
-        },
-        data: {
-          requestedCount: { increment: 1 },
-          ...(problem.runState === "IDLE" ? { runState: "IDLE" } : {}),
-        },
-      });
+      await incrementRequestedCount(problem);
 
       return {
         message: `Problem ${contestId}${index} has been requested and prioritized!`,
@@ -161,7 +235,8 @@ export async function requestProblem(_prevState: unknown, formData: FormData) {
     return {
       error: `Problem ${contestId}${index} does not exist in our database.`,
     };
-  } catch {
+  } catch (error) {
+    console.error("requestProblem failed", error);
     return { error: "An error occurred while requesting the problem." };
   }
 }
