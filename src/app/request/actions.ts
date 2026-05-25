@@ -3,7 +3,8 @@
 import type { RunState } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { verifyAdminPassword } from "@/lib/env";
-import { generateContentTask } from "@/trigger/generate-content";
+import { tasks } from "@trigger.dev/sdk";
+import type { generateContentTask } from "@/trigger/generate-content";
 
 const MAX_REQUESTED_COUNT = 2_000_000_000;
 
@@ -131,7 +132,7 @@ export async function requestProblem(_prevState: unknown, formData: FormData) {
           return { error: auth.error };
         }
 
-        await generateContentTask.trigger({
+        await tasks.trigger<typeof generateContentTask>("generate-content-task", {
           problemId: problem.id,
           adminBypass: true,
         });
