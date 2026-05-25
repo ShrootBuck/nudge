@@ -34,6 +34,7 @@ export function buildOpenRouterChatRequest(
     },
     reasoning: {
       effort: "high",
+      exclude: true,
     },
   };
 }
@@ -161,7 +162,13 @@ export function extractStructuredResponse(
   const outputText = extractMessageContent(firstChoice?.message?.content);
 
   if (!outputText) {
-    throw new Error("OpenRouter response missing message content");
+    throw new Error(
+      `OpenRouter response missing message content (id: ${result.id}, finish_reason: ${
+        firstChoice?.finish_reason ?? "unknown"
+      }, native_finish_reason: ${
+        firstChoice?.native_finish_reason ?? "unknown"
+      })`,
+    );
   }
 
   const promptTokens = coalesceNumber(
