@@ -11,10 +11,6 @@ export type GenerationAuditInfo = {
   displayName: string;
   responseId: string;
   resolvedModel: string | null;
-  promptTokens: number | null;
-  completionTokens: number | null;
-  totalTokens: number | null;
-  costCredits: number | null;
   finishReason: string | null;
   nativeFinishReason: string | null;
   providerName: string | null;
@@ -57,10 +53,6 @@ export async function saveProblemContent(
         generatedByDisplayName: generation.displayName,
         generatedByModel: generation.resolvedModel,
         generationResponseId: generation.responseId,
-        generationPromptTokens: generation.promptTokens,
-        generationCompletionTokens: generation.completionTokens,
-        generationTotalTokens: generation.totalTokens,
-        generationCostCredits: generation.costCredits,
         generationFinishReason: generation.finishReason,
         generationNativeFinishReason: generation.nativeFinishReason,
         generationProviderName: generation.providerName,

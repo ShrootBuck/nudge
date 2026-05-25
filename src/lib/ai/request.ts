@@ -1,4 +1,5 @@
-import type { OpenRouterMessage, OutputSchema, UserPromptInput } from "./types";
+import type { ModelMessage, UserModelMessage } from "ai";
+import type { UserPromptInput } from "./types";
 
 export function toStrictJsonSchema(
   schema: Record<string, unknown>,
@@ -49,21 +50,7 @@ export function toStrictJsonSchema(
   return copy;
 }
 
-export function toResponseFormat(outputSchema: OutputSchema) {
-  return {
-    type: "json_schema",
-    json_schema: {
-      name: outputSchema.name,
-      description: outputSchema.description,
-      strict: true,
-      schema: toStrictJsonSchema(outputSchema.schema),
-    },
-  };
-}
-
-function toUserContent(
-  input: UserPromptInput,
-): string | OpenRouterMessage["content"] {
+function toUserContent(input: UserPromptInput): UserModelMessage["content"] {
   if (typeof input === "string") {
     return input;
   }
@@ -73,19 +60,10 @@ function toUserContent(
       return { type: "text" as const, text: item.text ?? "" };
     }
 
-    return {
-      type: "image_url" as const,
-      image_url: { url: item.image_url?.url ?? "" },
-    };
+    return { type: "image" as const, image: item.image_url?.url ?? "" };
   });
 }
 
-export function buildMessages(
-  systemPrompt: string,
-  userPrompt: UserPromptInput,
-): OpenRouterMessage[] {
-  return [
-    { role: "system", content: systemPrompt },
-    { role: "user", content: toUserContent(userPrompt) },
-  ];
+export function buildMessages(userPrompt: UserPromptInput): ModelMessage[] {
+  return [{ role: "user", content: toUserContent(userPrompt) }];
 }

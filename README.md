@@ -4,7 +4,7 @@
 
 **Get unstuck without skipping straight to the answer.**
 
-Progressive hints, clean editorials, and full C++ solutions for Codeforces problems. Generated via OpenRouter, served at your own pace.
+Progressive hints, clean editorials, and full C++ solutions for Codeforces problems. Generated via AI SDK, served at your own pace.
 
 [Live Site](https://nudge.zaydkrunz.com)
 
@@ -16,67 +16,4 @@ Progressive hints, clean editorials, and full C++ solutions for Codeforces probl
 
 Most editorial sites give you the whole answer or nothing. Nudge sits in between: every problem has **progressive hints** that go from a gentle nudge toward the right area all the way to the key insight, plus a prose editorial and the full C++ solution when you're ready.
 
-All content is AI-generated via OpenRouter, then stored in Postgres and served through a Next.js frontend. Problems are synced from the Codeforces API automatically.
-
-1. **Sync** — A daily Trigger.dev scheduled task pulls every problem from the Codeforces API and upserts them into Postgres.
-2. **Generate** — Admin-triggered Trigger.dev tasks run synchronous generations for selected problems.
-3. **Serve** — Next.js renders the problem list with filtering by rating, tag, and search. Each problem page has collapsible hint panels so you control exactly how much you see.
-4. **Report** — Users can flag incorrect content. A daily digest sends new reports to Discord via webhook for human verification.
-
-## Tech stack
-
-| Layer               | Tech                                                                                                                                   |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| **Runtime**         | [Bun](https://bun.sh)                                                                                                                  |
-| **Framework**       | [Next.js 16](https://nextjs.org) (App Router, React Compiler)                                                                          |
-| **Database**        | PostgreSQL on [Supabase](https://supabase.com)                                                                                         |
-| **ORM**             | [Prisma v7](https://prisma.io) with `@prisma/adapter-pg`                                                                               |
-| **Background jobs** | [Trigger.dev v4](https://trigger.dev)                                                                                                  |
-| **AI**              | [OpenRouter](https://openrouter.ai) (`moonshotai/kimi-k2.6`, structured outputs)                                                       |
-| **Styling**         | [Tailwind CSS v4](https://tailwindcss.com), [shadcn/ui](https://ui.shadcn.com)                                                         |
-| **Linting**         | [Biome](https://biomejs.dev)                                                                                                           |
-
-## Getting started
-
-### Prerequisites
-
-- [Bun](https://bun.sh) installed
-- A PostgreSQL database (Supabase, Neon, local, etc.)
-- An [OpenRouter](https://openrouter.ai) API key
-- A [Trigger.dev](https://trigger.dev) account + project
-
-### Setup
-
-```bash
-# Clone
-git clone https://github.com/ShrootBuck/nudge.git
-cd nudge
-
-# Install
-bun install
-
-# Configure environment
-cp .env.example .env
-# Fill in DATABASE_URL, OPENROUTER_API_KEY, TRIGGER_SECRET_KEY, etc.
-
-# Apply database migrations
-bunx prisma migrate deploy
-
-# Run locally
-bun dev
-```
-
-### Background jobs
-
-```bash
-# Start the Trigger.dev dev server
-bunx trigger dev
-```
-
-This connects to Trigger.dev and registers the background tasks:
-
-- **`sync-problems`** — daily Codeforces sync (midnight MST)
-- **`generate-content-task`** — on-demand content generation
-- **`report-digest`** — daily Discord digest of user-reported issues
-
-Or, you know, use the [live website](https://nudge.zaydkrunz.com)
+All content is AI-generated via AI SDK, then stored in Postgres and served through a Next.js frontend. Problems are synced from the Codeforces API automatically.

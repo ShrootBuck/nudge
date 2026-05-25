@@ -50,10 +50,6 @@ function toGenerationAuditInfo(
     displayName: response.displayName,
     responseId: response.responseId,
     resolvedModel: response.resolvedModel,
-    promptTokens: response.promptTokens,
-    completionTokens: response.completionTokens,
-    totalTokens: response.totalTokens,
-    costCredits: response.costCredits,
     finishReason: response.finishReason,
     nativeFinishReason: response.nativeFinishReason,
     providerName: response.providerName,
@@ -67,10 +63,6 @@ function generationAuditData(
   | "generatedByDisplayName"
   | "generatedByModel"
   | "generationResponseId"
-  | "generationPromptTokens"
-  | "generationCompletionTokens"
-  | "generationTotalTokens"
-  | "generationCostCredits"
   | "generationFinishReason"
   | "generationNativeFinishReason"
   | "generationProviderName"
@@ -81,10 +73,6 @@ function generationAuditData(
     generatedByDisplayName: audit.displayName,
     generatedByModel: audit.resolvedModel,
     generationResponseId: audit.responseId,
-    generationPromptTokens: audit.promptTokens,
-    generationCompletionTokens: audit.completionTokens,
-    generationTotalTokens: audit.totalTokens,
-    generationCostCredits: audit.costCredits,
     generationFinishReason: audit.finishReason,
     generationNativeFinishReason: audit.nativeFinishReason,
     generationProviderName: audit.providerName,
@@ -100,18 +88,6 @@ function revalidateProblems(
   for (const problem of problems) {
     safeRevalidateTag(problemTag(problem.contestId, problem.index), "max");
   }
-}
-
-function utcDateKey(date = new Date()) {
-  return date.toISOString().slice(0, 10);
-}
-
-async function incrementDailyTokens(dateKey: string, tokens: number) {
-  await prisma.dailyTokenUsage.upsert({
-    where: { date: dateKey },
-    create: { date: dateKey, tokens },
-    update: { tokens: { increment: tokens } },
-  });
 }
 
 export const generateContentTask = task({
@@ -135,8 +111,6 @@ export const generateContentTask = task({
       logger.error(`Problem not found: ${payload.problemId}`);
       return { error: "Problem not found" };
     }
-
-    const dateKey = utcDateKey();
 
     const whereClause = payload.adminBypass
       ? problemWhere({ id: problem.id })
@@ -162,24 +136,20 @@ export const generateContentTask = task({
       logger.warn("Problem was already picked up for generation", {
         problemId: problem.id,
       });
-      return { processed: 0, tokensUsed: 0 };
+      return { processed: 0 };
     }
 
-    const result = await executeGeneration(problem, dateKey);
+    const result = await executeGeneration(problem);
 
     if (result.processed > 0) {
       await discordLog({
         title: "⚡ On-Demand Generation Complete",
-        description: `Processed a problem using Kimi K2.6 (thinking).`,
+        description: `Processed a problem using Kimi K2.6 via AI SDK.`,
         color: DISCORD_COLORS.info,
-        fields: [
-          { name: "Tokens used", value: `${result.tokensUsed}`, inline: true },
-          { name: "UTC date", value: dateKey, inline: true },
-        ],
       });
     }
 
-    return { processed: result.processed, tokensUsed: result.tokensUsed };
+    return { processed: result.processed };
   },
 });
 
@@ -189,17 +159,14 @@ export const generateContentTask = task({
 
 type GenerationResult = {
   processed: number;
-  tokensUsed: number;
 };
 
 async function executeGeneration(
   problem: ProblemForGeneration,
-  dateKey: string,
 ): Promise<GenerationResult> {
   const label = toProblemLabel(problem);
 
   let processed = 0;
-  let tokensUsed = 0;
 
   try {
     const statement = await fetchProblemStatement(
@@ -232,12 +199,6 @@ async function executeGeneration(
 
     const parsed = JSON.parse(response.outputText);
     const outputData = problemResultSchema.parse(parsed);
-    const usedTokens = response.totalTokens ?? 0;
-
-    if (usedTokens > 0) {
-      await incrementDailyTokens(dateKey, usedTokens);
-      tokensUsed += usedTokens;
-    }
 
     if (outputData.status === "unsolvable") {
       const reason = outputData.reason;
@@ -286,5 +247,5 @@ async function executeGeneration(
     revalidateProblems([problem]);
   }
 
-  return { processed, tokensUsed };
+  return { processed };
 }

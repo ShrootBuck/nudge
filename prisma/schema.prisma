@@ -36,14 +36,9 @@ model Problem {
   lastGenerationError String?      @db.Text
 
   generatedByDisplayName String?
-  generatedByPresetSlug  String?
   generatedByModel       String?
 
   generationResponseId         String?
-  generationPromptTokens       Int?
-  generationCompletionTokens   Int?
-  generationTotalTokens        Int?
-  generationCostCredits        Float?
   generationFinishReason       String?
   generationNativeFinishReason String?
   generationProviderName       String?
@@ -101,18 +96,4 @@ model Report {
   problem   Problem @relation(fields: [problemId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
-}
-
-model DailyTokenUsage {
-  date      String   @id
-  tokens    Int      @default(0)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-}
-
-model GenerationConfig {
-  id                         String   @id @default("default")
-  activeOpenRouterPresetSlug String
-  createdAt                  DateTime @default(now())
-  updatedAt                  DateTime @updatedAt
 }
