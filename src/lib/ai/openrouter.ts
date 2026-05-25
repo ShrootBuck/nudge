@@ -38,7 +38,6 @@ export function buildOpenRouterChatRequest(
   };
 }
 
-const CHAT_COMPLETION_TIMEOUT_MS = 120_000;
 const GENERATION_METADATA_TIMEOUT_MS = 10_000;
 const GENERATION_METADATA_DELAY_MS = 1_500;
 
@@ -52,7 +51,6 @@ export async function createChatCompletion(
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
-    signal: AbortSignal.timeout(CHAT_COMPLETION_TIMEOUT_MS),
   });
 
   if (!response.ok) {
