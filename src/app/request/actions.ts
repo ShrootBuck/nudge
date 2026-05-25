@@ -2,6 +2,7 @@
 
 import type { RunState } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { verifyAdminPassword } from "@/lib/env";
 import { generateContentTask } from "@/trigger/generate-content";
 
 const MAX_REQUESTED_COUNT = 2_000_000_000;
@@ -124,7 +125,12 @@ export async function requestProblem(_prevState: unknown, formData: FormData) {
         };
       }
 
-      if (adminPassword && adminPassword === process.env.ADMIN_PASSWORD) {
+      if (adminPassword) {
+        const auth = verifyAdminPassword(adminPassword);
+        if (!auth.ok) {
+          return { error: auth.error };
+        }
+
         await generateContentTask.trigger({
           problemId: problem.id,
           adminBypass: true,
