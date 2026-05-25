@@ -30,7 +30,7 @@ export function buildOpenRouterChatRequest(
     messages: buildMessages(options.systemPrompt, options.userPrompt),
     response_format: toResponseFormat(options.outputSchema),
     provider: {
-      require_parameters: ["response_format"],
+      require_parameters: true,
     },
     reasoning: {
       effort: "high",

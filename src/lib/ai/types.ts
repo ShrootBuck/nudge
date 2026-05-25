@@ -45,6 +45,9 @@ export type OpenRouterMessage = {
 export type OpenRouterChatRequest = Record<string, unknown> & {
   model: string;
   messages: OpenRouterMessage[];
+  provider?: {
+    require_parameters?: boolean;
+  };
 };
 
 export type OpenRouterChatResponse = {
