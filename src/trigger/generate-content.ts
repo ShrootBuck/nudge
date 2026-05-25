@@ -46,16 +46,11 @@ function toProblemLabel(
   return `${problem.contestId}${problem.index}`;
 }
 
-function toGenerationDisplayName(response: StructuredResponse) {
-  return response.presetLabel;
-}
-
 function toGenerationAuditInfo(
   response: StructuredResponse,
 ): GenerationAuditInfo {
   return {
-    displayName: toGenerationDisplayName(response),
-    presetSlug: response.presetSlug,
+    displayName: response.displayName,
     responseId: response.responseId,
     resolvedModel: response.resolvedModel,
     promptTokens: response.promptTokens,
@@ -73,7 +68,6 @@ function generationAuditData(
 ): Pick<
   Prisma.ProblemUpdateInput,
   | "generatedByDisplayName"
-  | "generatedByPresetSlug"
   | "generatedByModel"
   | "generationResponseId"
   | "generationPromptTokens"
@@ -88,7 +82,6 @@ function generationAuditData(
 
   return {
     generatedByDisplayName: audit.displayName,
-    generatedByPresetSlug: audit.presetSlug,
     generatedByModel: audit.resolvedModel,
     generationResponseId: audit.responseId,
     generationPromptTokens: audit.promptTokens,
@@ -278,18 +271,16 @@ export const generateContentScheduler = schedules.task({
 
     let processed = 0;
     let tokensUsed = 0;
-    let processedPresetLabel: string | null = null;
 
     const result = await executeGeneration(problem, dateKey);
     processed = result.processed;
     tokensUsed = result.tokensUsed;
-    processedPresetLabel = result.presetLabel;
     totalTokens += tokensUsed;
 
     if (processed > 0) {
       await discordLog({
         title: "⏱️ Hourly Generation Complete",
-        description: `Processed a problem using ${processedPresetLabel ?? "the active OpenRouter preset"}.`,
+        description: `Processed a problem using Kimi K2.6 (thinking).`,
         color: DISCORD_COLORS.info,
         fields: [
           { name: "Tokens used", value: `${tokensUsed}`, inline: true },
@@ -363,7 +354,7 @@ export const generateContentTask = task({
     if (result.processed > 0) {
       await discordLog({
         title: "⚡ On-Demand Generation Complete",
-        description: `Processed a problem using ${result.presetLabel ?? "the active OpenRouter preset"}.`,
+        description: `Processed a problem using Kimi K2.6 (thinking).`,
         color: DISCORD_COLORS.info,
         fields: [
           { name: "Tokens used", value: `${result.tokensUsed}`, inline: true },
@@ -383,7 +374,6 @@ export const generateContentTask = task({
 type GenerationResult = {
   processed: number;
   tokensUsed: number;
-  presetLabel: string | null;
 };
 
 async function executeGeneration(
@@ -394,7 +384,6 @@ async function executeGeneration(
 
   let processed = 0;
   let tokensUsed = 0;
-  let presetLabel: string | null = null;
 
   try {
     const statement = await fetchProblemStatement(
@@ -420,7 +409,6 @@ async function executeGeneration(
       userPrompt,
       outputSchema: problemOutputSchema,
     });
-    presetLabel = response.presetLabel;
 
     if (!response.outputText.trim()) {
       throw new Error("Provider response missing output text");
@@ -482,5 +470,5 @@ async function executeGeneration(
     revalidateProblems([problem]);
   }
 
-  return { processed, tokensUsed, presetLabel };
+  return { processed, tokensUsed };
 }

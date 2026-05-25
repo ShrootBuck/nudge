@@ -15,8 +15,7 @@ export type UserPromptInput =
 export type StructuredResponse = {
   outputText: string;
   responseId: string;
-  presetSlug: string;
-  presetLabel: string;
+  displayName: string;
   resolvedModel: string | null;
   promptTokens: number | null;
   completionTokens: number | null;

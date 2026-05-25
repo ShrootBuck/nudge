@@ -1,5 +1,3 @@
-import type { OpenRouterPreset } from "./openrouter-presets";
-import { toOpenRouterPresetModel } from "./openrouter-presets";
 import { buildMessages, toResponseFormat } from "./request";
 import type {
   GenerateOptions,
@@ -8,6 +6,9 @@ import type {
   OpenRouterGenerationMetadata,
   StructuredResponse,
 } from "./types";
+
+const MODEL = "moonshotai/kimi-k2.6";
+const DISPLAY_NAME = "Kimi K2.6 (thinking)";
 
 const CHAT_COMPLETIONS_URL = "https://openrouter.ai/api/v1/chat/completions";
 const GENERATION_METADATA_URL = "https://openrouter.ai/api/v1/generation";
@@ -23,14 +24,16 @@ function getOpenRouterApiKey() {
 
 export function buildOpenRouterChatRequest(
   options: GenerateOptions,
-  preset: OpenRouterPreset,
 ): OpenRouterChatRequest {
   return {
-    model: toOpenRouterPresetModel(preset.slug),
+    model: MODEL,
     messages: buildMessages(options.systemPrompt, options.userPrompt),
     response_format: toResponseFormat(options.outputSchema),
     provider: {
       require_parameters: ["response_format"],
+    },
+    reasoning: {
+      effort: "high",
     },
   };
 }
@@ -154,7 +157,6 @@ function coalesceString(
 
 export function extractStructuredResponse(
   result: OpenRouterChatResponse,
-  preset: OpenRouterPreset,
   metadata: OpenRouterGenerationMetadata["data"] | null = null,
 ): StructuredResponse {
   const firstChoice = result.choices[0];
@@ -180,8 +182,7 @@ export function extractStructuredResponse(
   return {
     outputText,
     responseId: result.id,
-    presetSlug: preset.slug,
-    presetLabel: preset.label,
+    displayName: DISPLAY_NAME,
     resolvedModel: coalesceString(metadata?.model, result.model),
     promptTokens,
     completionTokens,

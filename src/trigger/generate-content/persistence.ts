@@ -9,7 +9,6 @@ import type { ParsedContent } from "./content-schema";
 
 export type GenerationAuditInfo = {
   displayName: string;
-  presetSlug: string;
   responseId: string;
   resolvedModel: string | null;
   promptTokens: number | null;
@@ -56,7 +55,6 @@ export async function saveProblemContent(
       data: problemUpdateData({
         ...pipelineStateData("SUCCEEDED"),
         generatedByDisplayName: generation.displayName,
-        generatedByPresetSlug: generation.presetSlug,
         generatedByModel: generation.resolvedModel,
         generationResponseId: generation.responseId,
         generationPromptTokens: generation.promptTokens,
