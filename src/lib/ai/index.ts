@@ -1,4 +1,4 @@
-import { generateMoonshotStructuredResponse } from "./moonshot";
+import { generateOpenAIStructuredResponse } from "./openai";
 import type { GenerateOptions, StructuredResponse } from "./types";
 
 export * from "./types";
@@ -6,5 +6,5 @@ export * from "./types";
 export async function generateStructuredResponse(
   options: GenerateOptions,
 ): Promise<StructuredResponse> {
-  return generateMoonshotStructuredResponse(options);
+  return generateOpenAIStructuredResponse(options);
 }

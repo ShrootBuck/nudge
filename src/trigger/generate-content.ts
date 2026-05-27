@@ -144,7 +144,7 @@ export const generateContentTask = task({
     if (result.processed > 0) {
       await discordLog({
         title: "⚡ On-Demand Generation Complete",
-        description: `Processed a problem using Kimi K2.6 via AI SDK.`,
+        description: `Processed a problem using GPT-5.5 via AI SDK.`,
         color: DISCORD_COLORS.info,
       });
     }
