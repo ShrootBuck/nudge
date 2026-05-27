@@ -19,7 +19,7 @@ import { LuckyButton } from "./lucky-button";
 import { ProblemFilters } from "./problem-filters";
 import { MAX_RATING, MIN_RATING } from "./rating-constants";
 
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 10;
 
 function listableWhere(): Prisma.ProblemWhereInput {
   return problemWhere({
