@@ -26,6 +26,26 @@ export const reportDigest = schedules.task({
       return { sent: false, count: 0 };
     }
 
+    const problemCounts = new Map<string, { count: number; problem: typeof reports[0]["problem"] }>();
+    for (const r of reports) {
+      const existing = problemCounts.get(r.problemId);
+      if (existing) {
+        existing.count++;
+      } else {
+        problemCounts.set(r.problemId, { count: 1, problem: r.problem });
+      }
+    }
+
+    const top5 = Array.from(problemCounts.values())
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+
+    const top5Lines = top5.map((entry, i) => {
+      const tag = `${entry.problem.contestId}${entry.problem.index}`;
+      const link = `${SITE_URL}/problem/${entry.problem.contestId}/${entry.problem.index}`;
+      return `**${i + 1}.** [${tag} — ${entry.problem.name}](${link}) — **${entry.count}** report${entry.count === 1 ? "" : "s"}`;
+    });
+
     const lines = reports.map((r) => {
       const tag = `${r.problem.contestId}${r.problem.index}`;
       const link = `${SITE_URL}/problem/${r.problem.contestId}/${r.problem.index}`;
@@ -34,11 +54,19 @@ export const reportDigest = schedules.task({
       return `**[${tag} — ${r.problem.name}](${link})**\n${reason}\n${time}`;
     });
 
+    const description = [
+      "**🔥 Top Reported Problems**",
+      top5Lines.join("\n"),
+      "",
+      "**📋 All Reports**",
+      ...lines,
+    ].join("\n");
+
     await sendDiscordWebhook(
       getRequiredEnv("DISCORD_WEBHOOK_URL"),
       {
         title: `🚩 ${reports.length} new report${reports.length === 1 ? "" : "s"} today`,
-        description: lines.join("\n\n"),
+        description,
         color: DISCORD_COLORS.warning,
       },
       { throwOnError: true },
