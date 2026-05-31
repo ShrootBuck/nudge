@@ -39,7 +39,8 @@ function isValidProblem(problem: CFProblem) {
 
 function tagsEqual(a: string[], b: string[]): boolean {
   if (a.length !== b.length) return false;
-  return a.every((v, i) => v === b[i]);
+  const setA = new Set(a);
+  return b.every((v) => setA.has(v));
 }
 
 export const syncProblems = schedules.task({
