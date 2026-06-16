@@ -22,6 +22,7 @@ export type StructuredResponse = {
   finishReason: string | null;
   nativeFinishReason: string | null;
   providerName: string | null;
+  totalTokens: number | null;
 };
 
 export type GenerateOptions = {

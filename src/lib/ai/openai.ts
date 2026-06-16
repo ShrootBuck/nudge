@@ -1,4 +1,4 @@
-import { openai, type OpenAIResponsesProviderOptions } from "@ai-sdk/openai";
+import { type OpenAIResponsesProviderOptions, openai } from "@ai-sdk/openai";
 import { generateText, jsonSchema, Output } from "ai";
 import { buildMessages, toStrictJsonSchema } from "./request";
 import type { GenerateOptions, StructuredResponse } from "./types";
@@ -18,6 +18,12 @@ function coalesceString(
   }
 
   return null;
+}
+
+function coalesceTokenCount(value: number | null | undefined): number | null {
+  return typeof value === "number" && Number.isSafeInteger(value) && value >= 0
+    ? value
+    : null;
 }
 
 function buildOutput(options: GenerateOptions) {
@@ -51,6 +57,8 @@ export async function generateOpenAIStructuredResponse(
     );
   }
 
+  const usage = result.totalUsage;
+
   return {
     outputText,
     responseId: result.response.id,
@@ -59,5 +67,6 @@ export async function generateOpenAIStructuredResponse(
     finishReason: coalesceString(result.finishReason),
     nativeFinishReason: coalesceString(result.rawFinishReason),
     providerName: PROVIDER_NAME,
+    totalTokens: coalesceTokenCount(usage.totalTokens),
   };
 }

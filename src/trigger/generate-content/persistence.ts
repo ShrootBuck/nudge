@@ -14,6 +14,7 @@ export type GenerationAuditInfo = {
   finishReason: string | null;
   nativeFinishReason: string | null;
   providerName: string | null;
+  totalTokens: number | null;
 };
 
 export async function saveProblemContent(
@@ -56,6 +57,7 @@ export async function saveProblemContent(
         generationFinishReason: generation.finishReason,
         generationNativeFinishReason: generation.nativeFinishReason,
         generationProviderName: generation.providerName,
+        generationTotalTokens: generation.totalTokens,
         generationStartedAt: null,
         lastGenerationError: null,
       }),

@@ -1,6 +1,11 @@
 import type { Prisma } from "@prisma/client";
 import { logger, task } from "@trigger.dev/sdk";
 import { generateStructuredResponse, type StructuredResponse } from "../lib/ai";
+import {
+  formatOpenAIDailyTokenUsage,
+  getOpenAIDailyTokenUsage,
+  recordOpenAIGenerationUsage,
+} from "../lib/ai/token-budget";
 import { safeRevalidateTag } from "../lib/cache-revalidate";
 import { PROBLEM_LIST_TAG, problemTag } from "../lib/cache-tags";
 import { DISCORD_COLORS } from "../lib/discord-webhook";
@@ -8,7 +13,6 @@ import { prisma } from "../lib/prisma";
 import {
   pipelineStateData,
   problemUpdateData,
-  problemWhere,
 } from "../lib/problem-pipeline-db";
 import { discordLog } from "./discord-log";
 import {
@@ -21,8 +25,6 @@ import {
 } from "./generate-content/persistence";
 import { fetchProblemStatement } from "./generate-content/problem-statement";
 import { buildPrompt, SYSTEM_PROMPT } from "./generate-content/prompt";
-
-const MAX_GENERATION_ATTEMPTS = 3;
 
 type ProblemForGeneration = {
   id: string;
@@ -53,6 +55,7 @@ function toGenerationAuditInfo(
     finishReason: response.finishReason,
     nativeFinishReason: response.nativeFinishReason,
     providerName: response.providerName,
+    totalTokens: response.totalTokens,
   };
 }
 
@@ -66,6 +69,7 @@ function generationAuditData(
   | "generationFinishReason"
   | "generationNativeFinishReason"
   | "generationProviderName"
+  | "generationTotalTokens"
 > {
   const audit = toGenerationAuditInfo(response);
 
@@ -76,6 +80,7 @@ function generationAuditData(
     generationFinishReason: audit.finishReason,
     generationNativeFinishReason: audit.nativeFinishReason,
     generationProviderName: audit.providerName,
+    generationTotalTokens: audit.totalTokens,
   };
 }
 
@@ -95,6 +100,16 @@ export const generateContentTask = task({
   queue: { concurrencyLimit: 1 },
   retry: { maxAttempts: 1 },
   run: async (payload: { problemId: string; adminBypass?: boolean }) => {
+    if (!payload.adminBypass) {
+      logger.warn(
+        "Automatic generation is disabled; admin bypass is required",
+        {
+          problemId: payload.problemId,
+        },
+      );
+      return { processed: 0, skipped: "manual-admin-only" };
+    }
+
     const problem = await prisma.problem.findUnique({
       where: { id: payload.problemId },
       select: {
@@ -112,21 +127,27 @@ export const generateContentTask = task({
       return { error: "Problem not found" };
     }
 
-    const whereClause = payload.adminBypass
-      ? problemWhere({ id: problem.id })
-      : problemWhere({
-          id: problem.id,
-          runState: { in: ["IDLE", "FAILED"] },
-          generationAttempts: { lt: MAX_GENERATION_ATTEMPTS },
-          reviewStatus: { not: "UNSOLVABLE" },
-        });
+    const budget = await getOpenAIDailyTokenUsage();
+    if (budget.exhausted) {
+      logger.warn("OpenAI daily token grant exhausted", {
+        problemId: problem.id,
+        usage: formatOpenAIDailyTokenUsage(budget),
+      });
+      return {
+        processed: 0,
+        skipped: "openai-daily-token-grant-exhausted",
+        usedTokens: budget.usedTokens,
+        dailyTokenCap: budget.dailyTokenCap,
+        grantDate: budget.grantDate,
+      };
+    }
 
     const updated = await prisma.problem.updateMany({
-      where: whereClause,
+      where: { id: problem.id },
       data: problemUpdateData({
         ...pipelineStateData("RUNNING"),
         generationAttempts: { increment: 1 },
-        ...(payload.adminBypass ? { reviewStatus: "UNREVIEWED" } : {}),
+        reviewStatus: "UNREVIEWED",
         generationStartedAt: new Date(),
         lastGenerationError: null,
       }),
@@ -167,6 +188,7 @@ async function executeGeneration(
   const label = toProblemLabel(problem);
 
   let processed = 0;
+  let response: StructuredResponse | null = null;
 
   try {
     const statement = await fetchProblemStatement(
@@ -187,11 +209,12 @@ async function executeGeneration(
 
     logger.info(`Running generation for ${label}`);
 
-    const response = await generateStructuredResponse({
+    response = await generateStructuredResponse({
       systemPrompt: SYSTEM_PROMPT,
       userPrompt,
       outputSchema: problemOutputSchema,
     });
+    await recordOpenAIGenerationUsage({ problemId: problem.id, response });
 
     if (!response.outputText.trim()) {
       throw new Error("Provider response missing output text");
@@ -241,6 +264,7 @@ async function executeGeneration(
         ...pipelineStateData("FAILED"),
         generationStartedAt: null,
         lastGenerationError: reason,
+        ...(response ? generationAuditData(response) : {}),
       }),
     });
 

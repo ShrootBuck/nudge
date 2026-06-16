@@ -2,6 +2,10 @@
 
 import type { RunState } from "@prisma/client";
 import { ApiError } from "@trigger.dev/sdk";
+import {
+  formatOpenAIDailyTokenUsage,
+  getOpenAIDailyTokenUsage,
+} from "@/lib/ai/token-budget";
 import { getOptionalEnv, verifyAdminPassword } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { triggerGenerateContentTask } from "@/lib/trigger-tasks";
@@ -181,6 +185,15 @@ export async function requestProblem(_prevState: unknown, formData: FormData) {
         return {
           error:
             "Trigger.dev is not configured on the server (missing TRIGGER_SECRET_KEY).",
+        };
+      }
+
+      const budget = await getOpenAIDailyTokenUsage();
+      if (budget.exhausted) {
+        return {
+          error: `OpenAI daily token grant exhausted (${formatOpenAIDailyTokenUsage(
+            budget,
+          )}).`,
         };
       }
 

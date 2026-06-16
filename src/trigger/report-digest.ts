@@ -26,7 +26,10 @@ export const reportDigest = schedules.task({
       return { sent: false, count: 0 };
     }
 
-    const problemCounts = new Map<string, { count: number; problem: typeof reports[0]["problem"] }>();
+    const problemCounts = new Map<
+      string,
+      { count: number; problem: (typeof reports)[0]["problem"] }
+    >();
     for (const r of reports) {
       const existing = problemCounts.get(r.problemId);
       if (existing) {

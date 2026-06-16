@@ -1,6 +1,10 @@
 "use server";
 
 import { updateTag } from "next/cache";
+import {
+  formatOpenAIDailyTokenUsage,
+  getOpenAIDailyTokenUsage,
+} from "@/lib/ai/token-budget";
 import { PROBLEM_LIST_TAG, problemTag } from "@/lib/cache-tags";
 import { sendAdminLog } from "@/lib/discord";
 import { DISCORD_COLORS } from "@/lib/discord-webhook";
@@ -116,6 +120,16 @@ export async function triggerRegeneration(problemId: string, password: string) {
     return {
       success: false,
       error: "Trigger.dev is not configured on the server",
+    } as const;
+  }
+
+  const budget = await getOpenAIDailyTokenUsage();
+  if (budget.exhausted) {
+    return {
+      success: false,
+      error: `OpenAI daily token grant exhausted (${formatOpenAIDailyTokenUsage(
+        budget,
+      )}).`,
     } as const;
   }
 
