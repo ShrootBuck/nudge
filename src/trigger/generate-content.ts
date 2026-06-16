@@ -9,6 +9,11 @@ import {
 import { safeRevalidateTag } from "../lib/cache-revalidate";
 import { PROBLEM_LIST_TAG, problemTag } from "../lib/cache-tags";
 import { DISCORD_COLORS } from "../lib/discord-webhook";
+import {
+  AUTOMATIC_GENERATION_SOURCE,
+  type AutomaticGenerationSource,
+  automaticGenerationProblemWhere,
+} from "../lib/generation-queue";
 import { prisma } from "../lib/prisma";
 import {
   pipelineStateData,
@@ -33,6 +38,12 @@ type ProblemForGeneration = {
   name: string;
   rating: number | null;
   tags: string[];
+};
+
+export type GenerateContentPayload = {
+  problemId: string;
+  adminBypass?: boolean;
+  source?: AutomaticGenerationSource;
 };
 
 function toErrorMessage(error: unknown) {
@@ -99,7 +110,7 @@ export const generateContentTask = task({
   id: "generate-content-task",
   queue: { concurrencyLimit: 1 },
   retry: { maxAttempts: 1 },
-  run: async (payload: { problemId: string; adminBypass?: boolean }) => {
+  run: async (payload: GenerateContentPayload) => {
     if (!payload.adminBypass) {
       logger.warn(
         "Automatic generation is disabled; admin bypass is required",
@@ -129,13 +140,13 @@ export const generateContentTask = task({
 
     const budget = await getOpenAIDailyTokenUsage();
     if (budget.exhausted) {
-      logger.warn("OpenAI daily token grant exhausted", {
+      logger.warn("OpenAI daily generation token cap reached", {
         problemId: problem.id,
         usage: formatOpenAIDailyTokenUsage(budget),
       });
       return {
         processed: 0,
-        skipped: "openai-daily-token-grant-exhausted",
+        skipped: "openai-daily-generation-token-cap-reached",
         usedTokens: budget.usedTokens,
         dailyTokenCap: budget.dailyTokenCap,
         grantDate: budget.grantDate,
@@ -143,7 +154,10 @@ export const generateContentTask = task({
     }
 
     const updated = await prisma.problem.updateMany({
-      where: { id: problem.id },
+      where:
+        payload.source === AUTOMATIC_GENERATION_SOURCE
+          ? { id: problem.id, ...automaticGenerationProblemWhere() }
+          : { id: problem.id },
       data: problemUpdateData({
         ...pipelineStateData("RUNNING"),
         generationAttempts: { increment: 1 },
@@ -154,17 +168,21 @@ export const generateContentTask = task({
     });
 
     if (updated.count === 0) {
-      logger.warn("Problem was already picked up for generation", {
+      logger.warn("Problem was not eligible for generation", {
         problemId: problem.id,
+        source: payload.source,
       });
-      return { processed: 0 };
+      return { processed: 0, skipped: "not-eligible-for-generation" };
     }
 
     const result = await executeGeneration(problem);
 
     if (result.processed > 0) {
       await discordLog({
-        title: "⚡ On-Demand Generation Complete",
+        title:
+          payload.source === AUTOMATIC_GENERATION_SOURCE
+            ? "⚡ Hourly Generation Complete"
+            : "⚡ On-Demand Generation Complete",
         description: `Processed a problem using GPT-5.5 via AI SDK.`,
         color: DISCORD_COLORS.info,
       });

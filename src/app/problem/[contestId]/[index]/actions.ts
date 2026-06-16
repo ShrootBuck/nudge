@@ -127,7 +127,7 @@ export async function triggerRegeneration(problemId: string, password: string) {
   if (budget.exhausted) {
     return {
       success: false,
-      error: `OpenAI daily token grant exhausted (${formatOpenAIDailyTokenUsage(
+      error: `OpenAI daily generation token cap reached (${formatOpenAIDailyTokenUsage(
         budget,
       )}).`,
     } as const;

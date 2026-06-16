@@ -1,10 +1,8 @@
 import { tasks } from "@trigger.dev/sdk";
-import type { generateContentTask } from "@/trigger/generate-content";
-
-type GenerateContentPayload = {
-  problemId: string;
-  adminBypass?: boolean;
-};
+import type {
+  GenerateContentPayload,
+  generateContentTask,
+} from "@/trigger/generate-content";
 
 export async function triggerGenerateContentTask(
   payload: GenerateContentPayload,

@@ -2,10 +2,12 @@
 
 import type { RunState } from "@prisma/client";
 import { ApiError } from "@trigger.dev/sdk";
+import { updateTag } from "next/cache";
 import {
   formatOpenAIDailyTokenUsage,
   getOpenAIDailyTokenUsage,
 } from "@/lib/ai/token-budget";
+import { PROBLEM_LIST_TAG, problemTag } from "@/lib/cache-tags";
 import { getOptionalEnv, verifyAdminPassword } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { triggerGenerateContentTask } from "@/lib/trigger-tasks";
@@ -89,6 +91,14 @@ function isCompletedRunState(runState: RunState) {
   return runState === "SUCCEEDED";
 }
 
+function isRunningRunState(runState: RunState) {
+  return runState === "RUNNING";
+}
+
+function formatRequestCount(count: number) {
+  return `${count.toLocaleString()} request${count === 1 ? "" : "s"}`;
+}
+
 function formatTriggerError(error: unknown) {
   if (error instanceof ApiError) {
     const status = error.status;
@@ -158,6 +168,7 @@ export async function requestProblem(_prevState: unknown, formData: FormData) {
       select: {
         id: true,
         runState: true,
+        requestedCount: true,
       },
     });
 
@@ -169,10 +180,28 @@ export async function requestProblem(_prevState: unknown, formData: FormData) {
         };
       }
 
-      if (!adminPassword) {
+      if (isRunningRunState(problem.runState)) {
         return {
-          error:
-            "Automatic queueing is disabled right now. Use admin bypass to generate immediately.",
+          message: `Generation for ${contestId}${index} is already running.`,
+          problemHref: `/problem/${contestId}/${index}`,
+        };
+      }
+
+      if (!adminPassword) {
+        const queued = await prisma.problem.update({
+          where: { id: problem.id },
+          data: { requestedCount: { increment: 1 } },
+          select: { requestedCount: true },
+        });
+
+        updateTag(PROBLEM_LIST_TAG);
+        updateTag(problemTag(contestId, index));
+
+        return {
+          message: `Queued ${contestId}${index}. It now has ${formatRequestCount(
+            queued.requestedCount,
+          )}; hourly generation picks the most requested problem while OpenAI usage is under the daily cap.`,
+          problemHref: `/problem/${contestId}/${index}`,
         };
       }
 
@@ -191,7 +220,7 @@ export async function requestProblem(_prevState: unknown, formData: FormData) {
       const budget = await getOpenAIDailyTokenUsage();
       if (budget.exhausted) {
         return {
-          error: `OpenAI daily token grant exhausted (${formatOpenAIDailyTokenUsage(
+          error: `OpenAI daily generation token cap reached (${formatOpenAIDailyTokenUsage(
             budget,
           )}).`,
         };
