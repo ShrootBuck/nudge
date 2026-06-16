@@ -17,6 +17,11 @@ import { getAvailableProblemTags } from "@/lib/problem-read-cache";
 import { ratingTone } from "@/lib/utils";
 import { LuckyButton } from "./lucky-button";
 import { ProblemFilters } from "./problem-filters";
+import {
+  DEFAULT_PROBLEM_SORT,
+  isProblemSort,
+  type ProblemSort,
+} from "./problem-sort";
 import { MAX_RATING, MIN_RATING } from "./rating-constants";
 
 const PAGE_SIZE = 10;
@@ -51,6 +56,49 @@ function parseRatingBound(
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
   return Math.min(MAX_RATING, Math.max(MIN_RATING, Math.round(n)));
+}
+
+function parseSortParam(value: string | string[] | undefined): ProblemSort {
+  if (typeof value !== "string") return DEFAULT_PROBLEM_SORT;
+  return isProblemSort(value) ? value : DEFAULT_PROBLEM_SORT;
+}
+
+function problemOrderBy(
+  sort: ProblemSort,
+): Prisma.ProblemOrderByWithRelationInput[] {
+  switch (sort) {
+    case "rating-asc":
+      return [
+        { rating: { sort: "asc", nulls: "last" } },
+        { reviewStatus: "desc" },
+        { contestId: "desc" },
+        { index: "asc" },
+      ];
+    case "rating-desc":
+      return [
+        { rating: { sort: "desc", nulls: "last" } },
+        { reviewStatus: "desc" },
+        { contestId: "desc" },
+        { index: "asc" },
+      ];
+    case "newest-contest":
+      return [
+        { contestId: "desc" },
+        { index: "asc" },
+        { reviewStatus: "desc" },
+      ];
+    case "oldest-contest":
+      return [{ contestId: "asc" }, { index: "asc" }, { reviewStatus: "desc" }];
+    case "name-az":
+      return [
+        { name: "asc" },
+        { reviewStatus: "desc" },
+        { contestId: "desc" },
+        { index: "asc" },
+      ];
+    case "quality":
+      return [{ reviewStatus: "desc" }, { updatedAt: "desc" }];
+  }
 }
 
 function buildPageUrl(
@@ -139,12 +187,14 @@ async function getHomePageData({
   tags,
   minRating,
   maxRating,
+  sort,
 }: {
   page: number;
   query: string;
   tags: string[];
   minRating: number;
   maxRating: number;
+  sort: ProblemSort;
 }) {
   "use cache";
 
@@ -164,7 +214,7 @@ async function getHomePageData({
 
   const problems = await prisma.problem.findMany({
     where,
-    orderBy: [{ reviewStatus: "desc" }, { updatedAt: "desc" }],
+    orderBy: problemOrderBy(sort),
     skip: (safePage - 1) * PAGE_SIZE,
     take: PAGE_SIZE,
     select: {
@@ -213,6 +263,7 @@ export default async function Home({
   const tags = parseTagsParam(params.tags ?? params.tag);
   let minRating = parseRatingBound(params.minRating, MIN_RATING);
   let maxRating = parseRatingBound(params.maxRating, MAX_RATING);
+  const sort = parseSortParam(params.sort);
   if (minRating > maxRating) {
     [minRating, maxRating] = [maxRating, minRating];
   }
@@ -221,7 +272,7 @@ export default async function Home({
     { problems, safePage, totalCount, totalPages, verifiedCount },
     availableTags,
   ] = await Promise.all([
-    getHomePageData({ page, query, tags, minRating, maxRating }),
+    getHomePageData({ page, query, tags, minRating, maxRating, sort }),
     getAvailableProblemTags(),
   ]);
 
@@ -291,6 +342,7 @@ export default async function Home({
             tags={tags}
             minRating={minRating}
             maxRating={maxRating}
+            sort={sort}
             availableTags={availableTags}
             totalCount={totalCount}
           />

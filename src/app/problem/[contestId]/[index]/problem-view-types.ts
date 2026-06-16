@@ -118,7 +118,7 @@ export function reviewState(status: ReviewStatus): ReviewState {
           "border-emerald-500/20 bg-emerald-500/10 text-emerald-300 dark:text-emerald-200",
         panelClassName:
           "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200",
-        summary: "Marked verified and safer to trust heavily.",
+        summary: "Marked verified and guaranteed to pass.",
       };
     case "INCORRECT":
       return {

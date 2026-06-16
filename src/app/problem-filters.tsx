@@ -1,6 +1,14 @@
 "use client";
 
-import { Check, Plus, Search, SlidersHorizontal, Tag, X } from "lucide-react";
+import {
+  Check,
+  ChevronDown,
+  ListFilter,
+  Search,
+  SlidersHorizontal,
+  Tag,
+  X,
+} from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   useCallback,
@@ -11,6 +19,7 @@ import {
   useTransition,
 } from "react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import {
   Command,
   CommandEmpty,
@@ -19,13 +28,24 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { Input } from "@/components/ui/input";
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupInput,
+} from "@/components/ui/input-group";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
+import { cn } from "@/lib/utils";
+import {
+  DEFAULT_PROBLEM_SORT,
+  PROBLEM_SORT_OPTIONS,
+  type ProblemSort,
+  problemSortLabel,
+} from "./problem-sort";
 import { MAX_RATING, MIN_RATING, RATING_STEP } from "./rating-constants";
 
 export function ProblemFilters({
@@ -33,6 +53,7 @@ export function ProblemFilters({
   tags,
   minRating,
   maxRating,
+  sort,
   availableTags,
   totalCount,
 }: {
@@ -40,6 +61,7 @@ export function ProblemFilters({
   tags: string[];
   minRating: number;
   maxRating: number;
+  sort: ProblemSort;
   availableTags: string[];
   totalCount: number;
 }) {
@@ -57,6 +79,8 @@ export function ProblemFilters({
   ]);
 
   const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
+  const [ratingPopoverOpen, setRatingPopoverOpen] = useState(false);
+  const [sortPopoverOpen, setSortPopoverOpen] = useState(false);
 
   useEffect(() => {
     setSearchValue(query);
@@ -99,6 +123,12 @@ export function ProblemFilters({
     }, 300);
   }
 
+  function clearSearch() {
+    clearTimeout(searchTimeoutRef.current);
+    setSearchValue("");
+    updateParams({ q: null });
+  }
+
   function commitRating(next: readonly number[]) {
     const [nextMin, nextMax] = next;
     updateParams({
@@ -118,13 +148,40 @@ export function ProblemFilters({
     updateParams({ tags: null });
   }
 
+  function updateSort(nextSort: ProblemSort) {
+    setSortPopoverOpen(false);
+    updateParams({
+      sort: nextSort === DEFAULT_PROBLEM_SORT ? null : nextSort,
+    });
+  }
+
+  function clearFilters() {
+    clearTimeout(searchTimeoutRef.current);
+    setSearchValue("");
+    setSliderValue([MIN_RATING, MAX_RATING]);
+    updateParams({
+      q: null,
+      tags: null,
+      minRating: null,
+      maxRating: null,
+      sort: null,
+    });
+  }
+
   function resetRating() {
     setSliderValue([MIN_RATING, MAX_RATING]);
     updateParams({ minRating: null, maxRating: null });
   }
 
-  const ratingActive =
+  const committedRatingActive =
+    minRating !== MIN_RATING || maxRating !== MAX_RATING;
+  const sliderRatingActive =
     sliderValue[0] !== MIN_RATING || sliderValue[1] !== MAX_RATING;
+  const activeFilterCount =
+    (query ? 1 : 0) +
+    (committedRatingActive ? 1 : 0) +
+    (tags.length > 0 ? 1 : 0);
+  const sortLabel = problemSortLabel(sort);
 
   // Push selected tags to the top of the tag list for nicer UX.
   const sortedTagList = useMemo(() => {
@@ -134,171 +191,258 @@ export function ProblemFilters({
   }, [availableTags, tags]);
 
   return (
-    <div className="space-y-5" aria-busy={isPending}>
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-        <div className="relative flex-1">
-          <Search className="pointer-events-none absolute top-1/2 left-4 size-4 -translate-y-1/2 text-muted-foreground/60" />
-          <Input
-            placeholder="Search by name or contest ID..."
-            value={searchValue}
-            onChange={(e) => handleSearch(e.target.value)}
-            className="h-12 rounded-2xl border-border/60 bg-background/80 pr-4 pl-11 text-sm shadow-sm transition-all placeholder:text-muted-foreground/50 focus:bg-background"
-          />
-        </div>
-
-        <div className="inline-flex items-center gap-2 self-start rounded-full border border-border/60 bg-background/80 px-4 py-2 text-xs text-muted-foreground shadow-sm">
-          <SlidersHorizontal className="size-3.5" />
-          <span className="tabular-nums">{totalCount.toLocaleString()}</span>
-          <span>{totalCount === 1 ? "match" : "matches"}</span>
-        </div>
-      </div>
-
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-        <div className="rounded-2xl border border-border/60 bg-background/60 px-4 py-3 shadow-sm">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-              Rating
-            </span>
-            <div className="flex items-center gap-2 text-xs">
-              <span className="font-mono tabular-nums text-foreground">
-                {sliderValue[0]}
-              </span>
-              <span className="text-muted-foreground/60">–</span>
-              <span className="font-mono tabular-nums text-foreground">
-                {sliderValue[1]}
-              </span>
-              {ratingActive && (
-                <button
-                  type="button"
-                  onClick={resetRating}
-                  className="ml-1 cursor-pointer rounded-full border border-border/60 px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:border-foreground/15 hover:text-foreground"
-                >
-                  Reset
-                </button>
-              )}
-            </div>
-          </div>
-          <Slider
-            min={MIN_RATING}
-            max={MAX_RATING}
-            step={RATING_STEP}
-            minStepsBetweenValues={1}
-            value={sliderValue}
-            onValueChange={(value) => {
-              if (Array.isArray(value)) {
-                setSliderValue([value[0], value[1]] as [number, number]);
-              }
-            }}
-            onValueCommitted={(value) => {
-              if (Array.isArray(value)) {
-                commitRating(value);
-              }
-            }}
-            className="mt-1 mb-2"
-          />
-          <div className="mt-3 flex justify-between text-[10px] font-mono tabular-nums text-muted-foreground/60">
-            <span>{MIN_RATING}</span>
-            <span>{MAX_RATING}</span>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border border-border/60 bg-background/60 px-4 py-3 shadow-sm">
-          <div className="mb-2 flex items-center justify-between gap-2">
-            <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-              Tags
-            </span>
-            {tags.length > 0 && (
-              <button
-                type="button"
-                onClick={clearTags}
-                className="cursor-pointer rounded-full border border-border/60 px-1.5 py-0.5 text-[10px] text-muted-foreground transition-colors hover:border-foreground/15 hover:text-foreground"
+    <div className="flex flex-col gap-4" aria-busy={isPending}>
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-start">
+        <div className="min-w-0 flex-1">
+          <InputGroup className="h-11 rounded-xl border-border/60 bg-background/80 shadow-sm">
+            <InputGroupInput
+              placeholder="Search by name or contest ID..."
+              value={searchValue}
+              onChange={(e) => handleSearch(e.target.value)}
+              className="text-sm placeholder:text-muted-foreground/50"
+            />
+            <InputGroupAddon align="inline-start">
+              <Search />
+            </InputGroupAddon>
+            {searchValue && (
+              <InputGroupAddon
+                align="inline-end"
+                aria-label="Clear search"
+                className="cursor-pointer pr-2"
+                onClick={clearSearch}
               >
-                Clear ({tags.length})
-              </button>
+                <X />
+              </InputGroupAddon>
             )}
+          </InputGroup>
+
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+            <span>
+              <span className="tabular-nums">
+                {totalCount.toLocaleString()}
+              </span>{" "}
+              {totalCount === 1 ? "match" : "matches"}
+            </span>
+            {activeFilterCount > 0 && (
+              <span>
+                {activeFilterCount} active filter
+                {activeFilterCount === 1 ? "" : "s"}
+              </span>
+            )}
+            {isPending && <span>Updating...</span>}
           </div>
+        </div>
 
-          <div className="flex flex-wrap items-center gap-1.5">
-            {tags.map((tag) => (
-              <Badge
-                key={tag}
-                variant="outline"
-                className="h-7 cursor-pointer gap-1 border-foreground/30 bg-background pr-1.5 text-xs"
-                render={<button type="button" onClick={() => toggleTag(tag)} />}
-              >
-                {tag}
-                <X className="size-3 opacity-60" />
-              </Badge>
-            ))}
+        <div className="grid gap-2 sm:grid-cols-2 xl:w-auto xl:grid-cols-[auto_auto_auto_auto]">
+          <Popover open={sortPopoverOpen} onOpenChange={setSortPopoverOpen}>
+            <PopoverTrigger
+              render={
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="w-full justify-between border-border/60 bg-background/80 shadow-sm xl:w-56"
+                />
+              }
+            >
+              <span className="flex min-w-0 items-center gap-1.5">
+                <ListFilter data-icon="inline-start" />
+                <span className="truncate">{sortLabel}</span>
+              </span>
+              <ChevronDown data-icon="inline-end" />
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-72 p-0" sideOffset={6}>
+              <Command>
+                <CommandList>
+                  <CommandGroup heading="Sort by">
+                    {PROBLEM_SORT_OPTIONS.map((option) => (
+                      <CommandItem
+                        key={option.value}
+                        value={option.value}
+                        onSelect={() => updateSort(option.value)}
+                        data-checked={option.value === sort}
+                        className="cursor-pointer"
+                      >
+                        <div className="min-w-0">
+                          <div className="truncate">{option.label}</div>
+                          <div className="truncate text-xs text-muted-foreground">
+                            {option.description}
+                          </div>
+                        </div>
+                      </CommandItem>
+                    ))}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
 
-            <Popover open={tagPopoverOpen} onOpenChange={setTagPopoverOpen}>
-              <PopoverTrigger
-                render={
-                  <button
-                    type="button"
-                    className="inline-flex h-7 cursor-pointer items-center gap-1 rounded-full border border-dashed border-border/70 bg-background/80 px-2.5 text-xs text-muted-foreground shadow-sm transition-colors hover:border-foreground/30 hover:text-foreground"
-                  />
+          <Popover open={ratingPopoverOpen} onOpenChange={setRatingPopoverOpen}>
+            <PopoverTrigger
+              render={
+                <Button
+                  variant={committedRatingActive ? "secondary" : "outline"}
+                  size="lg"
+                  className="w-full justify-between border-border/60 shadow-sm xl:w-44"
+                />
+              }
+            >
+              <span className="flex min-w-0 items-center gap-1.5">
+                <SlidersHorizontal data-icon="inline-start" />
+                <span className="truncate">
+                  {sliderRatingActive
+                    ? `${sliderValue[0]} - ${sliderValue[1]}`
+                    : "Rating"}
+                </span>
+              </span>
+              <ChevronDown data-icon="inline-end" />
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-80 p-4" sideOffset={6}>
+              <div className="flex flex-col gap-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-medium">Rating range</div>
+                    <div className="mt-1 font-mono text-xs tabular-nums text-muted-foreground">
+                      {sliderValue[0]} - {sliderValue[1]}
+                    </div>
+                  </div>
+                  {sliderRatingActive && (
+                    <Button variant="ghost" size="xs" onClick={resetRating}>
+                      Reset
+                    </Button>
+                  )}
+                </div>
+                <Slider
+                  min={MIN_RATING}
+                  max={MAX_RATING}
+                  step={RATING_STEP}
+                  minStepsBetweenValues={1}
+                  value={sliderValue}
+                  onValueChange={(value) => {
+                    if (Array.isArray(value)) {
+                      setSliderValue([value[0], value[1]] as [number, number]);
+                    }
+                  }}
+                  onValueCommitted={(value) => {
+                    if (Array.isArray(value)) {
+                      commitRating(value);
+                    }
+                  }}
+                />
+                <div className="flex justify-between font-mono text-[10px] tabular-nums text-muted-foreground/70">
+                  <span>{MIN_RATING}</span>
+                  <span>{MAX_RATING}</span>
+                </div>
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          <Popover open={tagPopoverOpen} onOpenChange={setTagPopoverOpen}>
+            <PopoverTrigger
+              render={
+                <Button
+                  variant={tags.length > 0 ? "secondary" : "outline"}
+                  size="lg"
+                  className="w-full justify-between border-border/60 shadow-sm xl:w-36"
+                />
+              }
+            >
+              <span className="flex min-w-0 items-center gap-1.5">
+                <Tag data-icon="inline-start" />
+                <span className="truncate">
+                  {tags.length > 0 ? `Tags (${tags.length})` : "Tags"}
+                </span>
+              </span>
+              <ChevronDown data-icon="inline-end" />
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-80 p-0" sideOffset={6}>
+              <Command
+                // cmdk needs explicit filter for our string items
+                filter={(value, search) =>
+                  value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0
                 }
               >
-                {tags.length === 0 ? (
-                  <>
-                    <Tag className="size-3" />
-                    <span>Pick tags</span>
-                  </>
-                ) : (
-                  <>
-                    <Plus className="size-3" />
-                    <span>Add</span>
-                  </>
-                )}
-              </PopoverTrigger>
-              <PopoverContent align="start" className="w-72 p-0" sideOffset={6}>
-                <Command
-                  // cmdk needs explicit filter for our string items
-                  filter={(value, search) =>
-                    value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0
-                  }
-                >
-                  <CommandInput placeholder="Search tags..." />
-                  <CommandList>
-                    <CommandEmpty>No tags found.</CommandEmpty>
-                    <CommandGroup>
-                      {sortedTagList.map((tag) => {
-                        const selected = tags.includes(tag);
-                        return (
-                          <CommandItem
-                            key={tag}
-                            value={tag}
-                            onSelect={() => toggleTag(tag)}
-                            data-checked={selected}
+                <CommandInput placeholder="Search tags..." />
+                <CommandList>
+                  <CommandEmpty>No tags found.</CommandEmpty>
+                  <CommandGroup heading="Tags">
+                    {sortedTagList.map((tag) => {
+                      const selected = tags.includes(tag);
+                      return (
+                        <CommandItem
+                          key={tag}
+                          value={tag}
+                          onSelect={() => toggleTag(tag)}
+                          className="cursor-pointer"
+                        >
+                          <span
+                            className={cn(
+                              "flex size-4 items-center justify-center rounded border",
+                              selected
+                                ? "border-foreground bg-foreground text-background"
+                                : "border-border",
+                            )}
                           >
-                            <span
-                              className={`flex size-4 items-center justify-center rounded border ${
-                                selected
-                                  ? "border-foreground bg-foreground text-background"
-                                  : "border-border"
-                              }`}
-                            >
-                              {selected && <Check className="size-3" />}
-                            </span>
-                            <span className="truncate">{tag}</span>
-                          </CommandItem>
-                        );
-                      })}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
-              </PopoverContent>
-            </Popover>
+                            {selected && <Check />}
+                          </span>
+                          <span className="truncate">{tag}</span>
+                        </CommandItem>
+                      );
+                    })}
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
 
-            {tags.length === 0 && availableTags.length === 0 && (
-              <span className="text-xs text-muted-foreground/50">
-                No tags yet
-              </span>
-            )}
-          </div>
+          {activeFilterCount > 0 && (
+            <Button
+              variant="ghost"
+              size="lg"
+              className="w-full xl:w-auto"
+              onClick={clearFilters}
+            >
+              Clear filters
+            </Button>
+          )}
         </div>
       </div>
+
+      {(tags.length > 0 || committedRatingActive) && (
+        <div className="flex flex-wrap items-center gap-2">
+          {committedRatingActive && (
+            <Badge
+              variant="outline"
+              className="h-7 cursor-pointer gap-1 border-foreground/25 bg-background/80 pr-1.5 text-xs"
+              render={<button type="button" onClick={resetRating} />}
+            >
+              {minRating} - {maxRating}
+              <X data-icon="inline-end" />
+            </Badge>
+          )}
+
+          {tags.map((tag) => (
+            <Badge
+              key={tag}
+              variant="outline"
+              className="h-7 cursor-pointer gap-1 border-foreground/25 bg-background/80 pr-1.5 text-xs"
+              render={<button type="button" onClick={() => toggleTag(tag)} />}
+            >
+              {tag}
+              <X data-icon="inline-end" />
+            </Badge>
+          ))}
+
+          {tags.length > 1 && (
+            <Button variant="ghost" size="xs" onClick={clearTags}>
+              Clear tags
+            </Button>
+          )}
+        </div>
+      )}
+
+      {tags.length === 0 && availableTags.length === 0 && (
+        <div className="text-xs text-muted-foreground/50">No tags yet</div>
+      )}
     </div>
   );
 }
