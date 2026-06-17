@@ -1,11 +1,12 @@
 import { type OpenAIResponsesProviderOptions, openai } from "@ai-sdk/openai";
-import { generateText, jsonSchema, Output } from "ai";
+import { jsonSchema, Output, streamText } from "ai";
 import { buildMessages, toStrictJsonSchema } from "./request";
 import type { GenerateOptions, StructuredResponse } from "./types";
 
 const MODEL = "gpt-5.5-2026-04-23";
 const DISPLAY_NAME = "GPT-5.5 (xhigh)";
 const PROVIDER_NAME = "OpenAI";
+const GENERATION_TIMEOUT_MS = 45 * 60 * 1000;
 
 function coalesceString(
   ...values: Array<string | null | undefined>
@@ -37,11 +38,15 @@ function buildOutput(options: GenerateOptions) {
 export async function generateOpenAIStructuredResponse(
   options: GenerateOptions,
 ): Promise<StructuredResponse> {
-  const result = await generateText({
+  const result = streamText({
     model: openai(MODEL),
     system: options.systemPrompt,
     messages: buildMessages(options.userPrompt),
     output: buildOutput(options),
+    maxRetries: 0,
+    timeout: {
+      totalMs: GENERATION_TIMEOUT_MS,
+    },
     providerOptions: {
       openai: {
         reasoningEffort: "xhigh",
@@ -49,23 +54,30 @@ export async function generateOpenAIStructuredResponse(
     },
   });
 
-  const outputText = JSON.stringify(result.output);
+  const [output, response, finishReason, rawFinishReason, usage] =
+    await Promise.all([
+      result.output,
+      result.response,
+      result.finishReason,
+      result.rawFinishReason,
+      result.totalUsage,
+    ]);
+
+  const outputText = JSON.stringify(output);
 
   if (!outputText) {
     throw new Error(
-      `OpenAI response missing structured output (id: ${result.response.id}, finish_reason: ${result.finishReason})`,
+      `OpenAI response missing structured output (id: ${response.id}, finish_reason: ${finishReason})`,
     );
   }
 
-  const usage = result.totalUsage;
-
   return {
     outputText,
-    responseId: result.response.id,
+    responseId: response.id,
     displayName: DISPLAY_NAME,
-    resolvedModel: coalesceString(result.response.modelId, MODEL),
-    finishReason: coalesceString(result.finishReason),
-    nativeFinishReason: coalesceString(result.rawFinishReason),
+    resolvedModel: coalesceString(response.modelId, MODEL),
+    finishReason: coalesceString(finishReason),
+    nativeFinishReason: coalesceString(rawFinishReason),
     providerName: PROVIDER_NAME,
     totalTokens: coalesceTokenCount(usage.totalTokens),
   };
