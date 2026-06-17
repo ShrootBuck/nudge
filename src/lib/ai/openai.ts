@@ -6,7 +6,7 @@ import type { GenerateOptions, StructuredResponse } from "./types";
 const MODEL = "gpt-5.5-2026-04-23";
 const DISPLAY_NAME = "GPT-5.5 (xhigh)";
 const PROVIDER_NAME = "OpenAI";
-const GENERATION_TIMEOUT_MS = 45 * 60 * 1000;
+const GENERATION_TIMEOUT_MS = 60 * 60 * 1000;
 
 function coalesceString(
   ...values: Array<string | null | undefined>
