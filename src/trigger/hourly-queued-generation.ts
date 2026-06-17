@@ -5,11 +5,22 @@ import {
 } from "../lib/ai/token-budget";
 import {
   AUTOMATIC_GENERATION_SOURCE,
-  automaticGenerationProblemOrderBy,
   automaticGenerationProblemWhere,
+  backfillGenerationProblemOrderBy,
+  requestedGenerationProblemOrderBy,
+  requestedGenerationProblemWhere,
 } from "../lib/generation-queue";
 import { prisma } from "../lib/prisma";
 import type { generateContentTask } from "./generate-content";
+
+const problemSelect = {
+  id: true,
+  contestId: true,
+  index: true,
+  name: true,
+  requestedCount: true,
+  generationAttempts: true,
+} as const;
 
 function problemLabel(problem: { contestId: number; index: string }) {
   return `${problem.contestId}${problem.index}`;
@@ -39,24 +50,25 @@ export const hourlyQueuedGeneration = schedules.task({
       };
     }
 
-    const problem = await prisma.problem.findFirst({
-      where: automaticGenerationProblemWhere(),
-      orderBy: automaticGenerationProblemOrderBy(),
-      select: {
-        id: true,
-        contestId: true,
-        index: true,
-        name: true,
-        requestedCount: true,
-        generationAttempts: true,
-      },
+    const requestedProblem = await prisma.problem.findFirst({
+      where: requestedGenerationProblemWhere(),
+      orderBy: requestedGenerationProblemOrderBy(),
+      select: problemSelect,
     });
+    const selectionReason = requestedProblem ? "requested" : "backfill";
+    const problem =
+      requestedProblem ??
+      (await prisma.problem.findFirst({
+        where: automaticGenerationProblemWhere(),
+        orderBy: backfillGenerationProblemOrderBy(),
+        select: problemSelect,
+      }));
 
     if (!problem) {
-      logger.info("Skipping hourly generation; no queued problems");
+      logger.info("Skipping hourly generation; no eligible problems");
       return {
         triggered: false,
-        skipped: "no-queued-problems",
+        skipped: "no-eligible-problems",
         usedTokens: budget.usedTokens,
         dailyTokenCap: budget.dailyTokenCap,
         grantDate: budget.grantDate,
@@ -68,6 +80,7 @@ export const hourlyQueuedGeneration = schedules.task({
       problemId: problem.id,
       problem: label,
       name: problem.name,
+      selectionReason,
       requestedCount: problem.requestedCount,
       generationAttempts: problem.generationAttempts,
       usage: formatOpenAIDailyTokenUsage(budget),
@@ -100,6 +113,7 @@ export const hourlyQueuedGeneration = schedules.task({
       runId: result.id,
       problemId: problem.id,
       problem: label,
+      selectionReason,
       requestedCount: problem.requestedCount,
       output: result.output,
     };

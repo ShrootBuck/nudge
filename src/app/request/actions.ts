@@ -200,7 +200,7 @@ export async function requestProblem(_prevState: unknown, formData: FormData) {
         return {
           message: `Queued ${contestId}${index}. It now has ${formatRequestCount(
             queued.requestedCount,
-          )}; hourly generation picks the most requested problem while OpenAI usage is under the daily cap.`,
+          )}; hourly generation prioritizes requested problems while OpenAI usage is under the daily cap.`,
           problemHref: `/problem/${contestId}/${index}`,
         };
       }
