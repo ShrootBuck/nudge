@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
+    "codex:next": "bun scripts/codex-next.ts",
     "postinstall": "prisma generate",
     "start": "next start",
     "db:studio": "prisma studio",
@@ -21,6 +22,7 @@
     "@trigger.dev/build": "^4.4.6",
     "@trigger.dev/sdk": "^4.4.6",
     "ai": "^6.0.191",
+    "ai-sdk-provider-codex-cli": "1.2.2",
     "cheerio": "^1.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

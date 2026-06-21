@@ -71,7 +71,7 @@ export function formatOpenAIDailyTokenUsage(summary: OpenAIDailyTokenUsage) {
   )} tokens for ${summary.grantDate} ${summary.timeZone}`;
 }
 
-export async function recordOpenAIGenerationUsage({
+export async function recordGenerationUsage({
   problemId,
   response,
   date = new Date(),

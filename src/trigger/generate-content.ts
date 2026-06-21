@@ -1,110 +1,29 @@
-import type { Prisma } from "@prisma/client";
 import { logger, task } from "@trigger.dev/sdk";
-import { generateStructuredResponse, type StructuredResponse } from "../lib/ai";
+import { generateStructuredResponse } from "../lib/ai";
 import {
   formatOpenAIDailyTokenUsage,
   getOpenAIDailyTokenUsage,
-  recordOpenAIGenerationUsage,
 } from "../lib/ai/token-budget";
-import { safeRevalidateTag } from "../lib/cache-revalidate";
-import { PROBLEM_LIST_TAG, problemTag } from "../lib/cache-tags";
 import { DISCORD_COLORS } from "../lib/discord-webhook";
 import {
   AUTOMATIC_GENERATION_SOURCE,
   type AutomaticGenerationSource,
-  automaticGenerationProblemWhere,
+  automaticGenerationProblemSelect,
+  claimProblemForGeneration,
 } from "../lib/generation-queue";
 import { prisma } from "../lib/prisma";
-import {
-  pipelineStateData,
-  problemUpdateData,
-} from "../lib/problem-pipeline-db";
 import { discordLog } from "./discord-log";
 import {
-  problemOutputSchema,
-  problemResultSchema,
-} from "./generate-content/content-schema";
-import {
-  type GenerationAuditInfo,
-  saveProblemContent,
-} from "./generate-content/persistence";
-import { fetchProblemStatement } from "./generate-content/problem-statement";
-import { buildPrompt, SYSTEM_PROMPT } from "./generate-content/prompt";
-
-type ProblemForGeneration = {
-  id: string;
-  contestId: number;
-  index: string;
-  name: string;
-  rating: number | null;
-  tags: string[];
-};
+  executeProblemGeneration,
+  markClaimedProblemFailed,
+} from "./generate-content/execution";
 
 export type GenerateContentPayload = {
   problemId: string;
   adminBypass?: boolean;
   source?: AutomaticGenerationSource;
+  preclaimed?: boolean;
 };
-
-function toErrorMessage(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
-}
-
-function toProblemLabel(
-  problem: Pick<ProblemForGeneration, "contestId" | "index">,
-) {
-  return `${problem.contestId}${problem.index}`;
-}
-
-function toGenerationAuditInfo(
-  response: StructuredResponse,
-): GenerationAuditInfo {
-  return {
-    displayName: response.displayName,
-    responseId: response.responseId,
-    resolvedModel: response.resolvedModel,
-    finishReason: response.finishReason,
-    nativeFinishReason: response.nativeFinishReason,
-    providerName: response.providerName,
-    totalTokens: response.totalTokens,
-  };
-}
-
-function generationAuditData(
-  response: StructuredResponse,
-): Pick<
-  Prisma.ProblemUpdateInput,
-  | "generatedByDisplayName"
-  | "generatedByModel"
-  | "generationResponseId"
-  | "generationFinishReason"
-  | "generationNativeFinishReason"
-  | "generationProviderName"
-  | "generationTotalTokens"
-> {
-  const audit = toGenerationAuditInfo(response);
-
-  return {
-    generatedByDisplayName: audit.displayName,
-    generatedByModel: audit.resolvedModel,
-    generationResponseId: audit.responseId,
-    generationFinishReason: audit.finishReason,
-    generationNativeFinishReason: audit.nativeFinishReason,
-    generationProviderName: audit.providerName,
-    generationTotalTokens: audit.totalTokens,
-  };
-}
-
-function revalidateProblems(
-  problems: Array<Pick<ProblemForGeneration, "contestId" | "index">>,
-) {
-  if (problems.length === 0) return;
-
-  safeRevalidateTag(PROBLEM_LIST_TAG, "max");
-  for (const problem of problems) {
-    safeRevalidateTag(problemTag(problem.contestId, problem.index), "max");
-  }
-}
 
 export const generateContentTask = task({
   id: "generate-content-task",
@@ -121,16 +40,17 @@ export const generateContentTask = task({
       return { processed: 0, skipped: "manual-admin-only" };
     }
 
+    if (payload.preclaimed && payload.source !== AUTOMATIC_GENERATION_SOURCE) {
+      logger.error("Preclaimed generation requires the automatic source", {
+        problemId: payload.problemId,
+        source: payload.source,
+      });
+      return { processed: 0, skipped: "invalid-preclaimed-source" };
+    }
+
     const problem = await prisma.problem.findUnique({
       where: { id: payload.problemId },
-      select: {
-        id: true,
-        contestId: true,
-        index: true,
-        name: true,
-        rating: true,
-        tags: true,
-      },
+      select: automaticGenerationProblemSelect,
     });
 
     if (!problem) {
@@ -138,8 +58,24 @@ export const generateContentTask = task({
       return { error: "Problem not found" };
     }
 
+    if (payload.preclaimed && problem.runState !== "RUNNING") {
+      logger.warn("Preclaimed problem is not running", {
+        problemId: problem.id,
+        runState: problem.runState,
+      });
+      return { processed: 0, skipped: "preclaimed-problem-not-running" };
+    }
+
     const budget = await getOpenAIDailyTokenUsage();
     if (budget.exhausted) {
+      const reason = `OpenAI daily generation token cap reached (${formatOpenAIDailyTokenUsage(
+        budget,
+      )})`;
+
+      if (payload.preclaimed) {
+        await markClaimedProblemFailed({ problem, reason });
+      }
+
       logger.warn("OpenAI daily generation token cap reached", {
         problemId: problem.id,
         usage: formatOpenAIDailyTokenUsage(budget),
@@ -153,29 +89,27 @@ export const generateContentTask = task({
       };
     }
 
-    const updated = await prisma.problem.updateMany({
-      where:
-        payload.source === AUTOMATIC_GENERATION_SOURCE
-          ? { id: problem.id, ...automaticGenerationProblemWhere() }
-          : { id: problem.id },
-      data: problemUpdateData({
-        ...pipelineStateData("RUNNING"),
-        generationAttempts: { increment: 1 },
-        reviewStatus: "UNREVIEWED",
-        generationStartedAt: new Date(),
-        lastGenerationError: null,
-      }),
-    });
-
-    if (updated.count === 0) {
-      logger.warn("Problem was not eligible for generation", {
+    if (!payload.preclaimed) {
+      const claimed = await claimProblemForGeneration({
         problemId: problem.id,
-        source: payload.source,
+        requireAutomaticEligibility:
+          payload.source === AUTOMATIC_GENERATION_SOURCE,
       });
-      return { processed: 0, skipped: "not-eligible-for-generation" };
+
+      if (!claimed) {
+        logger.warn("Problem was not eligible for generation", {
+          problemId: problem.id,
+          source: payload.source,
+        });
+        return { processed: 0, skipped: "not-eligible-for-generation" };
+      }
     }
 
-    const result = await executeGeneration(problem);
+    const result = await executeProblemGeneration({
+      problem,
+      generate: generateStructuredResponse,
+      log: logger,
+    });
 
     if (result.processed > 0) {
       await discordLog({
@@ -183,7 +117,7 @@ export const generateContentTask = task({
           payload.source === AUTOMATIC_GENERATION_SOURCE
             ? "⚡ Hourly Generation Complete"
             : "⚡ On-Demand Generation Complete",
-        description: `Processed a problem using GPT-5.5 via AI SDK.`,
+        description: "Processed a problem using GPT-5.5 via AI SDK.",
         color: DISCORD_COLORS.info,
       });
     }
@@ -191,103 +125,3 @@ export const generateContentTask = task({
     return { processed: result.processed };
   },
 });
-
-// ---------------------------------------------------------------------------
-// Shared generation flow for on-demand tasks.
-// ---------------------------------------------------------------------------
-
-type GenerationResult = {
-  processed: number;
-};
-
-async function executeGeneration(
-  problem: ProblemForGeneration,
-): Promise<GenerationResult> {
-  const label = toProblemLabel(problem);
-
-  let processed = 0;
-  let response: StructuredResponse | null = null;
-
-  try {
-    const statement = await fetchProblemStatement(
-      problem.contestId,
-      problem.index,
-    );
-    const textPrompt = buildPrompt(problem, statement?.html);
-    const userPrompt =
-      statement?.images && statement.images.length > 0
-        ? [
-            { type: "text" as const, text: textPrompt },
-            ...statement.images.map((url) => ({
-              type: "image_url" as const,
-              image_url: { url },
-            })),
-          ]
-        : textPrompt;
-
-    logger.info(`Running generation for ${label}`);
-
-    response = await generateStructuredResponse({
-      systemPrompt: SYSTEM_PROMPT,
-      userPrompt,
-      outputSchema: problemOutputSchema,
-    });
-    await recordOpenAIGenerationUsage({ problemId: problem.id, response });
-
-    if (!response.outputText.trim()) {
-      throw new Error("Provider response missing output text");
-    }
-
-    const parsed = JSON.parse(response.outputText);
-    const outputData = problemResultSchema.parse(parsed);
-
-    if (outputData.status === "unsolvable") {
-      const reason = outputData.reason;
-      logger.warn(`Problem ${label} reported as unsolvable: ${reason}`);
-
-      await prisma.problem.update({
-        where: { id: problem.id },
-        data: problemUpdateData({
-          ...pipelineStateData("FAILED"),
-          reviewStatus: "UNSOLVABLE",
-          generationStartedAt: null,
-          lastGenerationError: reason,
-          ...generationAuditData(response),
-        }),
-      });
-
-      revalidateProblems([problem]);
-
-      await discordLog({
-        title: "🚫 Unsolvable Problem",
-        description: `Model reported that problem **${label}** cannot be solved.\n**Reason:** ${reason}`,
-        color: DISCORD_COLORS.error,
-      });
-    } else {
-      await saveProblemContent(
-        problem.id,
-        outputData,
-        toGenerationAuditInfo(response),
-      );
-    }
-
-    processed = 1;
-  } catch (error) {
-    const reason = `Generation failed for ${label}: ${toErrorMessage(error)}`;
-    logger.error(reason);
-
-    await prisma.problem.update({
-      where: { id: problem.id },
-      data: problemUpdateData({
-        ...pipelineStateData("FAILED"),
-        generationStartedAt: null,
-        lastGenerationError: reason,
-        ...(response ? generationAuditData(response) : {}),
-      }),
-    });
-
-    revalidateProblems([problem]);
-  }
-
-  return { processed };
-}

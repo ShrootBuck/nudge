@@ -5,22 +5,10 @@ import {
 } from "../lib/ai/token-budget";
 import {
   AUTOMATIC_GENERATION_SOURCE,
-  automaticGenerationProblemWhere,
-  backfillGenerationProblemOrderBy,
-  requestedGenerationProblemOrderBy,
-  requestedGenerationProblemWhere,
+  selectAndClaimNextAutomaticGenerationProblem,
 } from "../lib/generation-queue";
-import { prisma } from "../lib/prisma";
 import type { generateContentTask } from "./generate-content";
-
-const problemSelect = {
-  id: true,
-  contestId: true,
-  index: true,
-  name: true,
-  requestedCount: true,
-  generationAttempts: true,
-} as const;
+import { markClaimedProblemFailed } from "./generate-content/execution";
 
 function problemLabel(problem: { contestId: number; index: string }) {
   return `${problem.contestId}${problem.index}`;
@@ -50,21 +38,9 @@ export const hourlyQueuedGeneration = schedules.task({
       };
     }
 
-    const requestedProblem = await prisma.problem.findFirst({
-      where: requestedGenerationProblemWhere(),
-      orderBy: requestedGenerationProblemOrderBy(),
-      select: problemSelect,
-    });
-    const selectionReason = requestedProblem ? "requested" : "backfill";
-    const problem =
-      requestedProblem ??
-      (await prisma.problem.findFirst({
-        where: automaticGenerationProblemWhere(),
-        orderBy: backfillGenerationProblemOrderBy(),
-        select: problemSelect,
-      }));
+    const selection = await selectAndClaimNextAutomaticGenerationProblem();
 
-    if (!problem) {
+    if (!selection) {
       logger.info("Skipping hourly generation; no eligible problems");
       return {
         triggered: false,
@@ -75,6 +51,7 @@ export const hourlyQueuedGeneration = schedules.task({
       };
     }
 
+    const { problem, selectionReason } = selection;
     const label = problemLabel(problem);
     logger.info("Triggering hourly queued generation", {
       problemId: problem.id,
@@ -86,19 +63,34 @@ export const hourlyQueuedGeneration = schedules.task({
       usage: formatOpenAIDailyTokenUsage(budget),
     });
 
-    const result = await tasks.triggerAndWait<typeof generateContentTask>(
-      "generate-content-task",
-      {
-        problemId: problem.id,
-        adminBypass: true,
-        source: AUTOMATIC_GENERATION_SOURCE,
-      },
-      {
-        tags: [AUTOMATIC_GENERATION_SOURCE, `problem:${problem.id}`],
-      },
-    );
+    const result = await (async () => {
+      try {
+        return await tasks.triggerAndWait<typeof generateContentTask>(
+          "generate-content-task",
+          {
+            problemId: problem.id,
+            adminBypass: true,
+            source: AUTOMATIC_GENERATION_SOURCE,
+            preclaimed: true,
+          },
+          {
+            tags: [AUTOMATIC_GENERATION_SOURCE, `problem:${problem.id}`],
+          },
+        );
+      } catch (error) {
+        const reason = `Hourly queued generation failed to start: ${String(
+          error,
+        )}`;
+        await markClaimedProblemFailed({ problem, reason });
+        throw error;
+      }
+    })();
 
     if (!result.ok) {
+      await markClaimedProblemFailed({
+        problem,
+        reason: `Hourly queued generation task failed: ${result.id}`,
+      });
       logger.error("Hourly queued generation task failed", {
         runId: result.id,
         problemId: problem.id,

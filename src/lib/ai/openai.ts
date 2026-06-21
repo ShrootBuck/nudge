@@ -1,6 +1,6 @@
 import { type OpenAIResponsesProviderOptions, openai } from "@ai-sdk/openai";
-import { jsonSchema, Output, streamText } from "ai";
-import { buildMessages, toStrictJsonSchema } from "./request";
+import { streamText } from "ai";
+import { buildMessages, buildStructuredOutput } from "./request";
 import type { GenerateOptions, StructuredResponse } from "./types";
 
 const MODEL = "gpt-5.5-2026-04-23";
@@ -27,14 +27,6 @@ function coalesceTokenCount(value: number | null | undefined): number | null {
     : null;
 }
 
-function buildOutput(options: GenerateOptions) {
-  return Output.object({
-    name: options.outputSchema.name,
-    description: options.outputSchema.description,
-    schema: jsonSchema(toStrictJsonSchema(options.outputSchema.schema)),
-  });
-}
-
 export async function generateOpenAIStructuredResponse(
   options: GenerateOptions,
 ): Promise<StructuredResponse> {
@@ -42,7 +34,8 @@ export async function generateOpenAIStructuredResponse(
     model: openai(MODEL),
     system: options.systemPrompt,
     messages: buildMessages(options.userPrompt),
-    output: buildOutput(options),
+    output: buildStructuredOutput(options),
+    abortSignal: options.abortSignal,
     maxRetries: 0,
     timeout: {
       totalMs: GENERATION_TIMEOUT_MS,

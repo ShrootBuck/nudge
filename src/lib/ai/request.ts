@@ -1,5 +1,10 @@
-import type { ModelMessage, UserModelMessage } from "ai";
-import type { UserPromptInput } from "./types";
+import {
+  jsonSchema,
+  type ModelMessage,
+  Output,
+  type UserModelMessage,
+} from "ai";
+import type { GenerateOptions, UserPromptInput } from "./types";
 
 export function toStrictJsonSchema(
   schema: Record<string, unknown>,
@@ -66,4 +71,12 @@ function toUserContent(input: UserPromptInput): UserModelMessage["content"] {
 
 export function buildMessages(userPrompt: UserPromptInput): ModelMessage[] {
   return [{ role: "user", content: toUserContent(userPrompt) }];
+}
+
+export function buildStructuredOutput(options: GenerateOptions) {
+  return Output.object({
+    name: options.outputSchema.name,
+    description: options.outputSchema.description,
+    schema: jsonSchema(toStrictJsonSchema(options.outputSchema.schema)),
+  });
 }

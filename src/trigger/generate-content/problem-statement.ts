@@ -3,7 +3,15 @@ import * as cheerio from "cheerio";
 import { fetchWithTimeout } from "../../lib/http";
 import { cfProblemUrl } from "../../lib/utils";
 
-export async function fetchProblemStatement(contestId: number, index: string) {
+type ProblemStatementLogger = {
+  error(message: string, properties?: Record<string, unknown>): void;
+};
+
+export async function fetchProblemStatement(
+  contestId: number,
+  index: string,
+  log: ProblemStatementLogger = logger,
+) {
   try {
     const url = cfProblemUrl(contestId, index);
     const res = await fetchWithTimeout(url, {
@@ -15,7 +23,7 @@ export async function fetchProblemStatement(contestId: number, index: string) {
     });
 
     if (!res.ok) {
-      logger.error(
+      log.error(
         `Failed to fetch problem statement for ${contestId}${index}: ${res.status} ${res.statusText}`,
       );
       return null;
@@ -41,7 +49,7 @@ export async function fetchProblemStatement(contestId: number, index: string) {
     }
     return null;
   } catch (err) {
-    logger.error(`Error fetching problem statement for ${contestId}${index}`, {
+    log.error(`Error fetching problem statement for ${contestId}${index}`, {
       error: String(err),
     });
     return null;
