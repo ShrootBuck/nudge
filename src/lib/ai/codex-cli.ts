@@ -1,9 +1,18 @@
+import { execFile } from "node:child_process";
 import { constants } from "node:fs";
-import { access, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { access, mkdtemp, rm } from "node:fs/promises";
+import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
+import { promisify } from "node:util";
 import { streamText, type TextStreamPart, type ToolSet } from "ai";
-import { createCodexAppServer } from "ai-sdk-provider-codex-cli";
+import { codexExec } from "ai-sdk-provider-codex-cli";
+import { createCodexAssetDownloader } from "./codex-assets";
+import {
+  CODEX_AUTH_ENV_NAME,
+  withLocalCodexAuth,
+  withManagedCodexAuth,
+} from "./codex-auth";
 import { buildMessages, buildStructuredOutput } from "./request";
 import type {
   GenerateOptions,
@@ -12,46 +21,69 @@ import type {
 } from "./types";
 
 const MODEL = "gpt-5.5";
-const DISPLAY_NAME = "GPT-5.5 (xhigh)";
+export const CODEX_DISPLAY_NAME = "GPT-5.5 (xhigh)";
 const PROVIDER_NAME = "Codex CLI";
 const GENERATION_TIMEOUT_MS = 60 * 60 * 1000;
 const MIN_CODEX_VERSION = "0.130.0";
-const SERVICE_TIER_OVERRIDE = 'service_tier="flex"';
+const execFileAsync = promisify(execFile);
+const require = createRequire(import.meta.url);
 
-function createCodexWrapperSource(codexPath: string) {
-  return `import { spawn } from "node:child_process";
+function compareVersions(left: string, right: string) {
+  const leftParts = left.split(".").map(Number);
+  const rightParts = right.split(".").map(Number);
 
-const child = spawn(
-  ${JSON.stringify(codexPath)},
-  ["-c", ${JSON.stringify(SERVICE_TIER_OVERRIDE)}, ...process.argv.slice(2)],
-  { stdio: "inherit" },
-);
-
-for (const signal of ["SIGINT", "SIGTERM"]) {
-  process.on(signal, () => child.kill(signal));
-}
-
-child.on("error", (error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
-
-child.on("exit", (code, signal) => {
-  process.exitCode =
-    code ?? (signal === "SIGINT" ? 130 : signal === "SIGTERM" ? 143 : 1);
-});
-`;
-}
-
-export async function resolveGlobalCodexExecutable() {
-  const pathEntries = (process.env.PATH ?? "").split(delimiter);
-
-  for (const directory of pathEntries) {
-    if (!directory || directory.includes("node_modules/.bin")) {
-      continue;
+  for (let index = 0; index < 3; index++) {
+    const difference = (leftParts[index] ?? 0) - (rightParts[index] ?? 0);
+    if (difference !== 0) {
+      return difference;
     }
+  }
 
-    const candidate = join(directory, "codex");
+  return 0;
+}
+
+async function runCommand(command: string[], env?: Record<string, string>) {
+  try {
+    const { stdout, stderr } = await execFileAsync(
+      command[0],
+      command.slice(1),
+      { env: env ? { ...process.env, ...env } : process.env },
+    );
+    return {
+      exitCode: 0,
+      stdout: stdout.trim(),
+      stderr: stderr.trim(),
+    };
+  } catch (error) {
+    const details = error as {
+      code?: number;
+      stdout?: string;
+      stderr?: string;
+    };
+
+    return {
+      exitCode: details.code ?? 1,
+      stdout: details.stdout?.trim() ?? "",
+      stderr: details.stderr?.trim() ?? String(error),
+    };
+  }
+}
+
+export async function resolveCodexExecutable() {
+  const pathEntries = (process.env.PATH ?? "").split(delimiter);
+  const candidates = pathEntries
+    .filter(Boolean)
+    .map((directory) => join(directory, "codex"));
+
+  candidates.push(join(process.cwd(), "node_modules", ".bin", "codex"));
+
+  try {
+    candidates.push(require.resolve("@openai/codex/bin/codex.js"));
+  } catch {
+    // The Trigger build installs this package explicitly; PATH may still work.
+  }
+
+  for (const candidate of new Set(candidates)) {
     try {
       await access(candidate, constants.X_OK);
       return candidate;
@@ -60,9 +92,55 @@ export async function resolveGlobalCodexExecutable() {
     }
   }
 
-  throw new Error(
-    "Could not find a global Codex CLI executable outside node_modules/.bin",
+  throw new Error("Could not find the Codex CLI executable on PATH");
+}
+
+export async function verifyCodexCli({
+  codexHome,
+  codexPath,
+}: {
+  codexHome?: string;
+  codexPath?: string;
+} = {}) {
+  const resolvedCodexPath = codexPath ?? (await resolveCodexExecutable());
+  const env = codexHome ? { CODEX_HOME: codexHome } : undefined;
+  const versionResult = await runCommand([resolvedCodexPath, "--version"], env);
+  if (versionResult.exitCode !== 0) {
+    throw new Error(
+      `Could not run Codex CLI: ${versionResult.stderr || versionResult.stdout}`,
+    );
+  }
+
+  const version = versionResult.stdout.match(/\d+\.\d+\.\d+/)?.[0];
+  if (!version) {
+    throw new Error(
+      `Could not parse Codex CLI version from: ${versionResult.stdout}`,
+    );
+  }
+
+  if (compareVersions(version, MIN_CODEX_VERSION) < 0) {
+    throw new Error(
+      `Codex CLI ${version} is too old; ${MIN_CODEX_VERSION}+ is required`,
+    );
+  }
+
+  const loginResult = await runCommand(
+    [resolvedCodexPath, "login", "status"],
+    env,
   );
+  const loginStatus = loginResult.stdout || loginResult.stderr;
+  if (
+    loginResult.exitCode !== 0 ||
+    !/logged in using chatgpt/i.test(loginStatus)
+  ) {
+    throw new Error(
+      `Codex CLI is not logged in with ChatGPT: ${
+        loginStatus || "unknown status"
+      }`,
+    );
+  }
+
+  return { codexPath: resolvedCodexPath, version };
 }
 
 function coalesceString(
@@ -146,44 +224,41 @@ async function consumeTrace(
   }
 }
 
-export async function generateCodexCliStructuredResponse(
+async function generateCodexExecStructuredResponse(
   options: GenerateOptions,
+  codexHome?: string,
 ): Promise<StructuredResponse> {
-  const codexPath = await resolveGlobalCodexExecutable();
+  const codexPath = await resolveCodexExecutable();
+  await verifyCodexCli({ codexHome, codexPath });
+
   const workingDirectory = await mkdtemp(
     join(tmpdir(), "nudge-codex-generation-"),
   );
-  const codexWrapperPath = join(workingDirectory, "codex-wrapper.mjs");
-  let provider: ReturnType<typeof createCodexAppServer> | null = null;
 
   try {
-    await writeFile(
-      codexWrapperPath,
-      createCodexWrapperSource(codexPath),
-      "utf8",
-    );
-    provider = createCodexAppServer({
-      defaultSettings: {
-        codexPath: codexWrapperPath,
-        cwd: workingDirectory,
-        effort: "xhigh",
-        summary: "detailed",
-        approvalPolicy: "never",
-        sandboxPolicy: "read-only",
-        autoApprove: false,
-        threadMode: "stateless",
-        minCodexVersion: MIN_CODEX_VERSION,
-        requestTimeoutMs: GENERATION_TIMEOUT_MS,
-        logger: false,
-      },
-    });
-
     const result = streamText({
-      model: provider(MODEL),
+      model: codexExec(MODEL, {
+        codexPath,
+        cwd: workingDirectory,
+        reasoningEffort: "xhigh",
+        reasoningSummary: "detailed",
+        approvalMode: "never",
+        sandboxMode: "read-only",
+        skipGitRepoCheck: true,
+        color: "never",
+        logger: false,
+        env: codexHome ? { CODEX_HOME: codexHome } : undefined,
+        configOverrides: {
+          web_search: "live",
+        },
+      }),
       system: options.systemPrompt,
       messages: buildMessages(options.userPrompt),
       output: buildStructuredOutput(options),
       abortSignal: options.abortSignal,
+      experimental_download: createCodexAssetDownloader({
+        abortSignal: options.abortSignal,
+      }),
       maxRetries: 0,
       timeout: {
         totalMs: GENERATION_TIMEOUT_MS,
@@ -214,7 +289,7 @@ export async function generateCodexCliStructuredResponse(
     return {
       outputText,
       responseId: response.id,
-      displayName: DISPLAY_NAME,
+      displayName: CODEX_DISPLAY_NAME,
       resolvedModel: coalesceString(response.modelId, MODEL),
       finishReason: coalesceString(finishReason),
       nativeFinishReason: coalesceString(rawFinishReason),
@@ -222,7 +297,29 @@ export async function generateCodexCliStructuredResponse(
       totalTokens: coalesceTokenCount(usage.totalTokens),
     };
   } finally {
-    await provider?.close();
     await rm(workingDirectory, { recursive: true, force: true });
   }
+}
+
+export async function generateCodexCliStructuredResponse(
+  options: GenerateOptions,
+) {
+  return withLocalCodexAuth({
+    run: (codexHome) => generateCodexExecStructuredResponse(options, codexHome),
+  });
+}
+
+export async function verifyLocalCodexCli() {
+  return withLocalCodexAuth({
+    run: (codexHome) => verifyCodexCli({ codexHome }),
+  });
+}
+
+export async function generateManagedCodexStructuredResponse(
+  options: GenerateOptions,
+) {
+  return withManagedCodexAuth({
+    encodedAuth: process.env[CODEX_AUTH_ENV_NAME],
+    run: (codexHome) => generateCodexExecStructuredResponse(options, codexHome),
+  });
 }

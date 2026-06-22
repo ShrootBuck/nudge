@@ -4,7 +4,7 @@ import type {
   GenerationTraceEvent,
   StructuredResponse,
 } from "../../lib/ai";
-import { recordGenerationUsage } from "../../lib/ai/token-budget";
+import { recordGenerationUsage } from "../../lib/ai/usage";
 import { safeRevalidateTag } from "../../lib/cache-revalidate";
 import { PROBLEM_LIST_TAG, problemTag } from "../../lib/cache-tags";
 import { DISCORD_COLORS } from "../../lib/discord-webhook";

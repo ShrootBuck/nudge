@@ -2,7 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { prisma } from "./prisma";
 import { pipelineStateData, problemUpdateData } from "./problem-pipeline-db";
 
-export const AUTOMATIC_GENERATION_SOURCE = "hourly-queue";
+export const AUTOMATIC_GENERATION_SOURCE = "nightly-queue";
 export const AUTOMATIC_GENERATION_MAX_ATTEMPTS = 3;
 
 export type AutomaticGenerationSource = typeof AUTOMATIC_GENERATION_SOURCE;

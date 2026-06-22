@@ -1,10 +1,13 @@
+import { additionalPackages } from "@trigger.dev/build/extensions/core";
 import { prismaExtension } from "@trigger.dev/build/extensions/prisma";
 import { defineConfig } from "@trigger.dev/sdk";
+
 export default defineConfig({
   project: process.env.TRIGGER_PROJECT_REF ?? "",
   dirs: ["./src/trigger"],
   runtime: "bun",
-  maxDuration: 3600,
+  // Leave one minute after Codex's one-hour timeout to checkpoint auth and clean up.
+  maxDuration: 3660,
   retries: {
     enabledInDev: false,
     default: {
@@ -17,6 +20,9 @@ export default defineConfig({
   },
   build: {
     extensions: [
+      additionalPackages({
+        packages: ["@openai/codex@0.130.0"],
+      }),
       prismaExtension({
         mode: "legacy",
         version: "7.8.0",

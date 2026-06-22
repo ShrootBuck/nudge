@@ -1,8 +1,7 @@
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
 import {
+  CODEX_DISPLAY_NAME,
   generateCodexCliStructuredResponse,
-  resolveGlobalCodexExecutable,
+  verifyLocalCodexCli,
 } from "../src/lib/ai/codex-cli";
 import type { GenerationTraceEvent } from "../src/lib/ai/types";
 import { DISCORD_COLORS } from "../src/lib/discord-webhook";
@@ -18,100 +17,17 @@ import {
   toProblemLabel,
 } from "../src/trigger/generate-content/execution";
 
-const MIN_CODEX_VERSION = "0.130.0";
-const DISPLAY_NAME = "GPT-5.5 (xhigh)";
-const SERVICE_TIER_OVERRIDE = 'service_tier="flex"';
-
 type SignalName = "SIGINT" | "SIGTERM";
-const execFileAsync = promisify(execFile);
-
-function compareVersions(left: string, right: string) {
-  const leftParts = left.split(".").map(Number);
-  const rightParts = right.split(".").map(Number);
-
-  for (let index = 0; index < 3; index++) {
-    const difference = (leftParts[index] ?? 0) - (rightParts[index] ?? 0);
-    if (difference !== 0) {
-      return difference;
-    }
-  }
-
-  return 0;
-}
-
-async function runCommand(command: string[]) {
-  try {
-    const { stdout, stderr } = await execFileAsync(
-      command[0],
-      command.slice(1),
-    );
-    return {
-      exitCode: 0,
-      stdout: stdout.trim(),
-      stderr: stderr.trim(),
-    };
-  } catch (error) {
-    const details = error as {
-      code?: number;
-      stdout?: string;
-      stderr?: string;
-    };
-
-    return {
-      exitCode: details.code ?? 1,
-      stdout: details.stdout?.trim() ?? "",
-      stderr: details.stderr?.trim() ?? String(error),
-    };
-  }
-}
 
 async function preflight() {
   if (!process.env.DATABASE_URL?.trim()) {
     throw new Error("Missing required environment variable: DATABASE_URL");
   }
 
-  const codexPath = await resolveGlobalCodexExecutable();
-  const versionResult = await runCommand([codexPath, "--version"]);
-  if (versionResult.exitCode !== 0) {
-    throw new Error(
-      `Could not run Codex CLI: ${versionResult.stderr || versionResult.stdout}`,
-    );
-  }
-
-  const version = versionResult.stdout.match(/\d+\.\d+\.\d+/)?.[0];
-  if (!version) {
-    throw new Error(
-      `Could not parse Codex CLI version from: ${versionResult.stdout}`,
-    );
-  }
-
-  if (compareVersions(version, MIN_CODEX_VERSION) < 0) {
-    throw new Error(
-      `Codex CLI ${version} is too old; ${MIN_CODEX_VERSION}+ is required`,
-    );
-  }
-
-  const loginResult = await runCommand([
-    codexPath,
-    "login",
-    "-c",
-    SERVICE_TIER_OVERRIDE,
-    "status",
-  ]);
-  const loginStatus = loginResult.stdout || loginResult.stderr;
-  if (
-    loginResult.exitCode !== 0 ||
-    !/logged in using chatgpt/i.test(loginStatus)
-  ) {
-    throw new Error(
-      `Codex CLI is not logged in with ChatGPT: ${
-        loginStatus || "unknown status"
-      }`,
-    );
-  }
+  const { codexPath, version } = await verifyLocalCodexCli();
 
   console.log(
-    `Preflight passed: Codex CLI ${version} (${codexPath}), ChatGPT login, ${DISPLAY_NAME}`,
+    `Preflight passed: Codex CLI ${version} (${codexPath}), ChatGPT login, ${CODEX_DISPLAY_NAME}`,
   );
 }
 
@@ -294,12 +210,12 @@ async function main() {
       title: "⚡ Local Codex Generation Complete",
       description: `Processed **${toProblemLabel(
         selection.problem,
-      )}** using ${DISPLAY_NAME} via AI SDK.`,
+      )}** using ${CODEX_DISPLAY_NAME} via AI SDK.`,
       color: DISCORD_COLORS.info,
     });
 
     console.log(
-      `Completed ${toProblemLabel(selection.problem)} with ${DISPLAY_NAME} (${result.outcome}).`,
+      `Completed ${toProblemLabel(selection.problem)} with ${CODEX_DISPLAY_NAME} (${result.outcome}).`,
     );
   } catch (error) {
     const reason = `Local Codex generation failed: ${

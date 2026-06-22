@@ -1,9 +1,5 @@
 import { logger, task } from "@trigger.dev/sdk";
 import { generateStructuredResponse } from "../lib/ai";
-import {
-  formatOpenAIDailyTokenUsage,
-  getOpenAIDailyTokenUsage,
-} from "../lib/ai/token-budget";
 import { DISCORD_COLORS } from "../lib/discord-webhook";
 import {
   AUTOMATIC_GENERATION_SOURCE,
@@ -13,10 +9,7 @@ import {
 } from "../lib/generation-queue";
 import { prisma } from "../lib/prisma";
 import { discordLog } from "./discord-log";
-import {
-  executeProblemGeneration,
-  markClaimedProblemFailed,
-} from "./generate-content/execution";
+import { executeProblemGeneration } from "./generate-content/execution";
 
 export type GenerateContentPayload = {
   problemId: string;
@@ -66,29 +59,6 @@ export const generateContentTask = task({
       return { processed: 0, skipped: "preclaimed-problem-not-running" };
     }
 
-    const budget = await getOpenAIDailyTokenUsage();
-    if (budget.exhausted) {
-      const reason = `OpenAI daily generation token cap reached (${formatOpenAIDailyTokenUsage(
-        budget,
-      )})`;
-
-      if (payload.preclaimed) {
-        await markClaimedProblemFailed({ problem, reason });
-      }
-
-      logger.warn("OpenAI daily generation token cap reached", {
-        problemId: problem.id,
-        usage: formatOpenAIDailyTokenUsage(budget),
-      });
-      return {
-        processed: 0,
-        skipped: "openai-daily-generation-token-cap-reached",
-        usedTokens: budget.usedTokens,
-        dailyTokenCap: budget.dailyTokenCap,
-        grantDate: budget.grantDate,
-      };
-    }
-
     if (!payload.preclaimed) {
       const claimed = await claimProblemForGeneration({
         problemId: problem.id,
@@ -115,9 +85,10 @@ export const generateContentTask = task({
       await discordLog({
         title:
           payload.source === AUTOMATIC_GENERATION_SOURCE
-            ? "⚡ Hourly Generation Complete"
+            ? "⚡ Nightly Generation Complete"
             : "⚡ On-Demand Generation Complete",
-        description: "Processed a problem using GPT-5.5 via AI SDK.",
+        description:
+          "Processed a problem using GPT-5.5 (xhigh) through Codex CLI.",
         color: DISCORD_COLORS.info,
       });
     }

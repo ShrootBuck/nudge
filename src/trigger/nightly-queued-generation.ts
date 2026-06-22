@@ -1,9 +1,5 @@
 import { logger, schedules, tasks } from "@trigger.dev/sdk";
 import {
-  formatOpenAIDailyTokenUsage,
-  getOpenAIDailyTokenUsage,
-} from "../lib/ai/token-budget";
-import {
   AUTOMATIC_GENERATION_SOURCE,
   selectAndClaimNextAutomaticGenerationProblem,
 } from "../lib/generation-queue";
@@ -14,53 +10,34 @@ function problemLabel(problem: { contestId: number; index: string }) {
   return `${problem.contestId}${problem.index}`;
 }
 
-export const hourlyQueuedGeneration = schedules.task({
-  id: "hourly-queued-generation",
+export const nightlyQueuedGeneration = schedules.task({
+  id: "nightly-queued-generation",
   queue: { concurrencyLimit: 1 },
   retry: { maxAttempts: 1 },
   cron: {
-    pattern: "0 * * * *",
-    timezone: "UTC",
+    pattern: "0 0 * * *",
+    timezone: "America/Phoenix",
   },
   run: async () => {
-    const budget = await getOpenAIDailyTokenUsage();
-    if (budget.exhausted) {
-      logger.info("Skipping hourly generation; OpenAI token cap reached", {
-        usage: formatOpenAIDailyTokenUsage(budget),
-      });
-
-      return {
-        triggered: false,
-        skipped: "openai-daily-generation-token-cap-reached",
-        usedTokens: budget.usedTokens,
-        dailyTokenCap: budget.dailyTokenCap,
-        grantDate: budget.grantDate,
-      };
-    }
-
     const selection = await selectAndClaimNextAutomaticGenerationProblem();
 
     if (!selection) {
-      logger.info("Skipping hourly generation; no eligible problems");
+      logger.info("Skipping nightly generation; no eligible problems");
       return {
         triggered: false,
         skipped: "no-eligible-problems",
-        usedTokens: budget.usedTokens,
-        dailyTokenCap: budget.dailyTokenCap,
-        grantDate: budget.grantDate,
       };
     }
 
     const { problem, selectionReason } = selection;
     const label = problemLabel(problem);
-    logger.info("Triggering hourly queued generation", {
+    logger.info("Triggering nightly queued generation", {
       problemId: problem.id,
       problem: label,
       name: problem.name,
       selectionReason,
       requestedCount: problem.requestedCount,
       generationAttempts: problem.generationAttempts,
-      usage: formatOpenAIDailyTokenUsage(budget),
     });
 
     const result = await (async () => {
@@ -78,7 +55,7 @@ export const hourlyQueuedGeneration = schedules.task({
           },
         );
       } catch (error) {
-        const reason = `Hourly queued generation failed to start: ${String(
+        const reason = `Nightly queued generation failed to start: ${String(
           error,
         )}`;
         await markClaimedProblemFailed({ problem, reason });
@@ -89,15 +66,15 @@ export const hourlyQueuedGeneration = schedules.task({
     if (!result.ok) {
       await markClaimedProblemFailed({
         problem,
-        reason: `Hourly queued generation task failed: ${result.id}`,
+        reason: `Nightly queued generation task failed: ${result.id}`,
       });
-      logger.error("Hourly queued generation task failed", {
+      logger.error("Nightly queued generation task failed", {
         runId: result.id,
         problemId: problem.id,
         problem: label,
         error: String(result.error),
       });
-      throw new Error(`Hourly queued generation task failed: ${result.id}`);
+      throw new Error(`Nightly queued generation task failed: ${result.id}`);
     }
 
     return {

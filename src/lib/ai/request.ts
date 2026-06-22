@@ -65,7 +65,12 @@ function toUserContent(input: UserPromptInput): UserModelMessage["content"] {
       return { type: "text" as const, text: item.text ?? "" };
     }
 
-    return { type: "image" as const, image: item.image_url?.url ?? "" };
+    const imageUrl = item.image_url?.url;
+    if (!imageUrl) {
+      throw new Error("Image prompt item is missing a URL");
+    }
+
+    return { type: "image" as const, image: new URL(imageUrl) };
   });
 }
 

@@ -3,10 +3,6 @@
 import type { RunState } from "@prisma/client";
 import { ApiError } from "@trigger.dev/sdk";
 import { updateTag } from "next/cache";
-import {
-  formatOpenAIDailyTokenUsage,
-  getOpenAIDailyTokenUsage,
-} from "@/lib/ai/token-budget";
 import { PROBLEM_LIST_TAG, problemTag } from "@/lib/cache-tags";
 import { getOptionalEnv, verifyAdminPassword } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
@@ -200,7 +196,7 @@ export async function requestProblem(_prevState: unknown, formData: FormData) {
         return {
           message: `Queued ${contestId}${index}. It now has ${formatRequestCount(
             queued.requestedCount,
-          )}; hourly generation prioritizes requested problems while OpenAI usage is under the daily cap.`,
+          )}; nightly generation prioritizes requested problems.`,
           problemHref: `/problem/${contestId}/${index}`,
         };
       }
@@ -214,15 +210,6 @@ export async function requestProblem(_prevState: unknown, formData: FormData) {
         return {
           error:
             "Trigger.dev is not configured on the server (missing TRIGGER_SECRET_KEY).",
-        };
-      }
-
-      const budget = await getOpenAIDailyTokenUsage();
-      if (budget.exhausted) {
-        return {
-          error: `OpenAI daily generation token cap reached (${formatOpenAIDailyTokenUsage(
-            budget,
-          )}).`,
         };
       }
 
