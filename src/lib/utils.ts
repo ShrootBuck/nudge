@@ -9,6 +9,10 @@ export function cfProblemUrl(contestId: number, index: string): string {
   return `https://codeforces.com/contest/${contestId}/problem/${index}`;
 }
 
+export function cfProblemsetUrl(contestId: number, index: string): string {
+  return `https://codeforces.com/problemset/problem/${contestId}/${index}`;
+}
+
 export function ratingTone(rating: number | null): string {
   if (rating === null) {
     return "border-border/70 bg-background/80 text-muted-foreground";

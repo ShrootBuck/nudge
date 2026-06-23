@@ -17,7 +17,10 @@ import {
 import { discordLog } from "../discord-log";
 import { problemOutputSchema, problemResultSchema } from "./content-schema";
 import { type GenerationAuditInfo, saveProblemContent } from "./persistence";
-import { fetchProblemStatement } from "./problem-statement";
+import {
+  fetchProblemStatement,
+  ProblemStatementUnavailableError,
+} from "./problem-statement";
 import { buildPrompt, SYSTEM_PROMPT } from "./prompt";
 
 export type StructuredResponseGenerator = (
@@ -114,6 +117,28 @@ export async function markClaimedProblemFailed({
   }
 }
 
+async function releaseClaimedProblemAfterStatementFailure({
+  problem,
+  reason,
+}: {
+  problem: Pick<AutomaticGenerationProblem, "id" | "contestId" | "index">;
+  reason: string;
+}) {
+  const updated = await prisma.problem.updateMany({
+    where: { id: problem.id, runState: "RUNNING" },
+    data: problemUpdateData({
+      ...pipelineStateData("IDLE"),
+      generationAttempts: { decrement: 1 },
+      generationStartedAt: null,
+      lastGenerationError: reason,
+    }),
+  });
+
+  if (updated.count > 0) {
+    revalidateProblem(problem);
+  }
+}
+
 export async function executeProblemGeneration({
   problem,
   generate,
@@ -134,11 +159,10 @@ export async function executeProblemGeneration({
     const statement = await fetchProblemStatement(
       problem.contestId,
       problem.index,
-      log,
     );
-    const textPrompt = buildPrompt(problem, statement?.html);
+    const textPrompt = buildPrompt(problem, statement.html);
     const userPrompt =
-      statement?.images && statement.images.length > 0
+      statement.images.length > 0
         ? [
             { type: "text" as const, text: textPrompt },
             ...statement.images.map((url) => ({
@@ -200,10 +224,18 @@ export async function executeProblemGeneration({
 
     return { processed: 1, outcome: "succeeded" };
   } catch (error) {
-    const reason = `Generation failed for ${label}: ${toErrorMessage(error)}`;
+    const statementUnavailable =
+      error instanceof ProblemStatementUnavailableError;
+    const reason = statementUnavailable
+      ? `Statement fetch failed for ${label}: ${toErrorMessage(error)}`
+      : `Generation failed for ${label}: ${toErrorMessage(error)}`;
     log.error(reason);
 
-    await markClaimedProblemFailed({ problem, reason, response });
+    if (statementUnavailable) {
+      await releaseClaimedProblemAfterStatementFailure({ problem, reason });
+    } else {
+      await markClaimedProblemFailed({ problem, reason, response });
+    }
 
     return { processed: 0, outcome: "failed", error: reason };
   }

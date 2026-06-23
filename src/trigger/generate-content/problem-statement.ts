@@ -1,57 +1,71 @@
-import { logger } from "@trigger.dev/sdk";
 import * as cheerio from "cheerio";
 import { fetchWithTimeout } from "../../lib/http";
-import { cfProblemUrl } from "../../lib/utils";
+import { cfProblemsetUrl, cfProblemUrl } from "../../lib/utils";
 
-type ProblemStatementLogger = {
-  error(message: string, properties?: Record<string, unknown>): void;
-};
+type ProblemStatementFetch = typeof fetchWithTimeout;
+
+export class ProblemStatementUnavailableError extends Error {
+  override name = "ProblemStatementUnavailableError";
+}
+
+function statementUrls(contestId: number, index: string) {
+  return [cfProblemsetUrl(contestId, index), cfProblemUrl(contestId, index)];
+}
 
 export async function fetchProblemStatement(
   contestId: number,
   index: string,
-  log: ProblemStatementLogger = logger,
+  fetchPage: ProblemStatementFetch = fetchWithTimeout,
 ) {
-  try {
-    const url = cfProblemUrl(contestId, index);
-    const res = await fetchWithTimeout(url, {
-      timeoutMs: 15_000,
-      headers: {
-        "User-Agent":
-          "nudge-bot/1.0 (+https://nudge.zaydkrunz.com; contact@zaydkrunz.com)",
-      },
-    });
+  const failures: string[] = [];
 
-    if (!res.ok) {
-      log.error(
-        `Failed to fetch problem statement for ${contestId}${index}: ${res.status} ${res.statusText}`,
-      );
-      return null;
-    }
-    const html = await res.text();
+  for (const url of statementUrls(contestId, index)) {
+    try {
+      const res = await fetchPage(url, {
+        timeoutMs: 15_000,
+        headers: {
+          "User-Agent":
+            "nudge-bot/1.0 (+https://nudge.zaydkrunz.com; contact@zaydkrunz.com)",
+        },
+      });
 
-    const $ = cheerio.load(html);
-    const statementDiv = $(".problem-statement");
+      if (!res.ok) {
+        failures.push(`${url} returned ${res.status} ${res.statusText}`);
+        continue;
+      }
 
-    if (statementDiv.length > 0) {
+      const html = await res.text();
+      const $ = cheerio.load(html);
+      const statementDiv = $(".problem-statement");
+      if (statementDiv.length === 0) {
+        failures.push(`${url} did not contain a problem statement`);
+        continue;
+      }
+
       const images: string[] = [];
       statementDiv.find("img").each((_, img) => {
         const src = $(img).attr("src");
         if (src) {
-          const absoluteUrl = new URL(src, "https://codeforces.com").href;
+          const absoluteUrl = new URL(src, url).href;
           images.push(absoluteUrl);
           $(img).attr("src", absoluteUrl);
         }
       });
 
       const cleanHtml = statementDiv.html();
-      return cleanHtml ? { html: cleanHtml, images } : null;
+      if (cleanHtml?.trim()) {
+        return { html: cleanHtml, images };
+      }
+
+      failures.push(`${url} contained an empty problem statement`);
+    } catch (error) {
+      failures.push(
+        `${url} failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
-    return null;
-  } catch (err) {
-    log.error(`Error fetching problem statement for ${contestId}${index}`, {
-      error: String(err),
-    });
-    return null;
   }
+
+  throw new ProblemStatementUnavailableError(
+    `Problem statement unavailable for ${contestId}${index}. ${failures.join("; ")}`,
+  );
 }
