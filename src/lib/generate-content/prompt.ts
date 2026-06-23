@@ -1,4 +1,4 @@
-import { cfProblemUrl } from "../../lib/utils";
+import { cfProblemUrl } from "../utils";
 
 export const SYSTEM_PROMPT = `You are a legendary competitive programmer (think tourist) and a brutally honest but brilliant teacher. When generating hints, make them truly progressive: hint 1 should be a gentle nudge (e.g. "what if we looked at the parity?"), while hint 5 basically hands them the key insight on a silver platter.
 

@@ -1,9 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { cfProblemsetUrl, cfProblemUrl } from "../src/lib/utils";
 import {
   fetchProblemStatement,
   ProblemStatementUnavailableError,
-} from "../src/trigger/generate-content/problem-statement";
+} from "../src/lib/generate-content/problem-statement";
+import { cfProblemsetUrl, cfProblemUrl } from "../src/lib/utils";
 
 describe("Codeforces problem statement fetching", () => {
   test("falls back from the problemset route to the contest route", async () => {

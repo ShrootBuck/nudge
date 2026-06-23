@@ -80,7 +80,7 @@ export function generationState(
           icon: Ban,
           label: "Unsolvable",
           description:
-            "The active model reported that it cannot solve this problem reliably. It is parked until someone manually requests regeneration.",
+            "The active model reported that it cannot solve this problem reliably. It is parked until a local Codex run replaces it.",
           className:
             "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-200",
           animate: false,

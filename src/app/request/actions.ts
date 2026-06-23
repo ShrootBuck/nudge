@@ -1,12 +1,9 @@
 "use server";
 
 import type { RunState } from "@prisma/client";
-import { ApiError } from "@trigger.dev/sdk";
 import { updateTag } from "next/cache";
 import { PROBLEM_LIST_TAG, problemTag } from "@/lib/cache-tags";
-import { getOptionalEnv, verifyAdminPassword } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
-import { triggerGenerateContentTask } from "@/lib/trigger-tasks";
 
 const PROBLEM_IDENTIFIER_PATTERN =
   /^(\d+)\s*(?:\/|\s)?\s*([A-Za-z][A-Za-z0-9]*)$/;
@@ -95,50 +92,8 @@ function formatRequestCount(count: number) {
   return `${count.toLocaleString()} request${count === 1 ? "" : "s"}`;
 }
 
-function formatTriggerError(error: unknown) {
-  if (error instanceof ApiError) {
-    const status = error.status;
-    const baseMessage =
-      error.message?.trim() || "Trigger.dev rejected the request";
-    let hint = "";
-
-    if (status === 422) {
-      hint =
-        "This usually means the task is not deployed to this environment, the request is locked to an old TRIGGER_VERSION, or the payload is invalid.";
-    } else if (status === 401 || status === 403) {
-      hint = "Check TRIGGER_SECRET_KEY and project access.";
-    }
-
-    return {
-      userMessage: `${baseMessage}${status ? ` (status ${status})` : ""}${
-        hint ? ` ${hint}` : ""
-      }`,
-      logContext: {
-        status,
-        code: error.code,
-        type: error.type,
-        param: error.param,
-        error: error.error,
-      },
-    };
-  }
-
-  if (error instanceof Error) {
-    return {
-      userMessage: error.message || "Unexpected error",
-      logContext: { message: error.message, stack: error.stack },
-    };
-  }
-
-  return {
-    userMessage: "Unexpected error",
-    logContext: { error },
-  };
-}
-
 export async function requestProblem(_prevState: unknown, formData: FormData) {
   const input = toProblemInput(formData.get("problem"));
-  const adminPassword = toProblemInput(formData.get("adminPassword"));
   if (!input) {
     return { error: "Please provide a problem." };
   }
@@ -183,59 +138,21 @@ export async function requestProblem(_prevState: unknown, formData: FormData) {
         };
       }
 
-      if (!adminPassword) {
-        const queued = await prisma.problem.update({
-          where: { id: problem.id },
-          data: { requestedCount: { increment: 1 } },
-          select: { requestedCount: true },
-        });
+      const queued = await prisma.problem.update({
+        where: { id: problem.id },
+        data: { requestedCount: { increment: 1 } },
+        select: { requestedCount: true },
+      });
 
-        updateTag(PROBLEM_LIST_TAG);
-        updateTag(problemTag(contestId, index));
+      updateTag(PROBLEM_LIST_TAG);
+      updateTag(problemTag(contestId, index));
 
-        return {
-          message: `Queued ${contestId}${index}. It now has ${formatRequestCount(
-            queued.requestedCount,
-          )}; nightly generation prioritizes requested problems.`,
-          problemHref: `/problem/${contestId}/${index}`,
-        };
-      }
-
-      const auth = verifyAdminPassword(adminPassword);
-      if (!auth.ok) {
-        return { error: auth.error };
-      }
-
-      if (!getOptionalEnv("TRIGGER_SECRET_KEY")) {
-        return {
-          error:
-            "Trigger.dev is not configured on the server (missing TRIGGER_SECRET_KEY).",
-        };
-      }
-
-      try {
-        await triggerGenerateContentTask({
-          problemId: problem.id,
-          adminBypass: true,
-        });
-
-        return {
-          message: `Admin bypass activated! Generation for ${contestId}${index} started immediately.`,
-        };
-      } catch (error) {
-        const details = formatTriggerError(error);
-        console.error("Admin bypass trigger failed", {
-          problemId: problem.id,
-          contestId,
-          index,
-          triggerVersion: process.env.TRIGGER_VERSION,
-          ...details.logContext,
-        });
-
-        return {
-          error: `Admin bypass failed to start generation. ${details.userMessage}`,
-        };
-      }
+      return {
+        message: `Queued ${contestId}${index}. It now has ${formatRequestCount(
+          queued.requestedCount,
+        )}; the next local Codex run prioritizes requested problems.`,
+        problemHref: `/problem/${contestId}/${index}`,
+      };
     }
 
     return {

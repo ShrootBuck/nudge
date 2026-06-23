@@ -1,6 +1,6 @@
 import * as cheerio from "cheerio";
-import { fetchWithTimeout } from "../../lib/http";
-import { cfProblemsetUrl, cfProblemUrl } from "../../lib/utils";
+import { fetchWithTimeout } from "../http";
+import { cfProblemsetUrl, cfProblemUrl } from "../utils";
 
 type ProblemStatementFetch = typeof fetchWithTimeout;
 

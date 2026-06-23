@@ -1,6 +1,7 @@
 import { logger, schedules } from "@trigger.dev/sdk";
 import { safeRevalidateTag } from "../lib/cache-revalidate";
 import { PROBLEM_LIST_TAG, problemTag } from "../lib/cache-tags";
+import { discordLog } from "../lib/discord-log";
 import { DISCORD_COLORS } from "../lib/discord-webhook";
 import { fetchWithTimeout } from "../lib/http";
 import { prisma } from "../lib/prisma";
@@ -8,7 +9,6 @@ import {
   pipelineStateData,
   problemCreateData,
 } from "../lib/problem-pipeline-db";
-import { discordLog } from "./discord-log";
 
 interface CFProblem {
   contestId: number;

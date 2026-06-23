@@ -25,31 +25,9 @@ export type StructuredResponse = {
   totalTokens: number | null;
 };
 
-export type GenerationTraceEvent =
-  | { type: "reasoning-start" }
-  | { type: "reasoning-delta"; text: string }
-  | { type: "reasoning-end" }
-  | { type: "output-start" }
-  | { type: "output-delta"; text: string }
-  | { type: "output-end" }
-  | {
-      type: "tool-call";
-      toolCallId: string;
-      toolName: string;
-      input: unknown;
-    }
-  | {
-      type: "tool-result";
-      toolCallId: string;
-      toolName: string;
-      output: unknown;
-    }
-  | { type: "error"; error: unknown };
-
 export type GenerateOptions = {
   systemPrompt: string;
   userPrompt: UserPromptInput;
   outputSchema: OutputSchema;
   abortSignal?: AbortSignal;
-  onTraceEvent?: (event: GenerationTraceEvent) => void;
 };

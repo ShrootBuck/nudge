@@ -1,24 +1,13 @@
 "use client";
 
-import {
-  ArrowUpRight,
-  Check,
-  Flag,
-  RotateCw,
-  ShieldCheck,
-  Sparkles,
-} from "lucide-react";
+import { ArrowUpRight, Check, Flag, ShieldCheck, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cfProblemUrl, cn, ratingTone } from "@/lib/utils";
-import {
-  reportProblem,
-  setProblemReviewStatus,
-  triggerRegeneration,
-} from "./actions";
+import { reportProblem, setProblemReviewStatus } from "./actions";
 import { AnimatedCollapse, ChevronIcon } from "./problem-cards";
 import {
   type ProblemView,
@@ -231,9 +220,9 @@ export function ReviewSection({
   const passwordRef = useRef("");
   const passwordInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
-  const [pendingStatus, setPendingStatus] = useState<
-    ReviewOutcome | "REGENERATE" | null
-  >(null);
+  const [pendingStatus, setPendingStatus] = useState<ReviewOutcome | null>(
+    null,
+  );
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
   const review = reviewState(reviewStatus);
@@ -270,38 +259,6 @@ export function ReviewSection({
           }
         } catch {
           setError("Review update failed");
-        } finally {
-          setPendingStatus(null);
-        }
-      })();
-    });
-  }
-
-  function handleRegenerate() {
-    setError(null);
-    setPendingStatus("REGENERATE");
-
-    startTransition(() => {
-      void (async () => {
-        try {
-          const result = await triggerRegeneration(
-            problemId,
-            passwordRef.current,
-          );
-
-          if (result.success) {
-            passwordRef.current = "";
-            if (passwordInputRef.current) {
-              passwordInputRef.current.value = "";
-            }
-            setHasPassword(false);
-            setOpen(false);
-            router.refresh();
-          } else {
-            setError(result.error);
-          }
-        } catch {
-          setError("Regeneration trigger failed");
         } finally {
           setPendingStatus(null);
         }
@@ -419,22 +376,6 @@ export function ReviewSection({
                 {pendingStatus === "UNSOLVABLE"
                   ? "Marking..."
                   : "Mark unsolvable"}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={isPending || !hasPassword}
-                className="h-10 w-full rounded-xl border-border/60 bg-background/55 px-4 text-foreground/80 shadow-sm hover:bg-background/75 hover:text-foreground disabled:bg-background/40 sm:w-auto"
-                onClick={handleRegenerate}
-              >
-                <RotateCw
-                  className={cn(
-                    "mr-2 size-3.5",
-                    pendingStatus === "REGENERATE" && "animate-spin",
-                  )}
-                />
-                {pendingStatus === "REGENERATE" ? "Starting..." : "Regenerate"}
               </Button>
             </div>
           </form>

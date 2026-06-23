@@ -5,20 +5,11 @@ import { createRequire } from "node:module";
 import { tmpdir } from "node:os";
 import { delimiter, join } from "node:path";
 import { promisify } from "node:util";
-import { streamText, type TextStreamPart, type ToolSet } from "ai";
+import { generateText } from "ai";
 import { codexExec } from "ai-sdk-provider-codex-cli";
 import { createCodexAssetDownloader } from "./codex-assets";
-import {
-  CODEX_AUTH_ENV_NAME,
-  withLocalCodexAuth,
-  withManagedCodexAuth,
-} from "./codex-auth";
 import { buildMessages, buildStructuredOutput } from "./request";
-import type {
-  GenerateOptions,
-  GenerationTraceEvent,
-  StructuredResponse,
-} from "./types";
+import type { GenerateOptions, StructuredResponse } from "./types";
 
 const MODEL = "gpt-5.5";
 export const CODEX_DISPLAY_NAME = "GPT-5.5 (xhigh)";
@@ -42,12 +33,12 @@ function compareVersions(left: string, right: string) {
   return 0;
 }
 
-async function runCommand(command: string[], env?: Record<string, string>) {
+async function runCommand(command: string[]) {
   try {
     const { stdout, stderr } = await execFileAsync(
       command[0],
       command.slice(1),
-      { env: env ? { ...process.env, ...env } : process.env },
+      { env: process.env },
     );
     return {
       exitCode: 0,
@@ -71,19 +62,26 @@ async function runCommand(command: string[], env?: Record<string, string>) {
 
 export async function resolveCodexExecutable() {
   const pathEntries = (process.env.PATH ?? "").split(delimiter);
-  const candidates = pathEntries
+  const pathCandidates = pathEntries
     .filter(Boolean)
     .map((directory) => join(directory, "codex"));
+  const packageCandidates = pathCandidates.filter((candidate) =>
+    candidate.includes("node_modules/.bin/codex"),
+  );
+  const candidates = pathCandidates.filter(
+    (candidate) => !candidate.includes("node_modules/.bin/codex"),
+  );
 
-  candidates.push(join(process.cwd(), "node_modules", ".bin", "codex"));
+  candidates.push("/opt/homebrew/bin/codex", "/usr/local/bin/codex");
+  packageCandidates.push(join(process.cwd(), "node_modules", ".bin", "codex"));
 
   try {
-    candidates.push(require.resolve("@openai/codex/bin/codex.js"));
+    packageCandidates.push(require.resolve("@openai/codex/bin/codex.js"));
   } catch {
-    // The Trigger build installs this package explicitly; PATH may still work.
+    // PATH may still provide a global Codex CLI.
   }
 
-  for (const candidate of new Set(candidates)) {
+  for (const candidate of new Set([...candidates, ...packageCandidates])) {
     try {
       await access(candidate, constants.X_OK);
       return candidate;
@@ -96,15 +94,12 @@ export async function resolveCodexExecutable() {
 }
 
 export async function verifyCodexCli({
-  codexHome,
   codexPath,
 }: {
-  codexHome?: string;
   codexPath?: string;
 } = {}) {
   const resolvedCodexPath = codexPath ?? (await resolveCodexExecutable());
-  const env = codexHome ? { CODEX_HOME: codexHome } : undefined;
-  const versionResult = await runCommand([resolvedCodexPath, "--version"], env);
+  const versionResult = await runCommand([resolvedCodexPath, "--version"]);
   if (versionResult.exitCode !== 0) {
     throw new Error(
       `Could not run Codex CLI: ${versionResult.stderr || versionResult.stdout}`,
@@ -124,10 +119,7 @@ export async function verifyCodexCli({
     );
   }
 
-  const loginResult = await runCommand(
-    [resolvedCodexPath, "login", "status"],
-    env,
-  );
+  const loginResult = await runCommand([resolvedCodexPath, "login", "status"]);
   const loginStatus = loginResult.stdout || loginResult.stderr;
   if (
     loginResult.exitCode !== 0 ||
@@ -162,83 +154,18 @@ function coalesceTokenCount(value: number | null | undefined): number | null {
     : null;
 }
 
-function emitTrace(options: GenerateOptions, event: GenerationTraceEvent) {
-  try {
-    options.onTraceEvent?.(event);
-  } catch {
-    // Terminal tracing is best-effort and must not break a generation.
-  }
-}
-
-async function consumeTrace(
-  stream: AsyncIterable<TextStreamPart<ToolSet>>,
-  options: GenerateOptions,
-) {
-  for await (const part of stream) {
-    switch (part.type) {
-      case "reasoning-start":
-        emitTrace(options, { type: "reasoning-start" });
-        break;
-      case "reasoning-delta":
-        emitTrace(options, { type: "reasoning-delta", text: part.text });
-        break;
-      case "reasoning-end":
-        emitTrace(options, { type: "reasoning-end" });
-        break;
-      case "text-start":
-        emitTrace(options, { type: "output-start" });
-        break;
-      case "text-delta":
-        emitTrace(options, { type: "output-delta", text: part.text });
-        break;
-      case "text-end":
-        emitTrace(options, { type: "output-end" });
-        break;
-      case "tool-call":
-        emitTrace(options, {
-          type: "tool-call",
-          toolCallId: part.toolCallId,
-          toolName: part.toolName,
-          input: part.input,
-        });
-        break;
-      case "tool-result":
-        emitTrace(options, {
-          type: "tool-result",
-          toolCallId: part.toolCallId,
-          toolName: part.toolName,
-          output: part.output,
-        });
-        break;
-      case "tool-error":
-        emitTrace(options, {
-          type: "error",
-          error: part.error,
-        });
-        break;
-      case "error":
-        emitTrace(options, {
-          type: "error",
-          error: part.error,
-        });
-        break;
-    }
-  }
-}
-
 async function generateCodexExecStructuredResponse(
   options: GenerateOptions,
-  codexHome?: string,
 ): Promise<StructuredResponse> {
   const codexPath = await resolveCodexExecutable();
-  await verifyCodexCli({ codexHome, codexPath });
+  await verifyCodexCli({ codexPath });
 
   const workingDirectory = await mkdtemp(
     join(tmpdir(), "nudge-codex-generation-"),
   );
 
   try {
-    const result = streamText({
+    const result = await generateText({
       model: codexExec(MODEL, {
         codexPath,
         cwd: workingDirectory,
@@ -249,7 +176,6 @@ async function generateCodexExecStructuredResponse(
         skipGitRepoCheck: true,
         color: "never",
         logger: false,
-        env: codexHome ? { CODEX_HOME: codexHome } : undefined,
         configOverrides: {
           web_search: "live",
         },
@@ -267,36 +193,23 @@ async function generateCodexExecStructuredResponse(
       },
     });
 
-    const trace = options.onTraceEvent
-      ? consumeTrace(result.fullStream, options)
-      : Promise.resolve();
-    const [output, response, finishReason, rawFinishReason, usage] =
-      await Promise.all([
-        result.output,
-        result.response,
-        result.finishReason,
-        result.rawFinishReason,
-        result.totalUsage,
-        trace,
-      ]);
-
-    const outputText = JSON.stringify(output);
+    const outputText = JSON.stringify(result.output);
 
     if (!outputText) {
       throw new Error(
-        `Codex response missing structured output (id: ${response.id}, finish_reason: ${finishReason})`,
+        `Codex response missing structured output (id: ${result.response.id}, finish_reason: ${result.finishReason})`,
       );
     }
 
     return {
       outputText,
-      responseId: response.id,
+      responseId: result.response.id,
       displayName: CODEX_DISPLAY_NAME,
-      resolvedModel: coalesceString(response.modelId, MODEL),
-      finishReason: coalesceString(finishReason),
-      nativeFinishReason: coalesceString(rawFinishReason),
+      resolvedModel: coalesceString(result.response.modelId, MODEL),
+      finishReason: coalesceString(result.finishReason),
+      nativeFinishReason: coalesceString(result.rawFinishReason),
       providerName: PROVIDER_NAME,
-      totalTokens: coalesceTokenCount(usage.totalTokens),
+      totalTokens: coalesceTokenCount(result.totalUsage.totalTokens),
     };
   } finally {
     await rm(workingDirectory, { recursive: true, force: true });
@@ -306,22 +219,9 @@ async function generateCodexExecStructuredResponse(
 export async function generateCodexCliStructuredResponse(
   options: GenerateOptions,
 ) {
-  return withLocalCodexAuth({
-    run: (codexHome) => generateCodexExecStructuredResponse(options, codexHome),
-  });
+  return generateCodexExecStructuredResponse(options);
 }
 
 export async function verifyLocalCodexCli() {
-  return withLocalCodexAuth({
-    run: (codexHome) => verifyCodexCli({ codexHome }),
-  });
-}
-
-export async function generateManagedCodexStructuredResponse(
-  options: GenerateOptions,
-) {
-  return withManagedCodexAuth({
-    encodedAuth: process.env[CODEX_AUTH_ENV_NAME],
-    run: (codexHome) => generateCodexExecStructuredResponse(options, codexHome),
-  });
+  return verifyCodexCli();
 }

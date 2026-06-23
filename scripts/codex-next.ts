@@ -3,20 +3,18 @@ import {
   generateCodexCliStructuredResponse,
   verifyLocalCodexCli,
 } from "../src/lib/ai/codex-cli";
-import { normalizeCodexTerminalTraceEvent } from "../src/lib/ai/codex-terminal-trace";
-import type { GenerationTraceEvent } from "../src/lib/ai/types";
+import { discordLog } from "../src/lib/discord-log";
 import { DISCORD_COLORS } from "../src/lib/discord-webhook";
+import {
+  executeProblemGeneration,
+  markClaimedProblemFailed,
+  toProblemLabel,
+} from "../src/lib/generate-content/execution";
 import {
   selectAndClaimNextAutomaticGenerationProblem,
   selectNextAutomaticGenerationProblem,
 } from "../src/lib/generation-queue";
 import { prisma } from "../src/lib/prisma";
-import { discordLog } from "../src/trigger/discord-log";
-import {
-  executeProblemGeneration,
-  markClaimedProblemFailed,
-  toProblemLabel,
-} from "../src/trigger/generate-content/execution";
 
 type SignalName = "SIGINT" | "SIGTERM";
 
@@ -39,98 +37,6 @@ function candidateSummary(
 ) {
   const { problem, selectionReason } = selection;
   return `${toProblemLabel(problem)} — ${problem.name} (${selectionReason}, ${problem.requestedCount} requests, ${problem.generationAttempts} attempts)`;
-}
-
-function formatTraceValue(value: unknown) {
-  if (typeof value === "string") {
-    return value;
-  }
-
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
-  }
-}
-
-function createTerminalTrace() {
-  let activeSection: "reasoning" | "output" | null = null;
-  const displayedWebSearchCallIds = new Set<string>();
-
-  const closeSection = () => {
-    if (activeSection) {
-      process.stdout.write("\n");
-      activeSection = null;
-    }
-  };
-
-  const openSection = (section: "reasoning" | "output") => {
-    if (activeSection === section) {
-      return;
-    }
-
-    closeSection();
-    process.stdout.write(
-      section === "reasoning"
-        ? "\n[codex reasoning]\n"
-        : "\n[codex structured output]\n",
-    );
-    activeSection = section;
-  };
-
-  return {
-    handle(rawEvent: GenerationTraceEvent) {
-      const event = normalizeCodexTerminalTraceEvent(
-        rawEvent,
-        displayedWebSearchCallIds,
-      );
-      if (!event) {
-        return;
-      }
-
-      switch (event.type) {
-        case "reasoning-start":
-          openSection("reasoning");
-          break;
-        case "reasoning-delta":
-          openSection("reasoning");
-          process.stdout.write(event.text);
-          break;
-        case "reasoning-end":
-          closeSection();
-          break;
-        case "output-start":
-          openSection("output");
-          break;
-        case "output-delta":
-          openSection("output");
-          process.stdout.write(event.text);
-          break;
-        case "output-end":
-          closeSection();
-          break;
-        case "tool-call":
-          closeSection();
-          console.log(
-            `\n[codex tool] ${event.toolName} ${formatTraceValue(event.input)}`,
-          );
-          break;
-        case "tool-result":
-          closeSection();
-          console.log(
-            `[codex tool result] ${event.toolName} ${formatTraceValue(
-              event.output,
-            )}`,
-          );
-          break;
-        case "error":
-          closeSection();
-          console.error(`\n[codex stream error] ${String(event.error)}`);
-          break;
-      }
-    },
-    close: closeSection,
-  };
 }
 
 async function main() {
@@ -191,20 +97,12 @@ async function main() {
       throw abortController.signal.reason;
     }
 
-    const trace = createTerminalTrace();
-    const result = await (async () => {
-      try {
-        return await executeProblemGeneration({
-          problem: selection.problem,
-          generate: generateCodexCliStructuredResponse,
-          log: console,
-          abortSignal: abortController.signal,
-          onTraceEvent: trace.handle,
-        });
-      } finally {
-        trace.close();
-      }
-    })();
+    const result = await executeProblemGeneration({
+      problem: selection.problem,
+      generate: generateCodexCliStructuredResponse,
+      log: console,
+      abortSignal: abortController.signal,
+    });
 
     if (interruptedBy) {
       process.exitCode = interruptedBy === "SIGINT" ? 130 : 143;
@@ -224,8 +122,25 @@ async function main() {
       color: DISCORD_COLORS.info,
     });
 
+    const savedProblem = await prisma.problem.findUnique({
+      where: { id: selection.problem.id },
+      select: {
+        generationTotalTokens: true,
+        generatedByDisplayName: true,
+      },
+    });
+    const tokenSummary =
+      savedProblem?.generationTotalTokens != null
+        ? `, ${savedProblem.generationTotalTokens.toLocaleString()} tokens`
+        : "";
+
     console.log(
-      `Completed ${toProblemLabel(selection.problem)} with ${CODEX_DISPLAY_NAME} (${result.outcome}).`,
+      `Completed ${toProblemLabel(selection.problem)} with ${
+        savedProblem?.generatedByDisplayName ?? CODEX_DISPLAY_NAME
+      } (${result.outcome}${tokenSummary}).`,
+    );
+    console.log(
+      `Open: /problem/${selection.problem.contestId}/${selection.problem.index}`,
     );
   } catch (error) {
     const reason = `Local Codex generation failed: ${

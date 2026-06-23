@@ -1,10 +1,7 @@
-import { safeRevalidateTag } from "../../lib/cache-revalidate";
-import { PROBLEM_LIST_TAG, problemTag } from "../../lib/cache-tags";
-import { prisma } from "../../lib/prisma";
-import {
-  pipelineStateData,
-  problemUpdateData,
-} from "../../lib/problem-pipeline-db";
+import { safeRevalidateTag } from "../cache-revalidate";
+import { PROBLEM_LIST_TAG, problemTag } from "../cache-tags";
+import { prisma } from "../prisma";
+import { pipelineStateData, problemUpdateData } from "../problem-pipeline-db";
 import type { ParsedContent } from "./content-schema";
 
 export type GenerationAuditInfo = {

@@ -1,20 +1,13 @@
 import type { Prisma } from "@prisma/client";
-import type {
-  GenerateOptions,
-  GenerationTraceEvent,
-  StructuredResponse,
-} from "../../lib/ai";
-import { recordGenerationUsage } from "../../lib/ai/usage";
-import { safeRevalidateTag } from "../../lib/cache-revalidate";
-import { PROBLEM_LIST_TAG, problemTag } from "../../lib/cache-tags";
-import { DISCORD_COLORS } from "../../lib/discord-webhook";
-import type { AutomaticGenerationProblem } from "../../lib/generation-queue";
-import { prisma } from "../../lib/prisma";
-import {
-  pipelineStateData,
-  problemUpdateData,
-} from "../../lib/problem-pipeline-db";
+import type { GenerateOptions, StructuredResponse } from "../ai";
+import { recordGenerationUsage } from "../ai/usage";
+import { safeRevalidateTag } from "../cache-revalidate";
+import { PROBLEM_LIST_TAG, problemTag } from "../cache-tags";
 import { discordLog } from "../discord-log";
+import { DISCORD_COLORS } from "../discord-webhook";
+import type { AutomaticGenerationProblem } from "../generation-queue";
+import { prisma } from "../prisma";
+import { pipelineStateData, problemUpdateData } from "../problem-pipeline-db";
 import { problemOutputSchema, problemResultSchema } from "./content-schema";
 import { type GenerationAuditInfo, saveProblemContent } from "./persistence";
 import {
@@ -144,13 +137,11 @@ export async function executeProblemGeneration({
   generate,
   log,
   abortSignal,
-  onTraceEvent,
 }: {
   problem: AutomaticGenerationProblem;
   generate: StructuredResponseGenerator;
   log: GenerationLogger;
   abortSignal?: AbortSignal;
-  onTraceEvent?: (event: GenerationTraceEvent) => void;
 }): Promise<GenerationResult> {
   const label = toProblemLabel(problem);
   let response: StructuredResponse | null = null;
@@ -179,7 +170,6 @@ export async function executeProblemGeneration({
       userPrompt,
       outputSchema: problemOutputSchema,
       abortSignal,
-      onTraceEvent,
     });
     await recordGenerationUsage({ problemId: problem.id, response });
 
