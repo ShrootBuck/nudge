@@ -3,6 +3,7 @@ import {
   generateCodexCliStructuredResponse,
   verifyLocalCodexCli,
 } from "../src/lib/ai/codex-cli";
+import { normalizeCodexTerminalTraceEvent } from "../src/lib/ai/codex-terminal-trace";
 import type { GenerationTraceEvent } from "../src/lib/ai/types";
 import { DISCORD_COLORS } from "../src/lib/discord-webhook";
 import {
@@ -54,6 +55,7 @@ function formatTraceValue(value: unknown) {
 
 function createTerminalTrace() {
   let activeSection: "reasoning" | "output" | null = null;
+  const displayedWebSearchCallIds = new Set<string>();
 
   const closeSection = () => {
     if (activeSection) {
@@ -77,7 +79,15 @@ function createTerminalTrace() {
   };
 
   return {
-    handle(event: GenerationTraceEvent) {
+    handle(rawEvent: GenerationTraceEvent) {
+      const event = normalizeCodexTerminalTraceEvent(
+        rawEvent,
+        displayedWebSearchCallIds,
+      );
+      if (!event) {
+        return;
+      }
+
       switch (event.type) {
         case "reasoning-start":
           openSection("reasoning");

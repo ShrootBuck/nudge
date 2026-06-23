@@ -197,6 +197,7 @@ async function consumeTrace(
       case "tool-call":
         emitTrace(options, {
           type: "tool-call",
+          toolCallId: part.toolCallId,
           toolName: part.toolName,
           input: part.input,
         });
@@ -204,6 +205,7 @@ async function consumeTrace(
       case "tool-result":
         emitTrace(options, {
           type: "tool-result",
+          toolCallId: part.toolCallId,
           toolName: part.toolName,
           output: part.output,
         });

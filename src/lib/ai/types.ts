@@ -32,8 +32,18 @@ export type GenerationTraceEvent =
   | { type: "output-start" }
   | { type: "output-delta"; text: string }
   | { type: "output-end" }
-  | { type: "tool-call"; toolName: string; input: unknown }
-  | { type: "tool-result"; toolName: string; output: unknown }
+  | {
+      type: "tool-call";
+      toolCallId: string;
+      toolName: string;
+      input: unknown;
+    }
+  | {
+      type: "tool-result";
+      toolCallId: string;
+      toolName: string;
+      output: unknown;
+    }
   | { type: "error"; error: unknown };
 
 export type GenerateOptions = {
