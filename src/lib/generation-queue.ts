@@ -3,6 +3,8 @@ import { prisma } from "./prisma";
 import { pipelineStateData, problemUpdateData } from "./problem-pipeline-db";
 
 export const AUTOMATIC_GENERATION_MAX_ATTEMPTS = 3;
+const CLAIM_TRANSACTION_MAX_WAIT_MS = 15_000;
+const CLAIM_TRANSACTION_TIMEOUT_MS = 15_000;
 
 export const automaticGenerationProblemSelect = {
   id: true,
@@ -105,23 +107,29 @@ export async function claimProblemForGeneration({
 
 export async function selectAndClaimNextAutomaticGenerationProblem() {
   for (let attempt = 0; attempt < 10; attempt++) {
-    const result = await prisma.$transaction(async (tx) => {
-      const selection = await selectNextAutomaticGenerationProblem(tx);
+    const result = await prisma.$transaction(
+      async (tx) => {
+        const selection = await selectNextAutomaticGenerationProblem(tx);
 
-      if (!selection) {
-        return { status: "empty" as const };
-      }
+        if (!selection) {
+          return { status: "empty" as const };
+        }
 
-      const claimed = await claimProblemForGeneration({
-        problemId: selection.problem.id,
-        requireAutomaticEligibility: true,
-        client: tx,
-      });
+        const claimed = await claimProblemForGeneration({
+          problemId: selection.problem.id,
+          requireAutomaticEligibility: true,
+          client: tx,
+        });
 
-      return claimed
-        ? { status: "claimed" as const, selection }
-        : { status: "retry" as const };
-    });
+        return claimed
+          ? { status: "claimed" as const, selection }
+          : { status: "retry" as const };
+      },
+      {
+        maxWait: CLAIM_TRANSACTION_MAX_WAIT_MS,
+        timeout: CLAIM_TRANSACTION_TIMEOUT_MS,
+      },
+    );
 
     if (result.status === "empty") {
       return null;

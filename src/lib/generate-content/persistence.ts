@@ -14,56 +14,63 @@ export type GenerationAuditInfo = {
   totalTokens: number | null;
 };
 
+const CONTENT_SAVE_TRANSACTION_TIMEOUT_MS = 30_000;
+const CONTENT_SAVE_TRANSACTION_MAX_WAIT_MS = 15_000;
+
 export async function saveProblemContent(
   problemId: string,
   parsed: ParsedContent,
   generation: GenerationAuditInfo,
 ) {
-  const updatedProblem = await prisma.$transaction(async (tx) => {
-    await tx.hint.deleteMany({ where: { problemId } });
-    await tx.editorial.deleteMany({ where: { problemId } });
-    await tx.solution.deleteMany({ where: { problemId } });
+  const updatedProblem = await prisma.$transaction(
+    async (tx) => {
+      await tx.hint.deleteMany({ where: { problemId } });
+      await tx.editorial.deleteMany({ where: { problemId } });
+      await tx.solution.deleteMany({ where: { problemId } });
 
-    await Promise.all(
-      parsed.hints.map((hint) =>
-        tx.hint.create({
-          data: {
+      if (parsed.hints.length > 0) {
+        await tx.hint.createMany({
+          data: parsed.hints.map((hint) => ({
             problemId,
             order: hint.order,
             content: hint.content,
-          },
+          })),
+        });
+      }
+
+      await tx.editorial.create({
+        data: { problemId, content: parsed.editorial },
+      });
+
+      await tx.solution.create({
+        data: { problemId, content: parsed.solution },
+      });
+
+      return tx.problem.update({
+        where: { id: problemId },
+        data: problemUpdateData({
+          ...pipelineStateData("SUCCEEDED"),
+          generatedByDisplayName: generation.displayName,
+          generatedByModel: generation.resolvedModel,
+          generationResponseId: generation.responseId,
+          generationFinishReason: generation.finishReason,
+          generationNativeFinishReason: generation.nativeFinishReason,
+          generationProviderName: generation.providerName,
+          generationTotalTokens: generation.totalTokens,
+          generationStartedAt: null,
+          lastGenerationError: null,
         }),
-      ),
-    );
-
-    await tx.editorial.create({
-      data: { problemId, content: parsed.editorial },
-    });
-
-    await tx.solution.create({
-      data: { problemId, content: parsed.solution },
-    });
-
-    return tx.problem.update({
-      where: { id: problemId },
-      data: problemUpdateData({
-        ...pipelineStateData("SUCCEEDED"),
-        generatedByDisplayName: generation.displayName,
-        generatedByModel: generation.resolvedModel,
-        generationResponseId: generation.responseId,
-        generationFinishReason: generation.finishReason,
-        generationNativeFinishReason: generation.nativeFinishReason,
-        generationProviderName: generation.providerName,
-        generationTotalTokens: generation.totalTokens,
-        generationStartedAt: null,
-        lastGenerationError: null,
-      }),
-      select: {
-        contestId: true,
-        index: true,
-      },
-    });
-  });
+        select: {
+          contestId: true,
+          index: true,
+        },
+      });
+    },
+    {
+      maxWait: CONTENT_SAVE_TRANSACTION_MAX_WAIT_MS,
+      timeout: CONTENT_SAVE_TRANSACTION_TIMEOUT_MS,
+    },
+  );
 
   safeRevalidateTag(PROBLEM_LIST_TAG, "max");
   safeRevalidateTag(
