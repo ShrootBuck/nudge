@@ -94,7 +94,7 @@ export const problemOutputSchema: OutputSchema = {
       editorial: {
         anyOf: [{ type: "string" }, { type: "null" }],
         description:
-          "If status is 'success', a prose editorial explaining the solution. Otherwise null.",
+          "If status is 'success', a prose editorial explaining the solution in Nudge's own voice, with no links, citations, or source/research notes. Otherwise null.",
       },
       solution: {
         anyOf: [{ type: "string" }, { type: "null" }],

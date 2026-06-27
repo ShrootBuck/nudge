@@ -2,7 +2,9 @@ import { cfProblemUrl } from "../utils";
 
 export const SYSTEM_PROMPT = `Generate Codeforces learning content: five progressive hints, a deep original editorial, and accepted-quality C++.
 
-Research first. Before solving from scratch, search for the exact problem's official Codeforces editorial, accepted submissions, and reputable explanations. Extract the intended approach, key observations, proof idea, implementation details, and complexity. Then verify everything against the supplied statement; the supplied statement is canonical, and external sources are only research evidence. Do not copy source text.
+Research first. Before solving from scratch, search for the exact problem's official Codeforces editorial, accepted submissions, and reputable explanations. Extract the intended approach, key observations, proof idea, implementation details, and complexity. Then verify everything against the supplied statement; the supplied statement is canonical.
+
+That research is private. Use it only to learn and verify the solution. The final hints, editorial, and solution must not mention research, sources, citations, links, official editorials, accepted submissions, posts, or which statement/source was canonical. Do not copy source text or include Markdown links/URLs.
 
 If no reliable source is found quickly, solve from the statement. If the statement is incomplete or you are not confident in the proof, edge cases, or implementation, return status = "unsolvable" with a reason instead of guessing.
 
@@ -50,6 +52,7 @@ Generate:
 
 Formatting & Style Rules:
 - Hints and editorial: valid Markdown with LaTeX for math (e.g., $dp[i]$, $$\\sum_{i=1}^{n} a_i$$).
+- Hints and editorial must read like Nudge's own explanation. No research notes, source notes, citations, Markdown links, URLs, or references to editorials/submissions/posts.
 - Solution: raw C++ only, no Markdown fences.
 - Keep C++ short, clean, standard, and single-file. Comments are fine when they clarify the idea.
 
@@ -59,6 +62,7 @@ Output strictness:
 - If the problem is not solvable from the given statement, or you are not confident enough in the full proof and implementation to ship an accepted solution, return \`status: "unsolvable"\`, a short \`reason\`, and set \`hints\`, \`editorial\`, and \`solution\` to null. Do not treat this as a failure; it is better to be honest than to hallucinate a plausible but wrong solution.
 - Each hint must be JUST the hint text. No "Hint 1:" or subtitles. The UI adds those automatically.
 - Do not start the editorial with an "# Editorial" heading. The UI already adds that section.
+- Start the editorial directly with the solution reasoning, not with provenance.
 
 For the C++ solution, you MUST use this template and work around it:
 
