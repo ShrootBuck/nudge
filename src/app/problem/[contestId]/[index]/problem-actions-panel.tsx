@@ -7,7 +7,11 @@ import { useId, useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cfProblemUrl, cn, ratingTone } from "@/lib/utils";
-import { reportProblem, setProblemReviewStatus } from "./actions";
+import {
+  regenerateProblemContent,
+  reportProblem,
+  setProblemReviewStatus,
+} from "./actions";
 import { AnimatedCollapse, ChevronIcon } from "./problem-cards";
 import {
   type ProblemView,
@@ -215,12 +219,15 @@ export function ReviewSection({
   problemId: string;
   reviewStatus: ReviewStatus;
 }) {
+  type ReviewAction = Extract<ReviewOutcome, "VERIFIED" | "INCORRECT">;
+  type PendingAction = ReviewAction | "REGENERATE";
+
   const [open, setOpen] = useState(false);
   const [hasPassword, setHasPassword] = useState(false);
   const passwordRef = useRef("");
   const passwordInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
-  const [pendingStatus, setPendingStatus] = useState<ReviewOutcome | null>(
+  const [pendingAction, setPendingAction] = useState<PendingAction | null>(
     null,
   );
   const [isPending, startTransition] = useTransition();
@@ -233,9 +240,23 @@ export function ReviewSection({
     handleReview("VERIFIED");
   }
 
-  function handleReview(nextStatus: ReviewOutcome) {
+  function resetPassword() {
+    passwordRef.current = "";
+    if (passwordInputRef.current) {
+      passwordInputRef.current.value = "";
+    }
+    setHasPassword(false);
+  }
+
+  function closeAfterSuccess() {
+    resetPassword();
+    setOpen(false);
+    router.refresh();
+  }
+
+  function handleReview(nextStatus: ReviewAction) {
     setError(null);
-    setPendingStatus(nextStatus);
+    setPendingAction(nextStatus);
 
     startTransition(() => {
       void (async () => {
@@ -247,20 +268,40 @@ export function ReviewSection({
           );
 
           if (result.success) {
-            passwordRef.current = "";
-            if (passwordInputRef.current) {
-              passwordInputRef.current.value = "";
-            }
-            setHasPassword(false);
-            setOpen(false);
-            router.refresh();
+            closeAfterSuccess();
           } else {
             setError(result.error);
           }
         } catch {
           setError("Review update failed");
         } finally {
-          setPendingStatus(null);
+          setPendingAction(null);
+        }
+      })();
+    });
+  }
+
+  function handleRegenerate() {
+    setError(null);
+    setPendingAction("REGENERATE");
+
+    startTransition(() => {
+      void (async () => {
+        try {
+          const result = await regenerateProblemContent(
+            problemId,
+            passwordRef.current,
+          );
+
+          if (result.success) {
+            closeAfterSuccess();
+          } else {
+            setError(result.error);
+          }
+        } catch {
+          setError("Regenerate failed");
+        } finally {
+          setPendingAction(null);
         }
       })();
     });
@@ -349,7 +390,7 @@ export function ReviewSection({
                 disabled={isPending || !hasPassword}
                 className="h-10 w-full rounded-xl border-emerald-500/20 bg-emerald-500/10 px-4 text-emerald-200 shadow-sm hover:bg-emerald-500/15 hover:text-emerald-100 disabled:border-emerald-500/10 disabled:bg-emerald-500/10 disabled:text-emerald-200/55 sm:w-auto"
               >
-                {pendingStatus === "VERIFIED"
+                {pendingAction === "VERIFIED"
                   ? "Verifying..."
                   : "Mark verified"}
               </Button>
@@ -361,7 +402,7 @@ export function ReviewSection({
                 className="h-10 w-full rounded-xl border-rose-500/20 bg-rose-500/10 px-4 text-rose-200 shadow-sm hover:bg-rose-500/15 hover:text-rose-100 disabled:border-rose-500/10 disabled:bg-rose-500/10 disabled:text-rose-200/55 sm:w-auto"
                 onClick={() => handleReview("INCORRECT")}
               >
-                {pendingStatus === "INCORRECT"
+                {pendingAction === "INCORRECT"
                   ? "Marking..."
                   : "Mark incorrect"}
               </Button>
@@ -370,12 +411,10 @@ export function ReviewSection({
                 size="sm"
                 variant="outline"
                 disabled={isPending || !hasPassword}
-                className="h-10 w-full rounded-xl border-amber-500/20 bg-amber-500/10 px-4 text-amber-200 shadow-sm hover:bg-amber-500/15 hover:text-amber-100 disabled:border-amber-500/10 disabled:bg-amber-500/10 disabled:text-amber-200/55 sm:w-auto"
-                onClick={() => handleReview("UNSOLVABLE")}
+                className="h-10 w-full rounded-xl border-sky-500/20 bg-sky-500/10 px-4 text-sky-200 shadow-sm hover:bg-sky-500/15 hover:text-sky-100 disabled:border-sky-500/10 disabled:bg-sky-500/10 disabled:text-sky-200/55 sm:w-auto"
+                onClick={handleRegenerate}
               >
-                {pendingStatus === "UNSOLVABLE"
-                  ? "Marking..."
-                  : "Mark unsolvable"}
+                {pendingAction === "REGENERATE" ? "Queueing..." : "Regenerate"}
               </Button>
             </div>
           </form>

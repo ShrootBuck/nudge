@@ -6,12 +6,18 @@ import { sendAdminLog } from "@/lib/discord";
 import { DISCORD_COLORS } from "@/lib/discord-webhook";
 import { SITE_URL, verifyAdminPassword } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
+import {
+  pipelineStateData,
+  problemUpdateData,
+} from "@/lib/problem-pipeline-db";
 
-const REVIEW_STATUSES = ["VERIFIED", "INCORRECT", "UNSOLVABLE"] as const;
+const REVIEW_STATUSES = ["VERIFIED", "INCORRECT"] as const;
 
 type ReviewStatus = (typeof REVIEW_STATUSES)[number];
 
 const MAX_REASON_LENGTH = 1000;
+const REGENERATION_TRANSACTION_MAX_WAIT_MS = 15_000;
+const REGENERATION_TRANSACTION_TIMEOUT_MS = 15_000;
 
 export async function setProblemReviewStatus(
   problemId: string,
@@ -52,16 +58,87 @@ export async function setProblemReviewStatus(
       title: "⚠️ Marked Incorrect",
       color: DISCORD_COLORS.warning,
     },
-    UNSOLVABLE: {
-      title: "🚫 Marked Unsolvable",
-      color: DISCORD_COLORS.warning,
-    },
   } as const;
   const log = logConfig[reviewStatus];
   await sendAdminLog({
     title: log.title,
     description: `**[${tag} — ${problem.name}](${link})**`,
     color: log.color,
+  });
+
+  return { success: true } as const;
+}
+
+export async function regenerateProblemContent(
+  problemId: string,
+  password: string,
+) {
+  const auth = verifyAdminPassword(password);
+  if (!auth.ok) {
+    return { success: false, error: auth.error } as const;
+  }
+
+  const problem = await prisma.problem.findUnique({
+    where: { id: problemId },
+    select: {
+      contestId: true,
+      index: true,
+      name: true,
+      runState: true,
+    },
+  });
+
+  if (!problem) {
+    return { success: false, error: "Problem not found" } as const;
+  }
+
+  if (problem.runState === "RUNNING") {
+    return {
+      success: false,
+      error: "Generation is already running for this problem",
+    } as const;
+  }
+
+  await prisma.$transaction(
+    async (tx) => {
+      await tx.hint.deleteMany({ where: { problemId } });
+      await tx.editorial.deleteMany({ where: { problemId } });
+      await tx.solution.deleteMany({ where: { problemId } });
+
+      await tx.problem.update({
+        where: { id: problemId },
+        data: problemUpdateData({
+          ...pipelineStateData("IDLE"),
+          generationAttempts: 0,
+          reviewStatus: "UNREVIEWED",
+          requestedCount: { increment: 1 },
+          generationStartedAt: null,
+          lastGenerationError: null,
+          generatedByDisplayName: null,
+          generatedByModel: null,
+          generationResponseId: null,
+          generationFinishReason: null,
+          generationNativeFinishReason: null,
+          generationProviderName: null,
+          generationTotalTokens: null,
+        }),
+      });
+    },
+    {
+      maxWait: REGENERATION_TRANSACTION_MAX_WAIT_MS,
+      timeout: REGENERATION_TRANSACTION_TIMEOUT_MS,
+    },
+  );
+
+  updateTag(PROBLEM_LIST_TAG);
+  updateTag(problemTag(problem.contestId, problem.index));
+
+  const tag = `${problem.contestId}${problem.index}`;
+  const link = `${SITE_URL}/problem/${problem.contestId}/${problem.index}`;
+  await sendAdminLog({
+    title: "♻️ Queued Regeneration",
+    description: `**[${tag} — ${problem.name}](${link})**\nExisting generated content was deleted and the problem was queued for a future local Codex run.`,
+    color: DISCORD_COLORS.info,
   });
 
   return { success: true } as const;
