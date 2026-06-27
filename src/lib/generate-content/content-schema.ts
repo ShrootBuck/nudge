@@ -57,7 +57,7 @@ export const problemOutputSchema: OutputSchema = {
         type: "string",
         enum: ["success", "unsolvable"],
         description:
-          "Set to 'success' if you can solve the problem. Set to 'unsolvable' if the problem statement is fundamentally incomplete or you cannot solve it.",
+          "Set to 'success' when the supplied statement defines a solvable programming problem. Set to 'unsolvable' only if the statement is fundamentally incomplete, contradictory, or depends on an inaccessible required resource.",
       },
       reason: {
         anyOf: [{ type: "string" }, { type: "null" }],
