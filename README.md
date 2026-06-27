@@ -30,10 +30,22 @@ Generation is local-only. Trigger.dev does not run Codex and there is no encoded
    bun run codex:next
    ```
 
+   To run several queued generations sequentially:
+
+   ```bash
+   bun run codex:next -- 3
+   ```
+
+   The explicit form also works:
+
+   ```bash
+   bun run codex:next -- --count 3
+   ```
+
 For a no-write preview of the next candidate:
 
 ```bash
 bun run codex:next -- --dry-run
 ```
 
-The command claims one eligible problem, runs Codex in a temporary read-only workspace, persists the generated hints/editorial/solution, records usage, and prints a compact completion summary.
+Each real run claims one eligible problem, runs Codex in a temporary read-only workspace, persists the generated hints/editorial/solution, records usage, and prints a compact completion summary.
