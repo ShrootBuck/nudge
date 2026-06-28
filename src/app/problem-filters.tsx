@@ -29,6 +29,14 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import {
   InputGroup,
   InputGroupAddon,
   InputGroupInput,
@@ -78,8 +86,11 @@ export function ProblemFilters({
     maxRating,
   ]);
 
+  const [tagDialogOpen, setTagDialogOpen] = useState(false);
   const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
+  const [ratingDialogOpen, setRatingDialogOpen] = useState(false);
   const [ratingPopoverOpen, setRatingPopoverOpen] = useState(false);
+  const [sortDialogOpen, setSortDialogOpen] = useState(false);
   const [sortPopoverOpen, setSortPopoverOpen] = useState(false);
 
   useEffect(() => {
@@ -149,6 +160,7 @@ export function ProblemFilters({
   }
 
   function updateSort(nextSort: ProblemSort) {
+    setSortDialogOpen(false);
     setSortPopoverOpen(false);
     updateParams({
       sort: nextSort === DEFAULT_PROBLEM_SORT ? null : nextSort,
@@ -159,6 +171,12 @@ export function ProblemFilters({
     clearTimeout(searchTimeoutRef.current);
     setSearchValue("");
     setSliderValue([MIN_RATING, MAX_RATING]);
+    setSortDialogOpen(false);
+    setSortPopoverOpen(false);
+    setRatingDialogOpen(false);
+    setRatingPopoverOpen(false);
+    setTagDialogOpen(false);
+    setTagPopoverOpen(false);
     updateParams({
       q: null,
       tags: null,
@@ -189,6 +207,145 @@ export function ProblemFilters({
     const others = availableTags.filter((t) => !selected.has(t));
     return [...tags.filter((t) => availableTags.includes(t)), ...others];
   }, [availableTags, tags]);
+
+  const sortTriggerContent = (
+    <>
+      <span className="flex min-w-0 items-center gap-1.5">
+        <ListFilter data-icon="inline-start" />
+        <span className="truncate">{sortLabel}</span>
+      </span>
+      <ChevronDown data-icon="inline-end" />
+    </>
+  );
+
+  const ratingTriggerContent = (
+    <>
+      <span className="flex min-w-0 items-center gap-1.5">
+        <SlidersHorizontal data-icon="inline-start" />
+        <span className="truncate">
+          {sliderRatingActive
+            ? `${sliderValue[0]} - ${sliderValue[1]}`
+            : "Rating"}
+        </span>
+      </span>
+      <ChevronDown data-icon="inline-end" />
+    </>
+  );
+
+  const tagTriggerContent = (
+    <>
+      <span className="flex min-w-0 items-center gap-1.5">
+        <Tag data-icon="inline-start" />
+        <span className="truncate">
+          {tags.length > 0 ? `Tags (${tags.length})` : "Tags"}
+        </span>
+      </span>
+      <ChevronDown data-icon="inline-end" />
+    </>
+  );
+
+  const sortMenu = (
+    <Command>
+      <CommandList className="max-h-[min(22rem,calc(100dvh-8rem))]">
+        <CommandGroup heading="Sort by">
+          {PROBLEM_SORT_OPTIONS.map((option) => (
+            <CommandItem
+              key={option.value}
+              value={option.value}
+              onSelect={() => updateSort(option.value)}
+              data-checked={option.value === sort}
+              className="cursor-pointer"
+            >
+              <div className="min-w-0">
+                <div className="truncate">{option.label}</div>
+                <div className="truncate text-xs text-muted-foreground">
+                  {option.description}
+                </div>
+              </div>
+            </CommandItem>
+          ))}
+        </CommandGroup>
+      </CommandList>
+    </Command>
+  );
+
+  const ratingPanel = (
+    <div className="flex flex-col gap-4 p-4">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <div className="text-sm font-medium">Rating range</div>
+          <div className="mt-1 font-mono text-xs tabular-nums text-muted-foreground">
+            {sliderValue[0]} - {sliderValue[1]}
+          </div>
+        </div>
+        {sliderRatingActive && (
+          <Button variant="ghost" size="xs" onClick={resetRating}>
+            Reset
+          </Button>
+        )}
+      </div>
+      <Slider
+        min={MIN_RATING}
+        max={MAX_RATING}
+        step={RATING_STEP}
+        minStepsBetweenValues={1}
+        value={sliderValue}
+        onValueChange={(value) => {
+          if (Array.isArray(value)) {
+            setSliderValue([value[0], value[1]] as [number, number]);
+          }
+        }}
+        onValueCommitted={(value) => {
+          if (Array.isArray(value)) {
+            commitRating(value);
+          }
+        }}
+      />
+      <div className="flex justify-between font-mono text-[10px] tabular-nums text-muted-foreground/70">
+        <span>{MIN_RATING}</span>
+        <span>{MAX_RATING}</span>
+      </div>
+    </div>
+  );
+
+  const tagMenu = (
+    <Command
+      // cmdk needs explicit filter for our string items
+      filter={(value, search) =>
+        value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0
+      }
+    >
+      <CommandInput placeholder="Search tags..." />
+      <CommandList className="max-h-[min(22rem,calc(100dvh-9rem))]">
+        <CommandEmpty>No tags found.</CommandEmpty>
+        <CommandGroup heading="Tags">
+          {sortedTagList.map((tag) => {
+            const selected = tags.includes(tag);
+            return (
+              <CommandItem
+                key={tag}
+                value={tag}
+                onSelect={() => toggleTag(tag)}
+                className="cursor-pointer"
+              >
+                <span
+                  className={cn(
+                    "flex size-4 items-center justify-center rounded border",
+                    selected
+                      ? "border-foreground bg-foreground text-background"
+                      : "border-border",
+                  )}
+                >
+                  {selected && <Check />}
+                </span>
+                <span className="truncate">{tag}</span>
+              </CommandItem>
+            );
+          })}
+        </CommandGroup>
+      </CommandList>
+    </Command>
+  );
 
   return (
     <div className="flex flex-col gap-4" aria-busy={isPending}>
@@ -233,172 +390,173 @@ export function ProblemFilters({
           </div>
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-2 xl:w-auto xl:grid-cols-[auto_auto_auto_auto]">
-          <Popover open={sortPopoverOpen} onOpenChange={setSortPopoverOpen}>
-            <PopoverTrigger
-              render={
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="w-full justify-between border-border/60 bg-background/80 shadow-sm xl:w-56"
-                />
-              }
-            >
-              <span className="flex min-w-0 items-center gap-1.5">
-                <ListFilter data-icon="inline-start" />
-                <span className="truncate">{sortLabel}</span>
-              </span>
-              <ChevronDown data-icon="inline-end" />
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-72 p-0" sideOffset={6}>
-              <Command>
-                <CommandList>
-                  <CommandGroup heading="Sort by">
-                    {PROBLEM_SORT_OPTIONS.map((option) => (
-                      <CommandItem
-                        key={option.value}
-                        value={option.value}
-                        onSelect={() => updateSort(option.value)}
-                        data-checked={option.value === sort}
-                        className="cursor-pointer"
-                      >
-                        <div className="min-w-0">
-                          <div className="truncate">{option.label}</div>
-                          <div className="truncate text-xs text-muted-foreground">
-                            {option.description}
-                          </div>
-                        </div>
-                      </CommandItem>
-                    ))}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
+        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:w-auto xl:grid-cols-[14rem_11rem_9rem_auto]">
+          <div className="col-span-2 md:col-span-1">
+            <div className="md:hidden">
+              <Dialog open={sortDialogOpen} onOpenChange={setSortDialogOpen}>
+                <DialogTrigger
+                  render={
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      className="w-full justify-between border-border/60 bg-background/80 shadow-sm"
+                    />
+                  }
+                >
+                  {sortTriggerContent}
+                </DialogTrigger>
+                <DialogContent
+                  className="max-h-[calc(100dvh-2rem)] overflow-hidden p-0 sm:max-w-md"
+                  showCloseButton={false}
+                >
+                  <DialogHeader className="sr-only">
+                    <DialogTitle>Sort problems</DialogTitle>
+                    <DialogDescription>
+                      Choose how the problem list should be sorted.
+                    </DialogDescription>
+                  </DialogHeader>
+                  {sortMenu}
+                </DialogContent>
+              </Dialog>
+            </div>
 
-          <Popover open={ratingPopoverOpen} onOpenChange={setRatingPopoverOpen}>
-            <PopoverTrigger
-              render={
-                <Button
-                  variant={committedRatingActive ? "secondary" : "outline"}
-                  size="lg"
-                  className="w-full justify-between border-border/60 shadow-sm xl:w-44"
-                />
-              }
-            >
-              <span className="flex min-w-0 items-center gap-1.5">
-                <SlidersHorizontal data-icon="inline-start" />
-                <span className="truncate">
-                  {sliderRatingActive
-                    ? `${sliderValue[0]} - ${sliderValue[1]}`
-                    : "Rating"}
-                </span>
-              </span>
-              <ChevronDown data-icon="inline-end" />
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-80 p-4" sideOffset={6}>
-              <div className="flex flex-col gap-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-sm font-medium">Rating range</div>
-                    <div className="mt-1 font-mono text-xs tabular-nums text-muted-foreground">
-                      {sliderValue[0]} - {sliderValue[1]}
-                    </div>
-                  </div>
-                  {sliderRatingActive && (
-                    <Button variant="ghost" size="xs" onClick={resetRating}>
-                      Reset
-                    </Button>
-                  )}
-                </div>
-                <Slider
-                  min={MIN_RATING}
-                  max={MAX_RATING}
-                  step={RATING_STEP}
-                  minStepsBetweenValues={1}
-                  value={sliderValue}
-                  onValueChange={(value) => {
-                    if (Array.isArray(value)) {
-                      setSliderValue([value[0], value[1]] as [number, number]);
-                    }
-                  }}
-                  onValueCommitted={(value) => {
-                    if (Array.isArray(value)) {
-                      commitRating(value);
-                    }
-                  }}
-                />
-                <div className="flex justify-between font-mono text-[10px] tabular-nums text-muted-foreground/70">
-                  <span>{MIN_RATING}</span>
-                  <span>{MAX_RATING}</span>
-                </div>
-              </div>
-            </PopoverContent>
-          </Popover>
+            <div className="hidden md:block">
+              <Popover open={sortPopoverOpen} onOpenChange={setSortPopoverOpen}>
+                <PopoverTrigger
+                  render={
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      className="w-full justify-between border-border/60 bg-background/80 shadow-sm"
+                    />
+                  }
+                >
+                  {sortTriggerContent}
+                </PopoverTrigger>
+                <PopoverContent align="end" className="w-72 p-0" sideOffset={6}>
+                  {sortMenu}
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
 
-          <Popover open={tagPopoverOpen} onOpenChange={setTagPopoverOpen}>
-            <PopoverTrigger
-              render={
-                <Button
-                  variant={tags.length > 0 ? "secondary" : "outline"}
-                  size="lg"
-                  className="w-full justify-between border-border/60 shadow-sm xl:w-36"
-                />
-              }
-            >
-              <span className="flex min-w-0 items-center gap-1.5">
-                <Tag data-icon="inline-start" />
-                <span className="truncate">
-                  {tags.length > 0 ? `Tags (${tags.length})` : "Tags"}
-                </span>
-              </span>
-              <ChevronDown data-icon="inline-end" />
-            </PopoverTrigger>
-            <PopoverContent align="end" className="w-80 p-0" sideOffset={6}>
-              <Command
-                // cmdk needs explicit filter for our string items
-                filter={(value, search) =>
-                  value.toLowerCase().includes(search.toLowerCase()) ? 1 : 0
-                }
+          <div>
+            <div className="md:hidden">
+              <Dialog
+                open={ratingDialogOpen}
+                onOpenChange={setRatingDialogOpen}
               >
-                <CommandInput placeholder="Search tags..." />
-                <CommandList>
-                  <CommandEmpty>No tags found.</CommandEmpty>
-                  <CommandGroup heading="Tags">
-                    {sortedTagList.map((tag) => {
-                      const selected = tags.includes(tag);
-                      return (
-                        <CommandItem
-                          key={tag}
-                          value={tag}
-                          onSelect={() => toggleTag(tag)}
-                          className="cursor-pointer"
-                        >
-                          <span
-                            className={cn(
-                              "flex size-4 items-center justify-center rounded border",
-                              selected
-                                ? "border-foreground bg-foreground text-background"
-                                : "border-border",
-                            )}
-                          >
-                            {selected && <Check />}
-                          </span>
-                          <span className="truncate">{tag}</span>
-                        </CommandItem>
-                      );
-                    })}
-                  </CommandGroup>
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
+                <DialogTrigger
+                  render={
+                    <Button
+                      variant={committedRatingActive ? "secondary" : "outline"}
+                      size="lg"
+                      className="w-full justify-between border-border/60 shadow-sm"
+                    />
+                  }
+                >
+                  {ratingTriggerContent}
+                </DialogTrigger>
+                <DialogContent
+                  className="max-h-[calc(100dvh-2rem)] overflow-hidden p-0 sm:max-w-md"
+                  showCloseButton={false}
+                >
+                  <DialogHeader className="sr-only">
+                    <DialogTitle>Filter by rating</DialogTitle>
+                    <DialogDescription>
+                      Pick the Codeforces rating range.
+                    </DialogDescription>
+                  </DialogHeader>
+                  {ratingPanel}
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            <div className="hidden md:block">
+              <Popover
+                open={ratingPopoverOpen}
+                onOpenChange={setRatingPopoverOpen}
+              >
+                <PopoverTrigger
+                  render={
+                    <Button
+                      variant={committedRatingActive ? "secondary" : "outline"}
+                      size="lg"
+                      className="w-full justify-between border-border/60 shadow-sm"
+                    />
+                  }
+                >
+                  {ratingTriggerContent}
+                </PopoverTrigger>
+                <PopoverContent
+                  align="end"
+                  className="w-[min(20rem,calc(100vw-2rem))] p-0"
+                  sideOffset={6}
+                >
+                  {ratingPanel}
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
+
+          <div>
+            <div className="md:hidden">
+              <Dialog open={tagDialogOpen} onOpenChange={setTagDialogOpen}>
+                <DialogTrigger
+                  render={
+                    <Button
+                      variant={tags.length > 0 ? "secondary" : "outline"}
+                      size="lg"
+                      className="w-full justify-between border-border/60 shadow-sm"
+                    />
+                  }
+                >
+                  {tagTriggerContent}
+                </DialogTrigger>
+                <DialogContent
+                  className="max-h-[calc(100dvh-2rem)] overflow-hidden p-0 sm:max-w-md"
+                  showCloseButton={false}
+                >
+                  <DialogHeader className="sr-only">
+                    <DialogTitle>Filter by tags</DialogTitle>
+                    <DialogDescription>
+                      Choose one or more Codeforces tags.
+                    </DialogDescription>
+                  </DialogHeader>
+                  {tagMenu}
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            <div className="hidden md:block">
+              <Popover open={tagPopoverOpen} onOpenChange={setTagPopoverOpen}>
+                <PopoverTrigger
+                  render={
+                    <Button
+                      variant={tags.length > 0 ? "secondary" : "outline"}
+                      size="lg"
+                      className="w-full justify-between border-border/60 shadow-sm"
+                    />
+                  }
+                >
+                  {tagTriggerContent}
+                </PopoverTrigger>
+                <PopoverContent
+                  align="end"
+                  className="w-[min(20rem,calc(100vw-2rem))] p-0"
+                  sideOffset={6}
+                >
+                  {tagMenu}
+                </PopoverContent>
+              </Popover>
+            </div>
+          </div>
 
           {activeFilterCount > 0 && (
             <Button
               variant="ghost"
               size="lg"
-              className="w-full xl:w-auto"
+              className="col-span-2 w-full md:col-span-1 xl:w-auto"
               onClick={clearFilters}
             >
               Clear filters

@@ -17,8 +17,8 @@ export const metadata: Metadata = {
 export default function AboutPage() {
   return (
     <main className="min-h-screen pb-16">
-      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
-        <section className="relative overflow-hidden rounded-[2rem] border border-border/70 bg-card/80 p-6 shadow-[0_28px_70px_-40px_rgba(15,23,42,0.45)] backdrop-blur sm:p-10">
+      <div className="mx-auto max-w-4xl px-4 py-6 sm:px-6 sm:py-12 lg:px-8">
+        <section className="relative overflow-hidden rounded-[1.5rem] border border-border/70 bg-card/80 p-5 shadow-[0_28px_70px_-40px_rgba(15,23,42,0.45)] backdrop-blur sm:rounded-[2rem] sm:p-10">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.12),transparent_32%),radial-gradient(circle_at_85%_15%,rgba(245,158,11,0.16),transparent_28%)]" />
 
           <div className="relative">
@@ -40,13 +40,13 @@ export default function AboutPage() {
           </div>
         </section>
 
-        <section className="mt-10">
+        <section className="mt-8 sm:mt-10">
           <h2 className="text-xl font-semibold tracking-tight">How it works</h2>
           <p className="mt-2 text-sm text-muted-foreground">
             Three stages, fully automated.
           </p>
 
-          <div className="mt-6 grid gap-4 sm:grid-cols-3">
+          <div className="mt-5 grid gap-3 sm:mt-6 sm:grid-cols-3 sm:gap-4">
             <StepCard
               icon={Cpu}
               step="1"
@@ -68,8 +68,8 @@ export default function AboutPage() {
           </div>
         </section>
 
-        <section className="mt-10">
-          <div className="rounded-[1.75rem] border border-border/70 bg-card/75 p-6 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] backdrop-blur sm:p-8">
+        <section className="mt-8 sm:mt-10">
+          <div className="rounded-[1.25rem] border border-border/70 bg-card/75 p-5 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] backdrop-blur sm:rounded-[1.75rem] sm:p-8">
             <div className="flex items-start gap-4">
               <div className="shrink-0 rounded-full border border-border/60 bg-background/80 p-2.5 text-muted-foreground">
                 <Lightbulb className="size-5" />
@@ -90,7 +90,7 @@ export default function AboutPage() {
           </div>
         </section>
 
-        <section className="mt-10 text-center">
+        <section className="mt-8 text-center sm:mt-10">
           <a
             href="https://github.com/ShrootBuck/nudge"
             target="_blank"
@@ -118,7 +118,7 @@ function StepCard({
   description: string;
 }) {
   return (
-    <div className="rounded-[1.5rem] border border-border/60 bg-card/75 p-5 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] backdrop-blur transition hover:-translate-y-0.5 hover:border-foreground/15 hover:shadow-lg">
+    <div className="rounded-[1.25rem] border border-border/60 bg-card/75 p-4 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] backdrop-blur transition hover:-translate-y-0.5 hover:border-foreground/15 hover:shadow-lg sm:rounded-[1.5rem] sm:p-5">
       <div className="flex items-center gap-3">
         <div className="inline-flex size-8 items-center justify-center rounded-full border border-border/60 bg-background/80 text-muted-foreground">
           <Icon className="size-4" />

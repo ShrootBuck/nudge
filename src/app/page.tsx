@@ -289,22 +289,22 @@ export default async function Home({
 
   return (
     <main className="min-h-screen pb-16">
-      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-        <section className="relative overflow-hidden rounded-[2rem] border border-border/70 bg-card/80 p-6 shadow-[0_28px_70px_-40px_rgba(15,23,42,0.45)] backdrop-blur sm:p-8">
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+        <section className="relative overflow-hidden rounded-[1.5rem] border border-border/70 bg-card/80 p-5 shadow-[0_28px_70px_-40px_rgba(15,23,42,0.45)] backdrop-blur sm:rounded-[2rem] sm:p-8">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.12),transparent_32%),radial-gradient(circle_at_85%_15%,rgba(245,158,11,0.16),transparent_28%)]" />
 
-          <div className="relative grid gap-8 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
-            <div>
+          <div className="relative grid gap-6 sm:gap-8 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
+            <div className="min-w-0">
               <span className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 py-1 text-xs font-medium tracking-wide text-muted-foreground shadow-sm">
                 <Sparkles className="size-3.5" />
                 Competitive programming, slower and smarter
               </span>
 
-              <h1 className="mt-5 max-w-3xl text-4xl font-semibold tracking-tight text-balance sm:text-5xl">
+              <h1 className="mt-5 max-w-3xl text-3xl font-semibold tracking-tight text-balance sm:text-5xl">
                 Get unstuck without skipping straight to the answer.
               </h1>
 
-              <p className="mt-4 max-w-2xl text-base/7 text-muted-foreground sm:text-lg/8">
+              <p className="mt-4 max-w-2xl text-sm/7 text-muted-foreground sm:text-lg/8">
                 Nudge stores completed Codeforces problems with progressive
                 hints, a clean editorial, and the full C++ write-up once you
                 actually want it.
@@ -315,7 +315,7 @@ export default async function Home({
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+            <div className="grid gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-1">
               <StatCard
                 label={
                   activeFilterCount ? "Matching problems" : "Completed problems"
@@ -336,7 +336,7 @@ export default async function Home({
           </div>
         </section>
 
-        <section className="mt-6 rounded-[1.75rem] border border-border/70 bg-card/75 p-4 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] backdrop-blur sm:p-6">
+        <section className="mt-5 rounded-[1.25rem] border border-border/70 bg-card/75 p-3 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] backdrop-blur sm:mt-6 sm:rounded-[1.75rem] sm:p-6">
           <ProblemFilters
             query={query}
             tags={tags}
@@ -361,7 +361,7 @@ export default async function Home({
           </div>
 
           {problems.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-[1.75rem] border border-dashed border-border/60 bg-card/65 px-6 py-18 text-center shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)]">
+            <div className="flex flex-col items-center justify-center rounded-[1.25rem] border border-dashed border-border/60 bg-card/65 px-5 py-14 text-center shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] sm:rounded-[1.75rem] sm:px-6 sm:py-18">
               <div className="mb-4 rounded-full border border-border/60 bg-background/80 p-3 text-muted-foreground shadow-sm">
                 <SearchX className="size-5" />
               </div>
@@ -372,12 +372,12 @@ export default async function Home({
               </div>
             </div>
           ) : (
-            <div className="space-y-3">
+            <div className="flex flex-col gap-3">
               {problems.map((problem) => (
                 <Link
                   key={problem.id}
                   href={`/problem/${problem.contestId}/${problem.index}`}
-                  className="group relative block overflow-hidden rounded-[1.5rem] border border-border/60 bg-card/75 p-4 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] transition duration-200 hover:-translate-y-0.5 hover:border-foreground/15 hover:shadow-[0_24px_60px_-36px_rgba(15,23,42,0.5)] sm:p-5"
+                  className="group relative block overflow-hidden rounded-[1.25rem] border border-border/60 bg-card/75 p-4 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] transition duration-200 hover:-translate-y-0.5 hover:border-foreground/15 hover:shadow-[0_24px_60px_-36px_rgba(15,23,42,0.5)] sm:rounded-[1.5rem] sm:p-5"
                 >
                   <div className="absolute inset-0 bg-[linear-gradient(120deg,rgba(56,189,248,0.08),transparent_32%,rgba(245,158,11,0.1))] opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
 
@@ -399,8 +399,8 @@ export default async function Home({
                         )}
                       </div>
 
-                      <h3 className="mt-3 text-lg font-semibold tracking-tight sm:text-xl">
-                        <span className="inline-flex items-baseline gap-2 text-balance">
+                      <h3 className="mt-3 text-base font-semibold tracking-tight sm:text-xl">
+                        <span className="inline-flex min-w-0 items-baseline gap-2 text-balance">
                           <span>{problem.name}</span>
                           <ArrowRight className="size-4 shrink-0 translate-y-[0.02em] text-muted-foreground transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-foreground" />
                         </span>
@@ -474,17 +474,17 @@ function Pagination({
   }
 
   return (
-    <nav className="mt-10 flex items-center justify-center gap-1.5">
+    <nav className="mt-10 flex flex-wrap items-center justify-center gap-1.5">
       {currentPage > 1 ? (
         <Link
           href={buildPageUrl(searchParams, currentPage - 1)}
           scroll={false}
-          className="inline-flex size-10 items-center justify-center rounded-full border border-border/60 bg-card/75 text-muted-foreground transition hover:border-foreground/15 hover:text-foreground"
+          className="inline-flex size-9 items-center justify-center rounded-full border border-border/60 bg-card/75 text-muted-foreground transition hover:border-foreground/15 hover:text-foreground sm:size-10"
         >
           <ChevronLeft className="size-4" />
         </Link>
       ) : (
-        <span className="inline-flex size-10 items-center justify-center rounded-full border border-border/40 bg-card/40 text-muted-foreground/30">
+        <span className="inline-flex size-9 items-center justify-center rounded-full border border-border/40 bg-card/40 text-muted-foreground/30 sm:size-10">
           <ChevronLeft className="size-4" />
         </span>
       )}
@@ -493,7 +493,7 @@ function Pagination({
         p === "ellipsis-left" || p === "ellipsis-right" ? (
           <span
             key={p}
-            className="inline-flex size-10 items-center justify-center text-sm text-muted-foreground/40"
+            className="inline-flex size-9 items-center justify-center text-sm text-muted-foreground/40 sm:size-10"
           >
             ...
           </span>
@@ -502,7 +502,7 @@ function Pagination({
             key={p}
             href={buildPageUrl(searchParams, p)}
             scroll={false}
-            className={`inline-flex size-10 items-center justify-center rounded-full border text-sm transition ${
+            className={`inline-flex size-9 items-center justify-center rounded-full border text-sm transition sm:size-10 ${
               p === currentPage
                 ? "border-foreground bg-foreground font-medium text-background shadow-sm"
                 : "border-border/60 bg-card/75 text-muted-foreground hover:border-foreground/15 hover:text-foreground"
@@ -517,12 +517,12 @@ function Pagination({
         <Link
           href={buildPageUrl(searchParams, currentPage + 1)}
           scroll={false}
-          className="inline-flex size-10 items-center justify-center rounded-full border border-border/60 bg-card/75 text-muted-foreground transition hover:border-foreground/15 hover:text-foreground"
+          className="inline-flex size-9 items-center justify-center rounded-full border border-border/60 bg-card/75 text-muted-foreground transition hover:border-foreground/15 hover:text-foreground sm:size-10"
         >
           <ChevronRight className="size-4" />
         </Link>
       ) : (
-        <span className="inline-flex size-10 items-center justify-center rounded-full border border-border/40 bg-card/40 text-muted-foreground/30">
+        <span className="inline-flex size-9 items-center justify-center rounded-full border border-border/40 bg-card/40 text-muted-foreground/30 sm:size-10">
           <ChevronRight className="size-4" />
         </span>
       )}
@@ -540,7 +540,7 @@ function StatCard({
   detail: string;
 }) {
   return (
-    <div className="rounded-[1.4rem] border border-border/70 bg-background/78 p-4 shadow-sm backdrop-blur">
+    <div className="rounded-[1.15rem] border border-border/70 bg-background/78 p-3.5 shadow-sm backdrop-blur sm:rounded-[1.4rem] sm:p-4">
       <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
         {label}
       </p>

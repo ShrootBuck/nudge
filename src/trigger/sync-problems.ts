@@ -3,6 +3,7 @@ import { safeRevalidateTag } from "../lib/cache-revalidate";
 import { PROBLEM_LIST_TAG, problemTag } from "../lib/cache-tags";
 import { discordLog } from "../lib/discord-log";
 import { DISCORD_COLORS } from "../lib/discord-webhook";
+import { resetStaleRunningGenerations } from "../lib/generation-queue";
 import { fetchWithTimeout } from "../lib/http";
 import { prisma } from "../lib/prisma";
 import {
@@ -50,6 +51,49 @@ export const syncProblems = schedules.task({
     timezone: "America/Phoenix",
   },
   run: async () => {
+    const staleGenerationReset = await resetStaleRunningGenerations();
+
+    if (staleGenerationReset.resetCount > 0) {
+      safeRevalidateTag(PROBLEM_LIST_TAG, "max");
+      for (const problem of staleGenerationReset.problems) {
+        safeRevalidateTag(problemTag(problem.contestId, problem.index), "max");
+      }
+
+      const shownProblems = staleGenerationReset.problems.slice(0, 10);
+      const problemLines = shownProblems.map((problem) => {
+        const startedAt = problem.generationStartedAt
+          ? `<t:${Math.floor(problem.generationStartedAt.getTime() / 1000)}:R>`
+          : "unknown start time";
+        return `**${problem.contestId}${problem.index} - ${problem.name}** (${problem.generationAttempts} attempt${problem.generationAttempts === 1 ? "" : "s"}, started ${startedAt})`;
+      });
+      const extraCount = staleGenerationReset.resetCount - shownProblems.length;
+
+      logger.info("Reset stale running generations", {
+        count: staleGenerationReset.resetCount,
+        cutoff: staleGenerationReset.cutoff.toISOString(),
+      });
+
+      await discordLog({
+        title: "Stale Generations Requeued",
+        description: [
+          `Reset **${staleGenerationReset.resetCount}** generation${staleGenerationReset.resetCount === 1 ? "" : "s"} that had been running for more than 24 hours.`,
+          "",
+          ...problemLines,
+          ...(extraCount > 0 ? [`...and ${extraCount} more.`] : []),
+        ].join("\n"),
+        color: DISCORD_COLORS.warning,
+        fields: [
+          {
+            name: "Cutoff",
+            value: `<t:${Math.floor(staleGenerationReset.cutoff.getTime() / 1000)}:f>`,
+            inline: true,
+          },
+        ],
+      });
+    } else {
+      logger.info("No stale running generations to reset");
+    }
+
     logger.info("Fetching problems from Codeforces API");
 
     const res = await fetchWithTimeout(
@@ -213,6 +257,13 @@ export const syncProblems = schedules.task({
       throw new Error(`Problem sync completed with ${failed} failed upserts`);
     }
 
-    return { created, updated, unchanged, total: problems.length, failed };
+    return {
+      created,
+      updated,
+      unchanged,
+      total: problems.length,
+      failed,
+      staleGenerationsReset: staleGenerationReset.resetCount,
+    };
   },
 });

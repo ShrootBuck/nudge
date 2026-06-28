@@ -24,15 +24,15 @@ export function Navbar() {
   return (
     <header className="sticky top-0 z-50 w-full">
       <div className="border-b border-border/50 bg-background/60 backdrop-blur-xl">
-        <nav className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        <nav className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
           <Link
             href="/"
-            className="flex items-center gap-2 text-lg font-semibold tracking-tight transition hover:opacity-80"
+            className="flex min-w-0 items-center gap-2 text-lg font-semibold tracking-tight transition hover:opacity-80"
           >
             <span className="inline-flex size-7 items-center justify-center rounded-sm bg-foreground text-background text-xs font-bold">
               N
             </span>
-            Nudge
+            <span className="truncate">Nudge</span>
           </Link>
 
           <div className="hidden items-center gap-1 sm:flex">
@@ -60,7 +60,7 @@ export function Navbar() {
             })}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <button
               type="button"
               onClick={() => setCommandOpen(true)}
@@ -107,7 +107,7 @@ export function Navbar() {
           id="site-mobile-nav"
           className="border-b border-border/50 bg-background/80 backdrop-blur-xl sm:hidden"
         >
-          <div className="mx-auto max-w-6xl space-y-1 px-4 pb-4 pt-2">
+          <div className="mx-auto flex max-w-6xl flex-col gap-1 px-4 pb-4 pt-2">
             {NAV_LINKS.map((link) => {
               const isActive =
                 link.href === "/"

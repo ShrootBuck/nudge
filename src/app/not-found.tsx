@@ -9,12 +9,12 @@ export const metadata: Metadata = {
 
 export default function NotFound() {
   return (
-    <main className="flex flex-1 items-center justify-center p-4 min-h-[60vh]">
+    <main className="flex min-h-[60vh] flex-1 items-center justify-center p-4">
       <div className="mx-auto w-full max-w-md text-center">
-        <div className="relative mx-auto mb-8 flex h-24 w-24 items-center justify-center rounded-full border border-border/70 bg-card/80 shadow-[0_28px_70px_-40px_rgba(15,23,42,0.45)] backdrop-blur">
+        <div className="relative mx-auto mb-6 flex size-20 items-center justify-center rounded-full border border-border/70 bg-card/80 shadow-[0_28px_70px_-40px_rgba(15,23,42,0.45)] backdrop-blur sm:mb-8 sm:size-24">
           <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.12),transparent_32%)]" />
           <FileQuestion
-            className="relative size-10 text-muted-foreground"
+            className="relative size-8 text-muted-foreground sm:size-10"
             strokeWidth={1.5}
           />
         </div>
@@ -22,7 +22,7 @@ export default function NotFound() {
         <h1 className="mb-3 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
           Page not found
         </h1>
-        <p className="mb-8 text-base/7 text-muted-foreground">
+        <p className="mb-6 text-sm/7 text-muted-foreground sm:mb-8 sm:text-base/7">
           We couldn&apos;t find the page you were looking for. It might have
           been moved or deleted.
         </p>

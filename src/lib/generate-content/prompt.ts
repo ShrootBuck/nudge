@@ -58,6 +58,7 @@ Output strictness:
 - Return \`status: "unsolvable"\`, a short \`reason\`, and set \`hints\`, \`editorial\`, and \`solution\` to null only when the supplied statement is fundamentally incomplete, contradictory, or dependent on an inaccessible resource needed to define the task. Missing research is not a reason to return unsolvable.
 - Each hint must be JUST the hint text. No "Hint 1:" or subtitles. The UI adds those automatically.
 - Do not start the editorial with an "# Editorial" heading. The UI already adds that section. Feel free to add other headers as needed though.
+- Use styling in the editorial if needed! Just that first header is no good but any subheaders or bolding or whatever is good!
 
 For the C++ solution, you MUST use this template and work around it:
 

@@ -88,15 +88,15 @@ export function CommandMenu({
                   value={`${problem.contestId}${problem.index} ${problem.name}`}
                   onSelect={() => onSelect(problem)}
                 >
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-muted-foreground">
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
+                    <span className="shrink-0 font-mono text-muted-foreground">
                       {problem.contestId}
                       {problem.index}
                     </span>
-                    <span>{problem.name}</span>
+                    <span className="min-w-0 truncate">{problem.name}</span>
                     {problem.rating && (
                       <span
-                        className={`ml-auto inline-flex items-center rounded-full border px-2 py-0.5 font-mono text-[10px] font-semibold ${ratingTone(
+                        className={`ml-auto inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 font-mono text-[10px] font-semibold ${ratingTone(
                           problem.rating,
                         )}`}
                       >

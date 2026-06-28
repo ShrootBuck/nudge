@@ -76,7 +76,7 @@ export function ProblemFooterLinks({
   const cfUrl = cfProblemUrl(contestId, index);
 
   return (
-    <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <div className="mt-8 flex flex-col gap-3 sm:mt-10 sm:flex-row sm:items-center sm:justify-between">
       <a
         href={cfUrl}
         target="_blank"
@@ -128,7 +128,7 @@ export function ReportSection({ problemId }: { problemId: string }) {
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-[1.75rem] border bg-card/75 shadow-sm transition duration-200",
+        "overflow-hidden rounded-[1.25rem] border bg-card/75 shadow-sm transition duration-200 sm:rounded-[1.75rem]",
         open
           ? "border-amber-500/20"
           : "border-border/60 hover:border-foreground/10",
@@ -139,10 +139,10 @@ export function ReportSection({ problemId }: { problemId: string }) {
         onClick={() => setOpen(!open)}
         aria-expanded={open}
         aria-controls={panelId}
-        className="flex w-full cursor-pointer items-center justify-between gap-4 px-5 py-4 text-left sm:px-6"
+        className="flex w-full cursor-pointer items-center justify-between gap-3 px-4 py-3.5 text-left sm:gap-4 sm:px-6 sm:py-4"
       >
-        <div className="flex min-w-0 items-center gap-4">
-          <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-2xl border border-border/70 bg-background/80 text-muted-foreground shadow-sm">
+        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+          <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl border border-border/70 bg-background/80 text-muted-foreground shadow-sm sm:size-10 sm:rounded-2xl">
             <Flag className="size-4" />
           </span>
 
@@ -161,7 +161,7 @@ export function ReportSection({ problemId }: { problemId: string }) {
       </button>
 
       <AnimatedCollapse open={open} id={panelId}>
-        <div className="border-t border-border/60 px-5 pb-5 pt-4 sm:px-6">
+        <div className="border-t border-border/60 px-4 pb-4 pt-4 sm:px-6 sm:pb-5">
           {submitted ? (
             <div className="flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
               <Check className="size-4 shrink-0" />
@@ -310,7 +310,7 @@ export function ReviewSection({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-[1.75rem] border bg-card/75 shadow-sm transition duration-200",
+        "overflow-hidden rounded-[1.25rem] border bg-card/75 shadow-sm transition duration-200 sm:rounded-[1.75rem]",
         open
           ? "border-foreground/15"
           : "border-border/60 hover:border-foreground/10",
@@ -321,10 +321,10 @@ export function ReviewSection({
         onClick={() => setOpen(!open)}
         aria-expanded={open}
         aria-controls={panelId}
-        className="flex w-full cursor-pointer items-center justify-between gap-4 px-5 py-4 text-left sm:px-6"
+        className="flex w-full cursor-pointer items-center justify-between gap-3 px-4 py-3.5 text-left sm:gap-4 sm:px-6 sm:py-4"
       >
-        <div className="flex min-w-0 items-center gap-4">
-          <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-2xl border border-border/70 bg-background/80 text-muted-foreground shadow-sm">
+        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+          <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl border border-border/70 bg-background/80 text-muted-foreground shadow-sm sm:size-10 sm:rounded-2xl">
             <ShieldCheck className="size-4" />
           </span>
 
@@ -352,7 +352,7 @@ export function ReviewSection({
       </button>
 
       <AnimatedCollapse open={open} id={panelId}>
-        <div className="border-t border-border/60 px-5 pb-5 pt-4 sm:px-6">
+        <div className="border-t border-border/60 px-4 pb-4 pt-4 sm:px-6 sm:pb-5">
           <form
             onSubmit={handleSubmit}
             className="flex flex-col gap-4 sm:flex-row sm:items-end sm:flex-wrap"

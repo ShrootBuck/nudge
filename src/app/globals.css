@@ -122,6 +122,11 @@
   * {
     @apply border-border outline-ring/50;
   }
+  html,
+  body {
+    max-width: 100%;
+    overflow-x: clip;
+  }
   body {
     @apply bg-background text-foreground;
     background-image:
@@ -139,6 +144,9 @@
   }
   html {
     @apply font-sans;
+  }
+  main {
+    min-width: 0;
   }
   button:not(:disabled),
   [role="button"]:not(:disabled) {
@@ -160,10 +168,15 @@
   }
   .katex {
     color: inherit;
+    max-width: 100%;
   }
   .katex-display {
     overflow-x: auto;
     overflow-y: hidden;
     padding-block: 0.25rem;
+  }
+  .katex-display > .katex {
+    display: inline-block;
+    min-width: max-content;
   }
 }

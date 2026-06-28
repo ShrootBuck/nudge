@@ -22,8 +22,8 @@ export default function RequestPage() {
 
   return (
     <main className="min-h-screen pb-16">
-      <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 sm:py-12 lg:px-8">
-        <section className="relative overflow-hidden rounded-[2rem] border border-border/70 bg-card/80 p-6 shadow-[0_28px_70px_-40px_rgba(15,23,42,0.45)] backdrop-blur sm:p-10">
+      <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-12 lg:px-8">
+        <section className="relative overflow-hidden rounded-[1.5rem] border border-border/70 bg-card/80 p-5 shadow-[0_28px_70px_-40px_rgba(15,23,42,0.45)] backdrop-blur sm:rounded-[2rem] sm:p-10">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.12),transparent_32%),radial-gradient(circle_at_85%_15%,rgba(245,158,11,0.16),transparent_28%)]" />
 
           <div className="relative">
@@ -44,8 +44,8 @@ export default function RequestPage() {
         </section>
 
         <section className="mt-8">
-          <div className="rounded-[1.75rem] border border-border/70 bg-card/75 p-6 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] backdrop-blur sm:p-8">
-            <form action={formAction} className="space-y-4">
+          <div className="rounded-[1.25rem] border border-border/70 bg-card/75 p-5 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] backdrop-blur sm:rounded-[1.75rem] sm:p-8">
+            <form action={formAction} className="flex flex-col gap-4">
               <div>
                 <label
                   htmlFor="problem"
@@ -93,7 +93,7 @@ export default function RequestPage() {
         </section>
 
         <section className="mt-8">
-          <div className="rounded-[1.75rem] border border-border/70 bg-card/75 p-6 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] backdrop-blur sm:p-8">
+          <div className="rounded-[1.25rem] border border-border/70 bg-card/75 p-5 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] backdrop-blur sm:rounded-[1.75rem] sm:p-8">
             <h2 className="text-lg font-semibold tracking-tight">
               Looking for something else?
             </h2>

@@ -38,17 +38,19 @@ export function ProblemContentBody({ problem }: { problem: ProblemView }) {
   const cfUrl = cfProblemUrl(problem.contestId, problem.index);
   const resolvedRunState = resolveProblemRunState(problem);
   const hasContent = resolvedRunState === "SUCCEEDED";
+  const isUnsolvable = problem.reviewStatus === "UNSOLVABLE";
 
   const state = generationState(resolvedRunState, problem.reviewStatus);
   const StateIcon = state.icon;
+  const showGenerationBadge = !hasContent && !isUnsolvable;
 
   const review = reviewState(problem.reviewStatus);
   const ReviewIcon = review.icon;
 
   return (
     <main className="min-h-screen pb-20">
-      <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
-        <nav className="mb-6">
+      <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
+        <nav className="mb-5 sm:mb-6">
           <Link
             href="/"
             className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-card/75 px-4 py-2 text-sm text-muted-foreground shadow-sm transition hover:border-foreground/15 hover:text-foreground"
@@ -58,7 +60,7 @@ export function ProblemContentBody({ problem }: { problem: ProblemView }) {
           </Link>
         </nav>
 
-        <section className="relative overflow-hidden rounded-[2rem] border border-border/70 bg-card/80 p-6 shadow-[0_28px_70px_-40px_rgba(15,23,42,0.45)] backdrop-blur sm:p-8">
+        <section className="relative overflow-hidden rounded-[1.5rem] border border-border/70 bg-card/80 p-5 shadow-[0_28px_70px_-40px_rgba(15,23,42,0.45)] backdrop-blur sm:rounded-[2rem] sm:p-8">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.12),transparent_30%),radial-gradient(circle_at_90%_18%,rgba(245,158,11,0.14),transparent_28%)]" />
 
           <div className="relative">
@@ -67,7 +69,7 @@ export function ProblemContentBody({ problem }: { problem: ProblemView }) {
                 <div className="flex flex-wrap items-center gap-2">
                   <ProblemMetaRow problem={problem} hasContent={hasContent} />
 
-                  {!hasContent && (
+                  {showGenerationBadge && (
                     <span
                       className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs font-medium ${state.className}`}
                     >
@@ -92,7 +94,7 @@ export function ProblemContentBody({ problem }: { problem: ProblemView }) {
                 </p>
 
                 {problem.tags.length > 0 && (
-                  <div className="mt-6 flex flex-wrap gap-2">
+                  <div className="mt-5 flex flex-wrap gap-2 sm:mt-6">
                     {problem.tags.map((tag) => (
                       <Link
                         key={tag}
@@ -118,7 +120,7 @@ export function ProblemContentBody({ problem }: { problem: ProblemView }) {
                 </a>
 
                 <div
-                  className={`rounded-[1.25rem] border px-4 py-4 text-sm shadow-sm ${review.panelClassName}`}
+                  className={`rounded-[1.15rem] border px-4 py-4 text-sm shadow-sm sm:rounded-[1.25rem] ${review.panelClassName}`}
                 >
                   <div className="flex items-start gap-3">
                     <div className="rounded-xl border border-current/15 bg-background/60 p-2">
@@ -141,7 +143,7 @@ export function ProblemContentBody({ problem }: { problem: ProblemView }) {
 
         {!hasContent && (
           <section
-            className={`mt-8 rounded-[1.75rem] border px-6 py-8 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] ${state.className}`}
+            className={`mt-6 rounded-[1.25rem] border px-5 py-6 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] sm:mt-8 sm:rounded-[1.75rem] sm:px-6 sm:py-8 ${state.className}`}
           >
             <div className="flex items-start gap-4">
               <div className="rounded-2xl border border-current/15 bg-background/60 p-3">
@@ -163,7 +165,7 @@ export function ProblemContentBody({ problem }: { problem: ProblemView }) {
 
         {hasContent && problem.reviewStatus === "INCORRECT" && (
           <section
-            className={`mt-8 rounded-[1.75rem] border px-6 py-6 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] ${review.panelClassName}`}
+            className={`mt-6 rounded-[1.25rem] border px-5 py-6 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] sm:mt-8 sm:rounded-[1.75rem] sm:px-6 ${review.panelClassName}`}
           >
             <div className="flex items-start gap-4">
               <div className="rounded-2xl border border-current/15 bg-background/60 p-3">
@@ -183,9 +185,9 @@ export function ProblemContentBody({ problem }: { problem: ProblemView }) {
           </section>
         )}
 
-        {problem.reviewStatus === "UNSOLVABLE" && (
+        {hasContent && isUnsolvable && (
           <section
-            className={`mt-8 rounded-[1.75rem] border px-6 py-6 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] ${review.panelClassName}`}
+            className={`mt-6 rounded-[1.25rem] border px-5 py-6 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] sm:mt-8 sm:rounded-[1.75rem] sm:px-6 ${review.panelClassName}`}
           >
             <div className="flex items-start gap-4">
               <div className="rounded-2xl border border-current/15 bg-background/60 p-3">
@@ -206,9 +208,9 @@ export function ProblemContentBody({ problem }: { problem: ProblemView }) {
         )}
 
         {hasContent && (
-          <div className="mt-8 space-y-8">
+          <div className="mt-6 flex flex-col gap-6 sm:mt-8 sm:gap-8">
             {problem.hints.length > 0 && (
-              <section className="rounded-[1.75rem] border border-border/70 bg-card/75 p-5 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] sm:p-6">
+              <section className="rounded-[1.25rem] border border-border/70 bg-card/75 p-4 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] sm:rounded-[1.75rem] sm:p-6">
                 <SectionIntro
                   eyebrow="Hints"
                   title="Progressive nudges"
@@ -216,7 +218,7 @@ export function ProblemContentBody({ problem }: { problem: ProblemView }) {
                   icon={Lightbulb}
                 />
 
-                <div className="space-y-3">
+                <div className="flex flex-col gap-3">
                   {problem.hints.map((hint, i) => (
                     <HintCard key={hint.id} hint={hint} index={i} />
                   ))}
@@ -261,7 +263,7 @@ export function ProblemContentBody({ problem }: { problem: ProblemView }) {
           index={problem.index}
         />
 
-        <div className="mt-8 space-y-3">
+        <div className="mt-8 flex flex-col gap-3">
           {hasContent && problem.reviewStatus !== "VERIFIED" && (
             <ReportSection problemId={problem.id} />
           )}

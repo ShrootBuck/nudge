@@ -24,7 +24,7 @@ export function AnimatedCollapse({
         open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
       )}
     >
-      <div className="min-h-0 overflow-hidden">{children}</div>
+      <div className="min-h-0 min-w-0 overflow-hidden">{children}</div>
     </div>
   );
 }
@@ -63,7 +63,7 @@ export function HintCard({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-[1.4rem] border bg-card/75 shadow-sm transition duration-200",
+        "overflow-hidden rounded-[1.15rem] border bg-card/75 shadow-sm transition duration-200 sm:rounded-[1.4rem]",
         open
           ? "border-foreground/15"
           : "border-border/60 hover:border-foreground/10",
@@ -74,10 +74,10 @@ export function HintCard({
         onClick={() => setOpen(!open)}
         aria-expanded={open}
         aria-controls={panelId}
-        className="flex w-full cursor-pointer items-center justify-between gap-4 px-5 py-4 text-left sm:px-6"
+        className="flex w-full cursor-pointer items-center justify-between gap-3 px-4 py-3.5 text-left sm:gap-4 sm:px-6 sm:py-4"
       >
-        <div className="flex min-w-0 items-center gap-4">
-          <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-2xl border border-border/70 bg-background/80 font-mono text-sm font-semibold shadow-sm">
+        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+          <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl border border-border/70 bg-background/80 font-mono text-sm font-semibold shadow-sm sm:size-10 sm:rounded-2xl">
             {hint.order}
           </span>
 
@@ -92,7 +92,7 @@ export function HintCard({
       </button>
 
       <AnimatedCollapse open={open} id={panelId}>
-        <div className="border-t border-border/60 px-5 pb-5 pt-4 sm:px-6">
+        <div className="min-w-0 border-t border-border/60 px-4 pb-4 pt-4 sm:px-6 sm:pb-5">
           <ProblemMarkdown content={hint.content} />
         </div>
       </AnimatedCollapse>
@@ -138,11 +138,11 @@ export function SectionIntro({
   icon: ComponentType<{ className?: string }>;
 }) {
   return (
-    <div className="mb-5 flex items-start gap-4">
-      <div className="rounded-2xl border border-border/60 bg-background/80 p-3 text-muted-foreground shadow-sm">
+    <div className="mb-4 flex min-w-0 items-start gap-3 sm:mb-5 sm:gap-4">
+      <div className="rounded-xl border border-border/60 bg-background/80 p-2.5 text-muted-foreground shadow-sm sm:rounded-2xl sm:p-3">
         <Icon className="size-5" />
       </div>
-      <div>
+      <div className="min-w-0">
         <p className="text-xs font-semibold tracking-[0.24em] text-muted-foreground uppercase">
           {eyebrow}
         </p>
@@ -175,7 +175,7 @@ export function CollapsibleSection({
   return (
     <section
       className={cn(
-        "overflow-hidden rounded-[1.75rem] border bg-card/75 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] transition duration-200",
+        "overflow-hidden rounded-[1.25rem] border bg-card/75 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] transition duration-200 sm:rounded-[1.75rem]",
         open ? "border-foreground/15" : "border-border/70",
       )}
     >
@@ -184,13 +184,13 @@ export function CollapsibleSection({
         onClick={onToggle}
         aria-expanded={open}
         aria-controls={panelId}
-        className="flex w-full cursor-pointer items-center justify-between gap-4 p-5 text-left sm:p-6"
+        className="flex w-full cursor-pointer items-center justify-between gap-3 p-4 text-left sm:gap-4 sm:p-6"
       >
-        <div className="flex items-start gap-4">
-          <div className="rounded-2xl border border-border/60 bg-background/80 p-3 text-muted-foreground shadow-sm">
+        <div className="flex min-w-0 items-start gap-3 sm:gap-4">
+          <div className="rounded-xl border border-border/60 bg-background/80 p-2.5 text-muted-foreground shadow-sm sm:rounded-2xl sm:p-3">
             <Icon className="size-5" />
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-xs font-semibold tracking-[0.24em] text-muted-foreground uppercase">
               {eyebrow}
             </p>
@@ -204,7 +204,7 @@ export function CollapsibleSection({
       </button>
 
       <AnimatedCollapse open={open} id={panelId}>
-        <div className="border-t border-border/60 px-5 pb-5 pt-4 sm:px-6">
+        <div className="min-w-0 border-t border-border/60 px-4 pb-4 pt-4 sm:px-6 sm:pb-5">
           {children}
         </div>
       </AnimatedCollapse>

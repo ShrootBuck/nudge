@@ -3,6 +3,7 @@ import { prisma } from "./prisma";
 import { pipelineStateData, problemUpdateData } from "./problem-pipeline-db";
 
 export const AUTOMATIC_GENERATION_MAX_ATTEMPTS = 3;
+export const STALE_RUNNING_GENERATION_AGE_MS = 24 * 60 * 60 * 1000;
 const CLAIM_TRANSACTION_MAX_WAIT_MS = 15_000;
 const CLAIM_TRANSACTION_TIMEOUT_MS = 15_000;
 
@@ -27,6 +28,24 @@ export type AutomaticGenerationSelection = {
   selectionReason: "requested" | "backfill";
 };
 
+const staleRunningGenerationSelect = {
+  id: true,
+  contestId: true,
+  index: true,
+  name: true,
+  generationAttempts: true,
+  generationStartedAt: true,
+  requestedCount: true,
+} as const;
+
+export type StaleRunningGenerationReset = Prisma.ProblemGetPayload<{
+  select: typeof staleRunningGenerationSelect;
+}>;
+
+export function staleRunningGenerationCutoff(now = new Date()) {
+  return new Date(now.getTime() - STALE_RUNNING_GENERATION_AGE_MS);
+}
+
 export function automaticGenerationProblemWhere(): Prisma.ProblemWhereInput {
   return {
     generationAttempts: { lt: AUTOMATIC_GENERATION_MAX_ATTEMPTS },
@@ -48,6 +67,49 @@ export function requestedGenerationProblemOrderBy(): Prisma.ProblemOrderByWithRe
 
 export function backfillGenerationProblemOrderBy(): Prisma.ProblemOrderByWithRelationInput[] {
   return [{ contestId: "desc" }];
+}
+
+export async function resetStaleRunningGenerations(now = new Date()) {
+  const cutoff = staleRunningGenerationCutoff(now);
+  const staleProblems = await prisma.problem.findMany({
+    where: {
+      runState: "RUNNING",
+      generationStartedAt: { lte: cutoff },
+    },
+    orderBy: [{ generationStartedAt: "asc" }, { contestId: "desc" }],
+    select: staleRunningGenerationSelect,
+  });
+
+  const resetProblems: StaleRunningGenerationReset[] = [];
+
+  for (const problem of staleProblems) {
+    const updated = await prisma.problem.updateMany({
+      where: {
+        id: problem.id,
+        runState: "RUNNING",
+        generationStartedAt: { lte: cutoff },
+      },
+      data: problemUpdateData({
+        ...pipelineStateData("IDLE"),
+        ...(problem.generationAttempts > 0
+          ? { generationAttempts: { decrement: 1 } }
+          : {}),
+        generationStartedAt: null,
+        lastGenerationError:
+          "Generation was reset after running for more than 24 hours.",
+      }),
+    });
+
+    if (updated.count === 1) {
+      resetProblems.push(problem);
+    }
+  }
+
+  return {
+    cutoff,
+    resetCount: resetProblems.length,
+    problems: resetProblems,
+  };
 }
 
 export async function selectNextAutomaticGenerationProblem(

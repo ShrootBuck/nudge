@@ -7,7 +7,7 @@ export function Footer() {
     <footer className="mt-auto border-t border-border/50">
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="flex flex-col items-center justify-between gap-6 sm:flex-row">
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex min-w-0 flex-wrap items-center justify-center gap-2 text-center text-sm text-muted-foreground sm:justify-start sm:text-left">
             <span className="inline-flex size-5 items-center justify-center rounded bg-foreground text-background text-[10px] font-bold">
               N
             </span>
@@ -24,7 +24,7 @@ export function Footer() {
             </span>
           </div>
 
-          <div className="flex items-center gap-6">
+          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-3 sm:justify-end">
             {NAV_LINKS.map((link) => (
               <Link
                 key={link.href}
