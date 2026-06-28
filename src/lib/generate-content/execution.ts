@@ -14,7 +14,7 @@ import {
   fetchProblemStatement,
   ProblemStatementUnavailableError,
 } from "./problem-statement";
-import { buildPrompt, SYSTEM_PROMPT } from "./prompt";
+import { buildPrompt } from "./prompt";
 
 export type StructuredResponseGenerator = (
   options: GenerateOptions,
@@ -166,7 +166,7 @@ export async function executeProblemGeneration({
     log.info(`Running generation for ${label}`);
 
     response = await generate({
-      systemPrompt: SYSTEM_PROMPT,
+      systemPrompt: "Follow the user prompt and output schema exactly.",
       userPrompt,
       outputSchema: problemOutputSchema,
       abortSignal,
