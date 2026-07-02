@@ -51,4 +51,52 @@ describe("Codeforces problem statement fetching", () => {
       );
     }
   });
+
+  test("reports tutorial source status from the problem page", async () => {
+    const result = await fetchProblemStatement(2165, "F", async (input) => {
+      const url = String(input);
+
+      if (url === cfProblemsetUrl(2165, "F")) {
+        return new Response(
+          '<a href="/blog/entry/148452">Tutorial (en)</a><div class="problem-statement"><p>Arctic Acquisition</p></div>',
+        );
+      }
+
+      return new Response(
+        "<title>Codeforces Round 1064 Editorial</title><p>2165F Arctic Acquisition</p>",
+        {
+          status: 200,
+          statusText: "OK",
+        },
+      );
+    });
+
+    expect(result.sourceStatuses).toHaveLength(1);
+    expect(result.sourceStatuses[0]).toContain(
+      "Tutorial (en): https://codeforces.com/blog/entry/148452 loaded",
+    );
+    expect(result.sourceStatuses[0]).toContain("mentions 2165F");
+  });
+
+  test("includes Cloudflare challenge details in tutorial source status", async () => {
+    const result = await fetchProblemStatement(2165, "F", async (input) => {
+      const url = String(input);
+
+      if (url === cfProblemsetUrl(2165, "F")) {
+        return new Response(
+          '<a href="/blog/entry/148452">Tutorial (en)</a><div class="problem-statement"><p>Arctic Acquisition</p></div>',
+        );
+      }
+
+      return new Response("Challenge", {
+        status: 403,
+        statusText: "Forbidden",
+        headers: { "cf-mitigated": "challenge" },
+      });
+    });
+
+    expect(result.sourceStatuses).toEqual([
+      "Tutorial (en): https://codeforces.com/blog/entry/148452 returned 403 Forbidden (cf-mitigated: challenge)",
+    ]);
+  });
 });

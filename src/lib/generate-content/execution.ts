@@ -151,7 +151,11 @@ export async function executeProblemGeneration({
       problem.contestId,
       problem.index,
     );
-    const textPrompt = buildPrompt(problem, statement.html);
+    const textPrompt = buildPrompt(
+      problem,
+      statement.html,
+      statement.sourceStatuses,
+    );
     const userPrompt =
       statement.images.length > 0
         ? [

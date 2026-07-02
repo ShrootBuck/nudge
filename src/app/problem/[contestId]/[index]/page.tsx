@@ -71,6 +71,7 @@ async function getProblemView(
     reviewStatus: problem.reviewStatus,
     runState: problem.runState,
     modelDisplayName,
+    lastGenerationError: problem.lastGenerationError,
     hints: problem.hints,
     editorial: problem.editorial,
     solution: problem.solution

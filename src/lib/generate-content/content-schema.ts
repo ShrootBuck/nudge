@@ -32,7 +32,20 @@ export const contentSchema = z
 
 const unsolvableContentSchema = z.object({
   status: z.literal("unsolvable"),
-  reason: z.string().trim().min(1),
+  reason: z
+    .string()
+    .trim()
+    .min(1)
+    .refine(
+      (reason) =>
+        !/\b(can['’]?t|cannot)\s+(honestly\s+)?guarantee\b/i.test(reason) &&
+        !/\bmade[- ]up code\b/i.test(reason) &&
+        !/\bwithin this run\b/i.test(reason),
+      {
+        message:
+          "Unsolvable reason must name a concrete statement or source-access blocker, not lack of confidence.",
+      },
+    ),
   hints: z.null(),
   editorial: z.null(),
   solution: z.null(),
@@ -62,7 +75,7 @@ export const problemOutputSchema: OutputSchema = {
       reason: {
         anyOf: [{ type: "string" }, { type: "null" }],
         description:
-          "If status is 'unsolvable', provide a brief explanation. Otherwise null.",
+          "If status is 'unsolvable', provide a detailed failure message to show users. Name the concrete statement/resource blocker and any relevant source lookup/access status, such as missing official tutorial, 403/Cloudflare challenge, 404, or unavailable accepted submissions. Otherwise null.",
       },
       hints: {
         anyOf: [
