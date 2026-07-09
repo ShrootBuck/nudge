@@ -8,6 +8,7 @@ import { promisify } from "node:util";
 import { generateText } from "ai";
 import { codexExec } from "ai-sdk-provider-codex-cli";
 import { createCodexAssetDownloader } from "./codex-assets";
+import { mirrorCodexTranscript } from "./codex-transcript";
 import { buildMessages, buildStructuredOutput } from "./request";
 import type { GenerateOptions, StructuredResponse } from "./types";
 
@@ -154,6 +155,14 @@ function coalesceTokenCount(value: number | null | undefined): number | null {
     : null;
 }
 
+async function mirrorTranscriptSafely(workingDirectory: string) {
+  try {
+    return await mirrorCodexTranscript({ workingDirectory });
+  } catch {
+    return null;
+  }
+}
+
 async function generateCodexExecStructuredResponse(
   options: GenerateOptions,
 ): Promise<StructuredResponse> {
@@ -163,6 +172,8 @@ async function generateCodexExecStructuredResponse(
   const workingDirectory = await mkdtemp(
     join(tmpdir(), "nudge-codex-generation-"),
   );
+  let transcriptPath: string | null = null;
+  let generationCompleted = false;
 
   try {
     const result = await generateText({
@@ -193,6 +204,9 @@ async function generateCodexExecStructuredResponse(
       },
     });
 
+    generationCompleted = true;
+    transcriptPath = await mirrorTranscriptSafely(workingDirectory);
+
     const outputText = JSON.stringify(result.output);
 
     if (!outputText) {
@@ -204,6 +218,13 @@ async function generateCodexExecStructuredResponse(
     return {
       outputText,
       responseId: result.response.id,
+      ...(transcriptPath ? { transcriptPath } : {}),
+      ...(!transcriptPath
+        ? {
+            transcriptWarning:
+              "Could not mirror the full Codex transcript to .codex-runs; check ~/.codex/sessions.",
+          }
+        : {}),
       displayName: CODEX_DISPLAY_NAME,
       resolvedModel: coalesceString(result.response.modelId, MODEL),
       finishReason: coalesceString(result.finishReason),
@@ -212,6 +233,9 @@ async function generateCodexExecStructuredResponse(
       totalTokens: coalesceTokenCount(result.totalUsage.totalTokens),
     };
   } finally {
+    if (!generationCompleted) {
+      await mirrorTranscriptSafely(workingDirectory);
+    }
     await rm(workingDirectory, { recursive: true, force: true });
   }
 }

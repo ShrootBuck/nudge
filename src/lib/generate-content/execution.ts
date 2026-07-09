@@ -175,6 +175,11 @@ export async function executeProblemGeneration({
       outputSchema: problemOutputSchema,
       abortSignal,
     });
+    if (response.transcriptPath) {
+      log.info(`Saved full Codex transcript to ${response.transcriptPath}`);
+    } else if (response.transcriptWarning) {
+      log.warn(response.transcriptWarning);
+    }
     await recordGenerationUsage({ problemId: problem.id, response });
 
     if (!response.outputText.trim()) {

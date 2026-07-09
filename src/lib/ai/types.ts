@@ -17,6 +17,8 @@ export type UserPromptInput =
 export type StructuredResponse = {
   outputText: string;
   responseId: string;
+  transcriptPath?: string;
+  transcriptWarning?: string;
   displayName: string;
   resolvedModel: string | null;
   finishReason: string | null;
