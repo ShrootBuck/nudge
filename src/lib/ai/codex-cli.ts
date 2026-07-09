@@ -11,8 +11,8 @@ import { createCodexAssetDownloader } from "./codex-assets";
 import { buildMessages, buildStructuredOutput } from "./request";
 import type { GenerateOptions, StructuredResponse } from "./types";
 
-const MODEL = "gpt-5.5";
-export const CODEX_DISPLAY_NAME = "GPT-5.5 (xhigh)";
+const MODEL = "gpt-5.6-sol";
+export const CODEX_DISPLAY_NAME = "GPT-5.6 Sol (max)";
 const PROVIDER_NAME = "Codex CLI";
 const GENERATION_TIMEOUT_MS = 60 * 60 * 1000;
 const MIN_CODEX_VERSION = "0.130.0";
@@ -169,7 +169,6 @@ async function generateCodexExecStructuredResponse(
       model: codexExec(MODEL, {
         codexPath,
         cwd: workingDirectory,
-        reasoningEffort: "xhigh",
         reasoningSummary: "detailed",
         approvalMode: "never",
         sandboxMode: "read-only",
@@ -177,6 +176,7 @@ async function generateCodexExecStructuredResponse(
         color: "never",
         logger: false,
         configOverrides: {
+          model_reasoning_effort: "max",
           web_search: "live",
         },
       }),
