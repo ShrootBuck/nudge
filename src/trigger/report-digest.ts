@@ -3,6 +3,14 @@ import { DISCORD_COLORS, sendDiscordWebhook } from "../lib/discord-webhook";
 import { getRequiredEnv, SITE_URL } from "../lib/env";
 import { prisma } from "../lib/prisma";
 
+const RESOLVED_REPORT_RETENTION_DAYS = 30;
+
+const RESOLUTION_LABELS = {
+  VERIFIED: "dismissed after verification",
+  INCORRECT: "confirmed and marked incorrect",
+  REGENERATED: "superseded by regeneration",
+} as const;
+
 export const reportDigest = schedules.task({
   id: "report-digest",
   cron: {
@@ -10,11 +18,26 @@ export const reportDigest = schedules.task({
     timezone: "America/Phoenix",
   },
   run: async () => {
-    const since = new Date();
-    since.setDate(since.getDate() - 1);
+    const deleteBefore = new Date();
+    deleteBefore.setDate(
+      deleteBefore.getDate() - RESOLVED_REPORT_RETENTION_DAYS,
+    );
+
+    const deletedReports = await prisma.report.deleteMany({
+      where: {
+        digestedAt: { not: null },
+        resolvedAt: { lte: deleteBefore },
+      },
+    });
+
+    if (deletedReports.count > 0) {
+      logger.info(
+        `Deleted ${deletedReports.count} resolved report(s) older than ${RESOLVED_REPORT_RETENTION_DAYS} days`,
+      );
+    }
 
     const reports = await prisma.report.findMany({
-      where: { createdAt: { gte: since } },
+      where: { digestedAt: null },
       include: {
         problem: { select: { contestId: true, index: true, name: true } },
       },
@@ -22,8 +45,8 @@ export const reportDigest = schedules.task({
     });
 
     if (reports.length === 0) {
-      logger.info("No reports in the last 24 hours");
-      return { sent: false, count: 0 };
+      logger.info("No undigested reports");
+      return { sent: false, count: 0, deleted: deletedReports.count };
     }
 
     const problemCounts = new Map<
@@ -54,7 +77,10 @@ export const reportDigest = schedules.task({
       const link = `${SITE_URL}/problem/${r.problem.contestId}/${r.problem.index}`;
       const reason = r.reason ?? "_No reason given_";
       const time = `<t:${Math.floor(r.createdAt.getTime() / 1000)}:R>`;
-      return `**[${tag} — ${r.problem.name}](${link})**\n${reason}\n${time}`;
+      const resolution = r.resolution
+        ? `\n_Already handled: ${RESOLUTION_LABELS[r.resolution]}._`
+        : "";
+      return `**[${tag} — ${r.problem.name}](${link})**\n${reason}\n${time}${resolution}`;
     });
 
     const description = [
@@ -75,7 +101,23 @@ export const reportDigest = schedules.task({
       { throwOnError: true },
     );
 
-    logger.info(`Sent digest with ${reports.length} report(s)`);
-    return { sent: true, count: reports.length };
+    const digestedAt = new Date();
+    const markedDigested = await prisma.report.updateMany({
+      where: {
+        id: { in: reports.map((report) => report.id) },
+        digestedAt: null,
+      },
+      data: { digestedAt },
+    });
+
+    logger.info(
+      `Sent digest with ${reports.length} report(s); marked ${markedDigested.count} as digested`,
+    );
+    return {
+      sent: true,
+      count: reports.length,
+      markedDigested: markedDigested.count,
+      deleted: deletedReports.count,
+    };
   },
 });

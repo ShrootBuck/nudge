@@ -42,10 +42,17 @@ export async function setProblemReviewStatus(
     return { success: false, error: "Problem not found" } as const;
   }
 
-  await prisma.problem.update({
-    where: { id: problemId },
-    data: { reviewStatus },
-  });
+  const resolvedAt = new Date();
+  const [, resolvedReports] = await prisma.$transaction([
+    prisma.problem.update({
+      where: { id: problemId },
+      data: { reviewStatus },
+    }),
+    prisma.report.updateMany({
+      where: { problemId, resolvedAt: null },
+      data: { resolvedAt, resolution: reviewStatus },
+    }),
+  ]);
 
   updateTag(PROBLEM_LIST_TAG);
   updateTag(problemTag(problem.contestId, problem.index));
@@ -60,9 +67,13 @@ export async function setProblemReviewStatus(
     },
   } as const;
   const log = logConfig[reviewStatus];
+  const reportSummary =
+    resolvedReports.count > 0
+      ? `\n${resolvedReports.count} open report${resolvedReports.count === 1 ? " was" : "s were"} resolved by this action.`
+      : "";
   await sendAdminLog({
     title: log.title,
-    description: `**[${tag} — ${problem.name}](${link})**`,
+    description: `**[${tag} — ${problem.name}](${link})**${reportSummary}`,
     color: log.color,
   });
 
@@ -99,7 +110,7 @@ export async function regenerateProblemContent(
     } as const;
   }
 
-  await prisma.$transaction(
+  const resolvedReportCount = await prisma.$transaction(
     async (tx) => {
       await tx.hint.deleteMany({ where: { problemId } });
       await tx.editorial.deleteMany({ where: { problemId } });
@@ -123,6 +134,16 @@ export async function regenerateProblemContent(
           generationTotalTokens: null,
         }),
       });
+
+      const resolvedReports = await tx.report.updateMany({
+        where: { problemId, resolvedAt: null },
+        data: {
+          resolvedAt: new Date(),
+          resolution: "REGENERATED",
+        },
+      });
+
+      return resolvedReports.count;
     },
     {
       maxWait: REGENERATION_TRANSACTION_MAX_WAIT_MS,
@@ -135,9 +156,13 @@ export async function regenerateProblemContent(
 
   const tag = `${problem.contestId}${problem.index}`;
   const link = `${SITE_URL}/problem/${problem.contestId}/${problem.index}`;
+  const reportSummary =
+    resolvedReportCount > 0
+      ? `\n${resolvedReportCount} open report${resolvedReportCount === 1 ? " was" : "s were"} resolved by this regeneration.`
+      : "";
   await sendAdminLog({
     title: "♻️ Queued Regeneration",
-    description: `**[${tag} — ${problem.name}](${link})**\nExisting generated content was deleted and the problem was queued for a future local Codex run.`,
+    description: `**[${tag} — ${problem.name}](${link})**\nExisting generated content was deleted and the problem was queued for a future local Codex run.${reportSummary}`,
     color: DISCORD_COLORS.info,
   });
 
