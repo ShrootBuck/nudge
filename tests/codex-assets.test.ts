@@ -20,10 +20,8 @@ describe("Codex prompt assets", () => {
       throw new Error("Expected multipart user content");
     }
 
-    expect(content[1]).toMatchObject({ type: "image" });
-    expect(content[1]?.type === "image" && content[1].image).toBeInstanceOf(
-      URL,
-    );
+    expect(content[1]).toMatchObject({ type: "file", mediaType: "image" });
+    expect(content[1]?.type === "file" && content[1].data).toBeInstanceOf(URL);
   });
 
   test("downloads Codeforces images into binary prompt data", async () => {

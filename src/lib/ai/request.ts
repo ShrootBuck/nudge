@@ -70,7 +70,11 @@ function toUserContent(input: UserPromptInput): UserModelMessage["content"] {
       throw new Error("Image prompt item is missing a URL");
     }
 
-    return { type: "image" as const, image: new URL(imageUrl) };
+    return {
+      type: "file" as const,
+      mediaType: "image",
+      data: new URL(imageUrl),
+    };
   });
 }
 
