@@ -186,12 +186,30 @@ export async function executeProblemGeneration({
 
     log.info(`Running generation for ${label}`);
 
-    response = await generate({
-      systemPrompt: "Follow the user prompt and output schema exactly.",
-      userPrompt,
-      outputSchema: problemOutputSchema,
-      abortSignal,
-    });
+    const generationStartedAt = Date.now();
+    const heartbeat = setInterval(() => {
+      const elapsedSeconds = Math.round(
+        (Date.now() - generationStartedAt) / 1000,
+      );
+      const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+      const elapsed =
+        elapsedMinutes > 0
+          ? `${elapsedMinutes}m ${elapsedSeconds % 60}s`
+          : `${elapsedSeconds}s`;
+      log.info(`${label} still running (${elapsed} elapsed)`);
+    }, 30_000);
+    heartbeat.unref?.();
+
+    try {
+      response = await generate({
+        systemPrompt: "Follow the user prompt and output schema exactly.",
+        userPrompt,
+        outputSchema: problemOutputSchema,
+        abortSignal,
+      });
+    } finally {
+      clearInterval(heartbeat);
+    }
     if (response.transcriptPath) {
       log.info(`Saved full OpenCode transcript to ${response.transcriptPath}`);
       try {
