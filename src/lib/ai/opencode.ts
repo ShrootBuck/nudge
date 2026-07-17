@@ -324,18 +324,19 @@ class LocalOpenCodeRuntime implements OpenCodeRuntime {
           },
         );
         const [stdout, stderr, exitCode] = await Promise.all([
-          new Response(exportProcess.stdout).text(),
+          new Response(exportProcess.stdout).arrayBuffer(),
           new Response(exportProcess.stderr).text(),
           exportProcess.exited,
         ]);
+        const transcript = new Uint8Array(stdout);
         if (exitCode !== 0) {
           throw new Error(
-            `OpenCode session export failed: ${stderr.trim() || stdout.trim()}`,
+            `OpenCode session export failed: ${stderr.trim() || new TextDecoder().decode(transcript).trim()}`,
           );
         }
         return await mirrorOpenCodeTranscript({
           sessionId,
-          session: JSON.parse(stdout),
+          transcript,
         });
       } catch {
         return null;

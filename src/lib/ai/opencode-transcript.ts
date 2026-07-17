@@ -7,13 +7,11 @@ function safeSessionFilename(sessionId: string) {
 
 export async function mirrorOpenCodeTranscript({
   sessionId,
-  session,
-  capturedAt = new Date(),
+  transcript,
   destinationDirectory = join(process.cwd(), ".opencode-runs"),
 }: {
   sessionId: string;
-  session: unknown;
-  capturedAt?: Date;
+  transcript: Uint8Array;
   destinationDirectory?: string;
 }) {
   await mkdir(destinationDirectory, { recursive: true });
@@ -21,17 +19,6 @@ export async function mirrorOpenCodeTranscript({
     destinationDirectory,
     `${safeSessionFilename(sessionId)}.json`,
   );
-  await writeFile(
-    destinationPath,
-    `${JSON.stringify(
-      {
-        sessionId,
-        capturedAt: capturedAt.toISOString(),
-        session,
-      },
-      null,
-      2,
-    )}\n`,
-  );
+  await writeFile(destinationPath, transcript);
   return destinationPath;
 }
