@@ -278,12 +278,10 @@ export function ProblemContentBody({ problem }: { problem: ProblemView }) {
             <ReportSection problemId={problem.id} />
           )}
 
-          {hasContent && (
-            <ReviewSection
-              problemId={problem.id}
-              reviewStatus={problem.reviewStatus}
-            />
-          )}
+          <ReviewSection
+            problemId={problem.id}
+            reviewStatus={problem.reviewStatus}
+          />
         </div>
       </div>
     </main>
