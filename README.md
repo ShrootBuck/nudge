@@ -66,19 +66,17 @@ Each real run claims one eligible problem, creates an isolated OpenCode session,
 
 ## Switching models or providers
 
-Never hand-type a model ID from memory; copy it verbatim from the CLI. Use `bun run opencode` so you query the same bundled OpenCode binary that generation spawns and validates against.
+Never hand-type a model ID from memory; copy it verbatim from the CLI. `bun run models` queries the same bundled OpenCode runtime that generation spawns and validates against, drilling down in three steps:
 
 1. **Connect the provider** (skip if already authed): run `opencode auth login`, then confirm with `opencode auth list`.
-2. **Find the exact model ID**: `bun run opencode models` lists every available model as `provider/model-id`; `bun run opencode models <provider>` filters to one provider. Copy the whole line, slashes and dashes included.
-3. **Find valid variants and the display name**: `bun run opencode models <provider> --verbose` prints a JSON block per model. The keys of its `variants` object are the only valid `variant` values, and its `name` field is a good basis for `display.model`. Nudge also requires `capabilities.toolcall` and `capabilities.input.image` to be `true` — check before committing to a model.
-4. **Update `nudge.config.json`**:
-   - `model`: the exact `provider/model-id` string from step 2.
-   - `variant`: optional. Must be one of the variant keys from step 3.
-   - `display.model`: the public label. Free text — this is where you fix the name, not in `model`.
-   - `display.reasoning`: optional. Falls back to `variant` when omitted. The public label renders as `display.model (reasoning)`, or just `display.model` when neither is set, so the default configuration renders `GPT-5.6 Sol (max)`.
+2. **Pick a provider**: `bun run models` lists connected providers.
+3. **Pick a model**: `bun run models <provider>` lists its models, marking with ✓ the ones that meet Nudge's requirements (`capabilities.toolcall` and `capabilities.input.image`). Copy the full `provider/model-id` string, slashes and dashes included.
+4. **Pick a variant**: `bun run models <provider>/<model>` shows the valid `variant` values, the model's display name, and a ready-to-paste `nudge.config.json` block.
 5. **Verify without generating anything**: `bun run opencode:next -- --dry-run` runs preflight, which validates the model ID, variant, and required capabilities against live provider metadata and prints the exact display name. A typo'd variant fails fast with `does not expose the <variant> variant` instead of wasting a generation.
 
 Notes:
 
 - The config is strict-parsed on startup: unknown keys or a `model` missing the `provider/` prefix are rejected immediately.
+- `variant` is optional and must be one of the variant keys from step 4.
+- `display.model` is the public label — free text, so fix naming there, not in `model`. `display.reasoning` is optional and falls back to `variant` when omitted. The label renders as `display.model (reasoning)`, or just `display.model` when neither is set, so the default configuration renders `GPT-5.6 Sol (max)`.
 - `display.*` is cosmetic and safe to edit anytime, but the label is stored on each problem at generation time — existing content keeps the label it was generated with, and the new label applies to future generations.

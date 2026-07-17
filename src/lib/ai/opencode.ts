@@ -452,12 +452,18 @@ class LocalOpenCodeRuntime implements OpenCodeRuntime {
   }
 }
 
-export async function createLocalOpenCodeRuntime(): Promise<OpenCodeRuntime> {
+export async function createLocalOpenCodeInstance() {
   const { executablePath, expectedVersion } = configureBundledOpenCode();
   const instance = await createOpencode({
     port: 0,
     timeout: SERVER_STARTUP_TIMEOUT_MS,
     config: buildOpenCodeRuntimeConfig(),
   });
+  return { instance, executablePath, expectedVersion };
+}
+
+export async function createLocalOpenCodeRuntime(): Promise<OpenCodeRuntime> {
+  const { instance, executablePath, expectedVersion } =
+    await createLocalOpenCodeInstance();
   return new LocalOpenCodeRuntime(instance, executablePath, expectedVersion);
 }
