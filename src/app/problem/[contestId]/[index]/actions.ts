@@ -5,6 +5,7 @@ import { PROBLEM_LIST_TAG, problemTag } from "@/lib/cache-tags";
 import { sendAdminLog } from "@/lib/discord";
 import { DISCORD_COLORS } from "@/lib/discord-webhook";
 import { SITE_URL, verifyAdminPassword } from "@/lib/env";
+import { deleteGenerationTranscript } from "@/lib/generation-transcript";
 import { prisma } from "@/lib/prisma";
 import {
   pipelineStateData,
@@ -96,6 +97,7 @@ export async function regenerateProblemContent(
       index: true,
       name: true,
       runState: true,
+      generationTranscriptUrl: true,
     },
   });
 
@@ -132,6 +134,7 @@ export async function regenerateProblemContent(
           generationNativeFinishReason: null,
           generationProviderName: null,
           generationTotalTokens: null,
+          generationTranscriptUrl: null,
         }),
       });
 
@@ -150,6 +153,14 @@ export async function regenerateProblemContent(
       timeout: REGENERATION_TRANSACTION_TIMEOUT_MS,
     },
   );
+
+  if (problem.generationTranscriptUrl) {
+    await deleteGenerationTranscript(problem.generationTranscriptUrl).catch(
+      (error) => {
+        console.error("Failed to delete regenerated problem transcript", error);
+      },
+    );
+  }
 
   updateTag(PROBLEM_LIST_TAG);
   updateTag(problemTag(problem.contestId, problem.index));

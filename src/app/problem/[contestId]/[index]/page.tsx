@@ -1,3 +1,4 @@
+import { getDownloadUrl } from "@vercel/blob";
 import { cacheLife, cacheTag } from "next/cache";
 import { notFound } from "next/navigation";
 import { problemTag } from "@/lib/cache-tags";
@@ -71,6 +72,9 @@ async function getProblemView(
     reviewStatus: problem.reviewStatus,
     runState: problem.runState,
     modelDisplayName,
+    transcriptDownloadUrl: problem.generationTranscriptUrl
+      ? getDownloadUrl(problem.generationTranscriptUrl)
+      : null,
     lastGenerationError: problem.lastGenerationError,
     hints: problem.hints,
     editorial: problem.editorial,

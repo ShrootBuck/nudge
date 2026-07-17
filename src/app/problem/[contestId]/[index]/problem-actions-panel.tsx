@@ -1,6 +1,13 @@
 "use client";
 
-import { ArrowUpRight, Check, Flag, ShieldCheck, Sparkles } from "lucide-react";
+import {
+  ArrowUpRight,
+  Check,
+  FileJson,
+  Flag,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useId, useRef, useState, useTransition } from "react";
@@ -61,6 +68,17 @@ export function ProblemMetaRow({
           <Sparkles className="size-3" />
           {problem.modelDisplayName}
         </span>
+      )}
+
+      {problem.transcriptDownloadUrl && (
+        <a
+          href={problem.transcriptDownloadUrl}
+          className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/70 px-3 py-1.5 text-xs text-muted-foreground transition hover:text-foreground"
+          title="Download the raw OpenCode transcript"
+        >
+          <FileJson className="size-3" />
+          Transcript
+        </a>
       )}
     </>
   );

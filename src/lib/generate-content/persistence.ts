@@ -12,6 +12,7 @@ export type GenerationAuditInfo = {
   nativeFinishReason: string | null;
   providerName: string | null;
   totalTokens: number | null;
+  transcriptUrl: string | null;
 };
 
 const CONTENT_SAVE_TRANSACTION_TIMEOUT_MS = 30_000;
@@ -57,6 +58,7 @@ export async function saveProblemContent(
           generationNativeFinishReason: generation.nativeFinishReason,
           generationProviderName: generation.providerName,
           generationTotalTokens: generation.totalTokens,
+          generationTranscriptUrl: generation.transcriptUrl,
           generationStartedAt: null,
           lastGenerationError: null,
         }),

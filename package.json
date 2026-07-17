@@ -21,6 +21,7 @@
     "@tailwindcss/typography": "^0.5.19",
     "@trigger.dev/build": "^4.4.6",
     "@trigger.dev/sdk": "^4.4.6",
+    "@vercel/blob": "^2.6.1",
     "cheerio": "^1.2.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",

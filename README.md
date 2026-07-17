@@ -24,7 +24,8 @@ Generation is local-only. Trigger.dev does not run OpenCode and there is no enco
 
 1. Sign in with `opencode auth login`, choose OpenAI, and select ChatGPT Plus/Pro. Confirm `opencode auth list` shows OpenAI OAuth.
 2. Make sure `DATABASE_URL` points at the Nudge database.
-3. Configure the model, reasoning variant, and public display label in `nudge.config.json`.
+3. Connect a public Vercel Blob store to the project and set `BLOB_READ_WRITE_TOKEN` locally. `bunx vercel env pull` can pull the connected store credentials.
+4. Configure the model, reasoning variant, and public display label in `nudge.config.json`.
 
    ```json
    {
@@ -37,7 +38,7 @@ Generation is local-only. Trigger.dev does not run OpenCode and there is no enco
    }
    ```
 
-4. Run one queued generation:
+5. Run one queued generation:
 
    ```bash
    bun run opencode:next
@@ -61,6 +62,6 @@ For a no-write preview of the next candidate:
 bun run opencode:next -- --dry-run
 ```
 
-Each real run claims one eligible problem, creates an isolated OpenCode session, persists the generated hints/editorial/solution, records usage, mirrors the session into `.opencode-runs`, and prints a compact completion summary. OpenCode reads provider credentials from its normal local credential store; Nudge never copies them into project configuration.
+Each real run claims one eligible problem, creates an isolated OpenCode session, persists the generated hints/editorial/solution, records usage, mirrors the exact `opencode export` bytes into `.opencode-runs`, uploads that file to the public Blob store, and prints both transcript locations. OpenCode reads provider credentials from its normal local credential store; Nudge never copies them into project configuration.
 
 To switch models or providers, connect the provider with `opencode auth login`, use `opencode models <provider>` to find the exact model ID, and update `nudge.config.json`. The public label is composed from `display.model` and `display.reasoning`, so the default configuration renders `GPT-5.6 Sol (max)`.

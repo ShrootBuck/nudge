@@ -17,6 +17,7 @@ export const automaticGenerationProblemSelect = {
   requestedCount: true,
   generationAttempts: true,
   runState: true,
+  generationTranscriptUrl: true,
 } as const;
 
 export type AutomaticGenerationProblem = Prisma.ProblemGetPayload<{

@@ -6,6 +6,10 @@ import { PROBLEM_LIST_TAG, problemTag } from "../cache-tags";
 import { discordLog } from "../discord-log";
 import { DISCORD_COLORS } from "../discord-webhook";
 import type { AutomaticGenerationProblem } from "../generation-queue";
+import {
+  deleteGenerationTranscript,
+  publishGenerationTranscript,
+} from "../generation-transcript";
 import { prisma } from "../prisma";
 import { pipelineStateData, problemUpdateData } from "../problem-pipeline-db";
 import { problemOutputSchema, problemResultSchema } from "./content-schema";
@@ -42,6 +46,7 @@ export function toProblemLabel(
 
 function toGenerationAuditInfo(
   response: StructuredResponse,
+  transcriptUrl: string | null,
 ): GenerationAuditInfo {
   return {
     displayName: response.displayName,
@@ -51,11 +56,13 @@ function toGenerationAuditInfo(
     nativeFinishReason: response.nativeFinishReason,
     providerName: response.providerName,
     totalTokens: response.totalTokens,
+    transcriptUrl,
   };
 }
 
 function generationAuditData(
   response: StructuredResponse,
+  transcriptUrl: string | null,
 ): Pick<
   Prisma.ProblemUpdateInput,
   | "generatedByDisplayName"
@@ -65,8 +72,9 @@ function generationAuditData(
   | "generationNativeFinishReason"
   | "generationProviderName"
   | "generationTotalTokens"
+  | "generationTranscriptUrl"
 > {
-  const audit = toGenerationAuditInfo(response);
+  const audit = toGenerationAuditInfo(response, transcriptUrl);
 
   return {
     generatedByDisplayName: audit.displayName,
@@ -76,6 +84,7 @@ function generationAuditData(
     generationNativeFinishReason: audit.nativeFinishReason,
     generationProviderName: audit.providerName,
     generationTotalTokens: audit.totalTokens,
+    generationTranscriptUrl: audit.transcriptUrl,
   };
 }
 
@@ -90,10 +99,15 @@ export async function markClaimedProblemFailed({
   problem,
   reason,
   response,
+  transcriptUrl = null,
 }: {
-  problem: Pick<AutomaticGenerationProblem, "id" | "contestId" | "index">;
+  problem: Pick<
+    AutomaticGenerationProblem,
+    "id" | "contestId" | "index" | "generationTranscriptUrl"
+  >;
   reason: string;
   response?: StructuredResponse | null;
+  transcriptUrl?: string | null;
 }) {
   const updated = await prisma.problem.updateMany({
     where: { id: problem.id, runState: "RUNNING" },
@@ -101,7 +115,9 @@ export async function markClaimedProblemFailed({
       ...pipelineStateData("FAILED"),
       generationStartedAt: null,
       lastGenerationError: reason,
-      ...(response ? generationAuditData(response) : {}),
+      ...(response
+        ? generationAuditData(response, transcriptUrl)
+        : { generationTranscriptUrl: null }),
     }),
   });
 
@@ -145,6 +161,7 @@ export async function executeProblemGeneration({
 }): Promise<GenerationResult> {
   const label = toProblemLabel(problem);
   let response: StructuredResponse | null = null;
+  let transcriptUrl: string | null = null;
 
   try {
     const statement = await fetchProblemStatement(
@@ -177,6 +194,31 @@ export async function executeProblemGeneration({
     });
     if (response.transcriptPath) {
       log.info(`Saved full OpenCode transcript to ${response.transcriptPath}`);
+      try {
+        transcriptUrl = await publishGenerationTranscript({
+          problemId: problem.id,
+          problemLabel: label,
+          responseId: response.responseId,
+          transcriptPath: response.transcriptPath,
+        });
+        log.info(`Published full OpenCode transcript to ${transcriptUrl}`);
+        if (
+          problem.generationTranscriptUrl &&
+          problem.generationTranscriptUrl !== transcriptUrl
+        ) {
+          await deleteGenerationTranscript(
+            problem.generationTranscriptUrl,
+          ).catch((error) => {
+            log.warn(
+              `Could not delete previous transcript: ${toErrorMessage(error)}`,
+            );
+          });
+        }
+      } catch (error) {
+        log.warn(
+          `Could not publish OpenCode transcript: ${toErrorMessage(error)}`,
+        );
+      }
     } else if (response.transcriptWarning) {
       log.warn(response.transcriptWarning);
     }
@@ -200,7 +242,7 @@ export async function executeProblemGeneration({
           reviewStatus: "UNSOLVABLE",
           generationStartedAt: null,
           lastGenerationError: reason,
-          ...generationAuditData(response),
+          ...generationAuditData(response, transcriptUrl),
         }),
       });
 
@@ -218,7 +260,7 @@ export async function executeProblemGeneration({
     await saveProblemContent(
       problem.id,
       outputData,
-      toGenerationAuditInfo(response),
+      toGenerationAuditInfo(response, transcriptUrl),
     );
 
     return { processed: 1, outcome: "succeeded" };
@@ -233,7 +275,12 @@ export async function executeProblemGeneration({
     if (statementUnavailable) {
       await releaseClaimedProblemAfterStatementFailure({ problem, reason });
     } else {
-      await markClaimedProblemFailed({ problem, reason, response });
+      await markClaimedProblemFailed({
+        problem,
+        reason,
+        response,
+        transcriptUrl,
+      });
     }
 
     return { processed: 0, outcome: "failed", error: reason };

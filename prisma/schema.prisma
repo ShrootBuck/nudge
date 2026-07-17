@@ -49,6 +49,7 @@ model Problem {
   generationNativeFinishReason String?
   generationProviderName       String?
   generationTotalTokens        Int?
+  generationTranscriptUrl      String?
 
   hints                  Hint[]
   editorial              Editorial?
