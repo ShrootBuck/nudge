@@ -1,10 +1,5 @@
-import {
-  jsonSchema,
-  type ModelMessage,
-  Output,
-  type UserModelMessage,
-} from "ai";
-import type { GenerateOptions, UserPromptInput } from "./types";
+import type { OutputFormat } from "@opencode-ai/sdk/v2";
+import type { GenerateOptions } from "./types";
 
 export function toStrictJsonSchema(
   schema: Record<string, unknown>,
@@ -42,6 +37,12 @@ export function toStrictJsonSchema(
     );
   }
 
+  if (Array.isArray(copy.allOf)) {
+    copy.allOf = copy.allOf.map((schema) =>
+      toStrictJsonSchema(schema as Record<string, unknown>),
+    );
+  }
+
   if (copy.$defs && typeof copy.$defs === "object") {
     const defs = copy.$defs as Record<string, Record<string, unknown>>;
     copy.$defs = Object.fromEntries(
@@ -55,37 +56,16 @@ export function toStrictJsonSchema(
   return copy;
 }
 
-function toUserContent(input: UserPromptInput): UserModelMessage["content"] {
-  if (typeof input === "string") {
-    return input;
-  }
-
-  return input.map((item) => {
-    if (item.type === "text") {
-      return { type: "text" as const, text: item.text ?? "" };
-    }
-
-    const imageUrl = item.image_url?.url;
-    if (!imageUrl) {
-      throw new Error("Image prompt item is missing a URL");
-    }
-
-    return {
-      type: "file" as const,
-      mediaType: "image",
-      data: new URL(imageUrl),
-    };
-  });
-}
-
-export function buildMessages(userPrompt: UserPromptInput): ModelMessage[] {
-  return [{ role: "user", content: toUserContent(userPrompt) }];
-}
-
-export function buildStructuredOutput(options: GenerateOptions) {
-  return Output.object({
-    name: options.outputSchema.name,
-    description: options.outputSchema.description,
-    schema: jsonSchema(toStrictJsonSchema(options.outputSchema.schema)),
-  });
+export function buildStructuredOutputFormat(
+  options: GenerateOptions,
+): OutputFormat {
+  return {
+    type: "json_schema",
+    retryCount: 2,
+    schema: {
+      ...toStrictJsonSchema(options.outputSchema.schema),
+      title: options.outputSchema.name,
+      description: options.outputSchema.description,
+    },
+  };
 }

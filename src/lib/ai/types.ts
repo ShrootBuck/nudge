@@ -1,9 +1,7 @@
-import type { JSONSchema7 } from "ai";
-
 export type OutputSchema = {
   name: string;
   description: string;
-  schema: JSONSchema7;
+  schema: Record<string, unknown>;
 };
 
 export type UserPromptInput =

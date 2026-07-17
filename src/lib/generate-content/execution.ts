@@ -176,7 +176,7 @@ export async function executeProblemGeneration({
       abortSignal,
     });
     if (response.transcriptPath) {
-      log.info(`Saved full Codex transcript to ${response.transcriptPath}`);
+      log.info(`Saved full OpenCode transcript to ${response.transcriptPath}`);
     } else if (response.transcriptWarning) {
       log.warn(response.transcriptWarning);
     }

@@ -162,7 +162,7 @@ export async function regenerateProblemContent(
       : "";
   await sendAdminLog({
     title: "♻️ Queued Regeneration",
-    description: `**[${tag} — ${problem.name}](${link})**\nExisting generated content was deleted and the problem was queued for a future local Codex run.${reportSummary}`,
+    description: `**[${tag} — ${problem.name}](${link})**\nExisting generated content was deleted and the problem was queued for a future local generation run.${reportSummary}`,
     color: DISCORD_COLORS.info,
   });
 

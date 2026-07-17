@@ -161,7 +161,7 @@ export function ProblemContentBody({ problem }: { problem: ProblemView }) {
                 {problem.lastGenerationError && (
                   <div className="mt-4 max-w-3xl border-current/15 border-t pt-4">
                     <p className="text-[0.7rem] font-semibold uppercase tracking-[0.18em] opacity-65">
-                      Codex message
+                      Generation message
                     </p>
                     <p className="mt-2 whitespace-pre-wrap break-words text-sm/7 opacity-90">
                       {problem.lastGenerationError}

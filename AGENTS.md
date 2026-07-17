@@ -12,4 +12,4 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 - Use Bun only (`bun`, `bunx`). Do not use npm.
 - Keep AI integrations on current APIs only. No legacy shims/fallback paths.
-- All LLM generation goes through AI SDK with direct provider packages. Do not use Vercel AI Gateway.
+- All LLM generation goes through the local OpenCode SDK runtime and its directly configured providers. Do not use Vercel AI Gateway.

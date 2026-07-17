@@ -1,0 +1,8 @@
+{
+  "model": "openai/gpt-5.6-sol",
+  "variant": "max",
+  "display": {
+    "model": "GPT-5.6 Sol",
+    "reasoning": "max"
+  }
+}
