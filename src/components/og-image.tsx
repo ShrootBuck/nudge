@@ -14,11 +14,13 @@ export function OgFrame({ children }: { children: ReactNode }) {
   return (
     <div
       style={{
-        width: "100%",
-        height: "100%",
+        width: 1200,
+        height: 630,
         display: "flex",
         position: "relative",
         overflow: "hidden",
+        transform: "scale(2)",
+        transformOrigin: "top left",
         color: OG_COLORS.foreground,
         backgroundColor: OG_COLORS.background,
         backgroundImage:
@@ -84,11 +86,13 @@ export function OgBrand() {
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          borderRadius: 11,
-          backgroundColor: OG_COLORS.foreground,
-          color: OG_COLORS.background,
-          fontSize: 23,
-          fontWeight: 800,
+          borderRadius: 8.25,
+          backgroundColor: "#ffffff",
+          color: "#000000",
+          fontFamily: "system-ui, sans-serif",
+          fontSize: 27.5,
+          fontWeight: 700,
+          lineHeight: 1,
         }}
       >
         N
@@ -115,120 +119,6 @@ export function OgBrand() {
         >
           COMPETITIVE PROGRAMMING
         </div>
-      </div>
-    </div>
-  );
-}
-
-const HINT_LEVELS = ["gentle", "warmer", "direction", "almost", "insight"];
-
-export function HintLadder({ activeLevels = 5 }: { activeLevels?: number }) {
-  return (
-    <div
-      style={{
-        width: 298,
-        display: "flex",
-        flexDirection: "column",
-        padding: "25px 24px 22px",
-        borderRadius: 24,
-        border: `1px solid ${OG_COLORS.border}`,
-        backgroundColor: "rgba(17, 25, 39, 0.82)",
-      }}
-    >
-      <div
-        style={{
-          display: "flex",
-          color: OG_COLORS.muted,
-          fontSize: 11,
-          fontWeight: 700,
-          letterSpacing: "0.18em",
-        }}
-      >
-        REVEAL AT YOUR PACE
-      </div>
-      <div
-        style={{
-          display: "flex",
-          marginTop: 8,
-          fontSize: 20,
-          fontWeight: 700,
-        }}
-      >
-        A nudge, not a spoiler.
-      </div>
-
-      <div
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          marginTop: 22,
-        }}
-      >
-        {HINT_LEVELS.map((label, index) => {
-          const active = index < activeLevels;
-          return (
-            <div
-              key={label}
-              style={{
-                height: 47,
-                display: "flex",
-                alignItems: "center",
-                marginTop: index === 0 ? 0 : 8,
-                padding: "0 13px",
-                borderRadius: 13,
-                border: `1px solid ${
-                  active
-                    ? "rgba(148, 163, 184, 0.2)"
-                    : "rgba(148, 163, 184, 0.1)"
-                }`,
-                backgroundColor: active
-                  ? "rgba(248, 250, 252, 0.055)"
-                  : "rgba(248, 250, 252, 0.018)",
-                opacity: active ? 1 : 0.4,
-              }}
-            >
-              <div
-                style={{
-                  width: 25,
-                  height: 25,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  borderRadius: 999,
-                  color: index === 4 ? OG_COLORS.amber : OG_COLORS.foreground,
-                  backgroundColor:
-                    index === 4
-                      ? "rgba(251, 191, 36, 0.13)"
-                      : "rgba(148, 163, 184, 0.12)",
-                  fontSize: 12,
-                  fontWeight: 700,
-                }}
-              >
-                {index + 1}
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  marginLeft: 12,
-                  color: active ? OG_COLORS.foreground : OG_COLORS.muted,
-                  fontSize: 14,
-                  fontWeight: 600,
-                }}
-              >
-                {label}
-              </div>
-              <div
-                style={{
-                  width: 5,
-                  height: 5,
-                  marginLeft: "auto",
-                  borderRadius: 999,
-                  backgroundColor: active ? OG_COLORS.sky : OG_COLORS.muted,
-                }}
-              />
-            </div>
-          );
-        })}
       </div>
     </div>
   );

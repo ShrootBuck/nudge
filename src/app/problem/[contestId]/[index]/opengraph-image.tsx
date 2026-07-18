@@ -1,12 +1,6 @@
 import { notFound } from "next/navigation";
 import { ImageResponse } from "next/og";
-import {
-  HintLadder,
-  OG_COLORS,
-  OgBrand,
-  OgFrame,
-  OgPill,
-} from "@/components/og-image";
+import { OG_COLORS, OgBrand, OgFrame, OgPill } from "@/components/og-image";
 import { getProblemSocialData } from "@/lib/problem-read-cache";
 import { formatProblemId, parseProblemRouteParams } from "@/lib/problem-social";
 import { OG_IMAGE_SIZE } from "@/lib/site-metadata";
@@ -50,7 +44,7 @@ function reviewBadge(problem: { runState: string; reviewStatus: string }) {
     case "UNSOLVABLE":
       return { label: "UNSOLVABLE", color: OG_COLORS.amber };
     default:
-      return { label: "AI GENERATED", color: OG_COLORS.muted };
+      return null;
   }
 }
 
@@ -101,25 +95,13 @@ export default async function ProblemOpenGraphImage({
         <div
           style={{
             display: "flex",
-            alignItems: "center",
             color: OG_COLORS.muted,
             fontSize: 12,
             fontWeight: 700,
             letterSpacing: "0.14em",
           }}
         >
-          CODEFORCES
-          <div
-            style={{
-              display: "flex",
-              marginLeft: 10,
-              color: OG_COLORS.foreground,
-              fontSize: 16,
-              letterSpacing: "0.04em",
-            }}
-          >
-            {problemId}
-          </div>
+          CODEFORCES <span style={{ color: "#ffffff" }}>{problemId}</span>
         </div>
       </div>
 
@@ -143,29 +125,19 @@ export default async function ProblemOpenGraphImage({
             <OgPill accent={ratingColor(problem.rating)}>
               {problem.rating === null ? "UNRATED" : `RATING ${problem.rating}`}
             </OgPill>
-            <div style={{ display: "flex", marginLeft: 10 }}>
-              <OgPill accent={review.color}>{review.label}</OgPill>
-            </div>
+            {review ? (
+              <div style={{ display: "flex", marginLeft: 10 }}>
+                <OgPill accent={review.color}>{review.label}</OgPill>
+              </div>
+            ) : null}
           </div>
 
-          <div
-            style={{
-              display: "flex",
-              marginTop: 23,
-              color: OG_COLORS.sky,
-              fontSize: 13,
-              fontWeight: 800,
-              letterSpacing: "0.18em",
-            }}
-          >
-            PROBLEM {problemId}
-          </div>
           <div
             style={{
               width: 730,
               maxHeight: 205,
               display: "flex",
-              marginTop: 10,
+              marginTop: 23,
               overflow: "hidden",
               fontSize: titleFontSize(problem.name),
               fontWeight: 800,
@@ -215,8 +187,6 @@ export default async function ProblemOpenGraphImage({
             ) : null}
           </div>
         </div>
-
-        <HintLadder activeLevels={Math.min(problem.hintCount, 5)} />
       </div>
 
       <div

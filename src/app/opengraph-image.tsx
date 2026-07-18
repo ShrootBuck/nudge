@@ -1,11 +1,5 @@
 import { ImageResponse } from "next/og";
-import {
-  HintLadder,
-  OG_COLORS,
-  OgBrand,
-  OgFrame,
-  OgPill,
-} from "@/components/og-image";
+import { OG_COLORS, OgBrand, OgFrame } from "@/components/og-image";
 import { OG_IMAGE_SIZE } from "@/lib/site-metadata";
 
 export const alt = "Nudge - progressive Codeforces hints without the spoilers";
@@ -52,14 +46,10 @@ export default function OpenGraphImage() {
             flexDirection: "column",
           }}
         >
-          <div style={{ display: "flex" }}>
-            <OgPill accent={OG_COLORS.sky}>NO-SPOILER HELP</OgPill>
-          </div>
           <div
             style={{
               display: "flex",
               flexDirection: "column",
-              marginTop: 24,
               fontSize: 67,
               fontWeight: 800,
               letterSpacing: "-0.045em",
@@ -85,8 +75,6 @@ export default function OpenGraphImage() {
             Codeforces problems.
           </div>
         </div>
-
-        <HintLadder />
       </div>
 
       <div
