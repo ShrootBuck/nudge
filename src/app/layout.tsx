@@ -7,6 +7,11 @@ import { Footer } from "@/components/footer";
 import { Navbar } from "@/components/navbar";
 import { SITE_URL } from "@/lib/env";
 import { NAV_LINKS } from "@/lib/nav-links";
+import {
+  createPageMetadata,
+  SITE_DESCRIPTION,
+  SITE_NAME,
+} from "@/lib/site-metadata";
 import "./globals.css";
 
 const themeInitScript = `
@@ -41,32 +46,31 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
+  ...createPageMetadata({
+    title: SITE_NAME,
+    description: SITE_DESCRIPTION,
+    path: "/",
+    absoluteTitle: true,
+  }),
   title: {
-    default: "Nudge",
-    template: "%s | Nudge",
+    default: SITE_NAME,
+    template: `%s | ${SITE_NAME}`,
   },
-  description:
-    "Progressive hints, clean editorials, and full C++ solutions for Codeforces problems.",
-  applicationName: "Nudge",
-  alternates: {
-    canonical: "/",
-  },
-  openGraph: {
-    title: "Nudge",
-    description:
-      "Progressive hints, clean editorials, and full C++ solutions for Codeforces problems.",
-    url: SITE_URL,
-    siteName: "Nudge",
-    type: "website",
-  },
-  twitter: {
-    card: "summary",
-    title: "Nudge",
-    description:
-      "Progressive hints, clean editorials, and full C++ solutions for Codeforces problems.",
-  },
-  icons: {
-    icon: "https://fav.farm/💻",
+  applicationName: SITE_NAME,
+  keywords: [
+    "Codeforces",
+    "competitive programming",
+    "programming hints",
+    "editorials",
+    "C++ solutions",
+  ],
+  category: "education",
+  creator: SITE_NAME,
+  publisher: SITE_NAME,
+  formatDetection: {
+    email: false,
+    address: false,
+    telephone: false,
   },
 };
 

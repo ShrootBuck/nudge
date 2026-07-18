@@ -1,16 +1,79 @@
 import { getDownloadUrl } from "@vercel/blob";
+import type { Metadata } from "next";
 import { cacheLife, cacheTag } from "next/cache";
 import { notFound } from "next/navigation";
 import { problemTag } from "@/lib/cache-tags";
 import { prisma } from "@/lib/prisma";
+import { getProblemSocialData } from "@/lib/problem-read-cache";
+import {
+  formatProblemId,
+  isProblemIndexable,
+  parseProblemRouteParams,
+  problemSocialDescription,
+  problemSocialTitle,
+} from "@/lib/problem-social";
 import { parseSolutionContent } from "@/lib/problem-solution";
 import {
   highlightCodeHtml,
   SHIKI_DARK_THEME,
   SHIKI_LIGHT_THEME,
 } from "@/lib/shiki";
+import { createPageMetadata, OG_IMAGE_SIZE } from "@/lib/site-metadata";
 import { ProblemContent } from "./problem-content";
 import type { ProblemView } from "./problem-view-types";
+
+type ProblemPageProps = {
+  params: Promise<{ contestId: string; index: string }>;
+};
+
+export async function generateMetadata({
+  params,
+}: ProblemPageProps): Promise<Metadata> {
+  const route = parseProblemRouteParams(await params);
+  if (!route) notFound();
+
+  const problem = await getProblemSocialData(route.contestId, route.index);
+  if (!problem) notFound();
+
+  const path = `/problem/${problem.contestId}/${problem.index}`;
+  const problemId = formatProblemId(problem.contestId, problem.index);
+  const title = problemSocialTitle(problem);
+  const description = problemSocialDescription(problem);
+  const image = {
+    url: `${path}/opengraph-image`,
+    ...OG_IMAGE_SIZE,
+    alt: `${problemId}: ${problem.name} - Codeforces hints and editorial on Nudge`,
+    type: "image/png" as const,
+  };
+  const metadata = createPageMetadata({
+    title,
+    description,
+    path,
+    image,
+  });
+
+  return {
+    ...metadata,
+    keywords: [
+      `Codeforces ${problemId}`,
+      problem.name,
+      ...problem.tags,
+      "competitive programming",
+      "progressive hints",
+      "editorial",
+      "C++ solution",
+    ],
+    category: "education",
+    robots: isProblemIndexable(problem)
+      ? { index: true, follow: true }
+      : { index: false, follow: false, noarchive: true },
+    openGraph: {
+      ...metadata.openGraph,
+      type: "article",
+      tags: problem.tags,
+    },
+  };
+}
 
 async function getProblemView(
   contestId: number,
@@ -88,18 +151,11 @@ async function getProblemView(
   };
 }
 
-export default async function ProblemPage({
-  params,
-}: {
-  params: Promise<{ contestId: string; index: string }>;
-}) {
-  const { contestId, index } = await params;
-  const contestIdNum = Number.parseInt(contestId, 10);
-  const normalizedIndex = index.toUpperCase();
+export default async function ProblemPage({ params }: ProblemPageProps) {
+  const route = parseProblemRouteParams(await params);
+  if (!route) notFound();
 
-  if (Number.isNaN(contestIdNum)) notFound();
-
-  const problem = await getProblemView(contestIdNum, normalizedIndex);
+  const problem = await getProblemView(route.contestId, route.index);
 
   if (!problem) notFound();
 

@@ -1,7 +1,8 @@
 import { cacheLife, cacheTag } from "next/cache";
-import { PROBLEM_LIST_TAG } from "@/lib/cache-tags";
+import { PROBLEM_LIST_TAG, problemTag } from "@/lib/cache-tags";
 import { prisma } from "@/lib/prisma";
 import { completedContentWhere, problemWhere } from "@/lib/problem-pipeline-db";
+import type { ProblemSocialData } from "@/lib/problem-social";
 
 function listableWhere() {
   return problemWhere({
@@ -39,6 +40,49 @@ export async function getRandomProblemPool() {
     where: listableWhere(),
     select: { contestId: true, index: true },
   });
+}
+
+export async function getProblemSocialData(
+  contestId: number,
+  index: string,
+): Promise<ProblemSocialData | null> {
+  "use cache";
+
+  cacheLife("days");
+  cacheTag(problemTag(contestId, index));
+
+  const problem = await prisma.problem.findUnique({
+    where: {
+      contestId_index: { contestId, index },
+    },
+    select: {
+      contestId: true,
+      index: true,
+      name: true,
+      rating: true,
+      tags: true,
+      runState: true,
+      reviewStatus: true,
+      _count: { select: { hints: true } },
+      editorial: { select: { id: true } },
+      solution: { select: { id: true } },
+    },
+  });
+
+  if (!problem) return null;
+
+  return {
+    contestId: problem.contestId,
+    index: problem.index,
+    name: problem.name,
+    rating: problem.rating,
+    tags: problem.tags,
+    runState: problem.runState,
+    reviewStatus: problem.reviewStatus,
+    hintCount: problem._count.hints,
+    hasEditorial: problem.editorial !== null,
+    hasSolution: problem.solution !== null,
+  };
 }
 
 export async function getCachedProblemSearchResults(query: string) {

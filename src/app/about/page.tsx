@@ -7,12 +7,14 @@ import {
   Lightbulb,
 } from "lucide-react";
 import type { Metadata } from "next";
+import { createPageMetadata } from "@/lib/site-metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = createPageMetadata({
   title: "About",
   description:
     "Learn how Nudge uses AI to generate progressive hints and editorials for competitive programming problems.",
-};
+  path: "/about",
+});
 
 export default function AboutPage() {
   return (

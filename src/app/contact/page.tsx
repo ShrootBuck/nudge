@@ -1,10 +1,12 @@
 import { ArrowUpRight, Bug, Mail, MessageCircle } from "lucide-react";
 import type { Metadata } from "next";
+import { createPageMetadata } from "@/lib/site-metadata";
 
-export const metadata: Metadata = {
+export const metadata: Metadata = createPageMetadata({
   title: "Contact",
   description: "Get in touch with the Nudge team.",
-};
+  path: "/contact",
+});
 
 export default function ContactPage() {
   return (
