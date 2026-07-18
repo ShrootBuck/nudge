@@ -297,7 +297,7 @@ export default async function Home({
             <div className="min-w-0">
               <span className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 py-1 text-xs font-medium tracking-wide text-muted-foreground shadow-sm">
                 <Sparkles className="size-3.5" />
-                Competitive programming, slower and smarter
+                Competitive programming, faster and smarter
               </span>
 
               <h1 className="mt-5 max-w-3xl text-3xl font-semibold tracking-tight text-balance sm:text-5xl">

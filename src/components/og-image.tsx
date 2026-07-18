@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 
 export const OG_COLORS = {
-  background: "#0a0f18",
+  background: "#101720",
   panel: "#111927",
   foreground: "#f8fafc",
   muted: "#94a3b8",
@@ -25,46 +25,6 @@ export function OgFrame({ children }: { children: ReactNode }) {
         backgroundColor: OG_COLORS.background,
       }}
     >
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          left: 0,
-          width: "62%",
-          height: "70%",
-          backgroundColor: "#080d15",
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          top: 0,
-          right: 0,
-          width: "38%",
-          height: "70%",
-          backgroundColor: "#101720",
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          bottom: 0,
-          left: 0,
-          width: "62%",
-          height: "30%",
-          backgroundColor: "#0b1522",
-        }}
-      />
-      <div
-        style={{
-          position: "absolute",
-          right: 0,
-          bottom: 0,
-          width: "38%",
-          height: "30%",
-          backgroundColor: "#19160e",
-        }}
-      />
       <div
         style={{
           position: "absolute",

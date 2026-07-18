@@ -48,19 +48,6 @@ function reviewBadge(problem: { runState: string; reviewStatus: string }) {
   }
 }
 
-function visibleTags(tags: string[]) {
-  const visible: string[] = [];
-  let characterCount = 0;
-
-  for (const tag of tags) {
-    if (visible.length >= 4 || characterCount + tag.length > 46) break;
-    visible.push(tag);
-    characterCount += tag.length;
-  }
-
-  return visible;
-}
-
 export default async function ProblemOpenGraphImage({
   params,
 }: {
@@ -73,8 +60,6 @@ export default async function ProblemOpenGraphImage({
   if (!problem) notFound();
 
   const problemId = formatProblemId(problem.contestId, problem.index);
-  const tags = visibleTags(problem.tags);
-  const hiddenTagCount = problem.tags.length - tags.length;
   const review = reviewBadge(problem);
   const features = [
     `${problem.hintCount} progressive hint${problem.hintCount === 1 ? "" : "s"}`,
@@ -117,7 +102,7 @@ export default async function ProblemOpenGraphImage({
       >
         <div
           style={{
-            width: 740,
+            width: "100%",
             display: "flex",
             flexDirection: "column",
           }}
@@ -157,13 +142,14 @@ export default async function ProblemOpenGraphImage({
               marginTop: 22,
             }}
           >
-            {tags.map((tag, index) => (
+            {problem.tags.map((tag) => (
               <div
                 key={tag}
                 style={{
                   display: "flex",
                   padding: "7px 11px",
-                  marginLeft: index === 0 ? 0 : 8,
+                  marginRight: 8,
+                  marginBottom: 8,
                   borderRadius: 999,
                   border: `1px solid ${OG_COLORS.border}`,
                   color: "#cbd5e1",
@@ -174,18 +160,6 @@ export default async function ProblemOpenGraphImage({
                 {tag}
               </div>
             ))}
-            {hiddenTagCount > 0 ? (
-              <div
-                style={{
-                  display: "flex",
-                  marginLeft: 9,
-                  color: OG_COLORS.muted,
-                  fontSize: 12,
-                }}
-              >
-                +{hiddenTagCount} more
-              </div>
-            ) : null}
           </div>
         </div>
       </div>
