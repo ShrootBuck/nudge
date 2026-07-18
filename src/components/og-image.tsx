@@ -10,16 +10,6 @@ export const OG_COLORS = {
   amber: "#fbbf24",
 } as const;
 
-const OG_DITHER = `data:image/svg+xml,${encodeURIComponent(`
-  <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630">
-    <filter id="noise" x="0" y="0" width="100%" height="100%">
-      <feTurbulence type="fractalNoise" baseFrequency="0.8" numOctaves="3" seed="17" stitchTiles="stitch" />
-      <feColorMatrix values="0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0.0027 0.0027 0.0027 0 0" />
-    </filter>
-    <rect width="100%" height="100%" filter="url(#noise)" />
-  </svg>
-`)}`;
-
 export function OgFrame({ children }: { children: ReactNode }) {
   return (
     <div
@@ -33,18 +23,47 @@ export function OgFrame({ children }: { children: ReactNode }) {
         transformOrigin: "top left",
         color: OG_COLORS.foreground,
         backgroundColor: OG_COLORS.background,
-        backgroundImage:
-          "linear-gradient(135deg, #080d15 0%, #0e1725 54%, #19160e 100%)",
       }}
     >
-      {/* next/image cannot be rendered inside an ImageResponse. */}
-      {/* biome-ignore lint/performance/noImgElement: The dither is an embedded SVG. */}
-      <img
-        alt=""
-        src={OG_DITHER}
-        width={1200}
-        height={630}
-        style={{ position: "absolute", inset: 0 }}
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          left: 0,
+          width: "62%",
+          height: "70%",
+          backgroundColor: "#080d15",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          top: 0,
+          right: 0,
+          width: "38%",
+          height: "70%",
+          backgroundColor: "#101720",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          width: "62%",
+          height: "30%",
+          backgroundColor: "#0b1522",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          right: 0,
+          bottom: 0,
+          width: "38%",
+          height: "30%",
+          backgroundColor: "#19160e",
+        }}
       />
       <div
         style={{
