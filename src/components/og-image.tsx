@@ -51,17 +51,6 @@ export function OgFrame({ children }: { children: ReactNode }) {
       />
       <div
         style={{
-          position: "absolute",
-          width: 7,
-          height: 220,
-          borderRadius: 999,
-          background: "linear-gradient(180deg, #38bdf8, #fbbf24)",
-          left: 0,
-          top: 205,
-        }}
-      />
-      <div
-        style={{
           width: "100%",
           height: "100%",
           display: "flex",

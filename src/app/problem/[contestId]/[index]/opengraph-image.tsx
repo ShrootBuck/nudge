@@ -101,7 +101,8 @@ export default async function ProblemOpenGraphImage({
             letterSpacing: "0.14em",
           }}
         >
-          CODEFORCES <span style={{ color: "#ffffff" }}>{problemId}</span>
+          CODEFORCES
+          <span style={{ color: "#ffffff", marginLeft: 6 }}>{problemId}</span>
         </div>
       </div>
 
