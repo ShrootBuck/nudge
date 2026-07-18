@@ -23,7 +23,7 @@ export default function OpenGraphImage() {
             color: OG_COLORS.muted,
             fontSize: 12,
             fontWeight: 700,
-            letterSpacing: "0.16em",
+            letterSpacing: "0.1em",
           }}
         >
           CODEFORCES FIELD NOTES

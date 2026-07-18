@@ -101,7 +101,7 @@ export function OgBrand() {
             color: OG_COLORS.muted,
             fontSize: 10,
             fontWeight: 700,
-            letterSpacing: "0.24em",
+            letterSpacing: "0.2em",
           }}
         >
           COMPETITIVE PROGRAMMING
