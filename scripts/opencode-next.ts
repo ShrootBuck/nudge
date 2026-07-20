@@ -3,7 +3,7 @@ import {
   type OpenCodeRuntime,
 } from "../src/lib/ai/opencode";
 import { discordLog } from "../src/lib/discord-log";
-import { DISCORD_COLORS } from "../src/lib/discord-webhook";
+import { SITE_URL } from "../src/lib/env";
 import {
   executeProblemGeneration,
   type GenerationLogger,
@@ -216,11 +216,7 @@ async function main() {
         }
 
         await discordLog({
-          title: "⚡ Local OpenCode Generation Complete",
-          description: `Processed **${toProblemLabel(
-            selection.problem,
-          )}** using ${runtimeDetails.displayName}.`,
-          color: DISCORD_COLORS.info,
+          content: `⚡ Generated **${toProblemLabel(selection.problem)}** using ${runtimeDetails.displayName}\n${SITE_URL}/problem/${selection.problem.contestId}/${selection.problem.index}`,
         });
 
         const savedProblem = await prisma.problem.findUnique({

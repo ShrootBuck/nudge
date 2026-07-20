@@ -19,9 +19,30 @@ export type DiscordEmbed = {
   timestamp?: string;
 };
 
+// Plain content lets Discord unfurl bare links with the site's Open Graph card.
+export type DiscordContentMessage = { content: string };
+
+export type DiscordMessage = DiscordEmbed | DiscordContentMessage;
+
+function toWebhookBody(message: DiscordMessage) {
+  if ("content" in message) {
+    return { content: message.content };
+  }
+
+  return {
+    embeds: [
+      {
+        ...message,
+        color: message.color ?? DISCORD_COLORS.info,
+        timestamp: message.timestamp ?? new Date().toISOString(),
+      },
+    ],
+  };
+}
+
 export async function sendDiscordWebhook(
   webhookUrl: string,
-  embed: DiscordEmbed,
+  message: DiscordMessage,
   options?: { throwOnError?: boolean },
 ): Promise<boolean> {
   const normalizedWebhookUrl = webhookUrl.trim();
@@ -35,15 +56,7 @@ export async function sendDiscordWebhook(
     return false;
   }
 
-  const body = {
-    embeds: [
-      {
-        ...embed,
-        color: embed.color ?? DISCORD_COLORS.info,
-        timestamp: embed.timestamp ?? new Date().toISOString(),
-      },
-    ],
-  };
+  const body = toWebhookBody(message);
 
   let response: Response;
 
@@ -70,12 +83,12 @@ export async function sendDiscordWebhook(
   }
 
   const text = await response.text();
-  const message = `Discord webhook failed (${response.status}): ${text}`;
+  const errorMessage = `Discord webhook failed (${response.status}): ${text}`;
 
   if (options?.throwOnError) {
-    throw new Error(message);
+    throw new Error(errorMessage);
   }
 
-  console.error(message);
+  console.error(errorMessage);
   return false;
 }

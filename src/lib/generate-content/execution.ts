@@ -4,7 +4,7 @@ import { recordGenerationUsage } from "../ai/usage";
 import { safeRevalidateTag } from "../cache-revalidate";
 import { PROBLEM_LIST_TAG, problemTag } from "../cache-tags";
 import { discordLog } from "../discord-log";
-import { DISCORD_COLORS } from "../discord-webhook";
+import { SITE_URL } from "../env";
 import type { AutomaticGenerationProblem } from "../generation-queue";
 import {
   deleteGenerationTranscript,
@@ -266,10 +266,9 @@ export async function executeProblemGeneration({
 
       revalidateProblem(problem);
 
+      // Keep the whole message under Discord's 2000-char content limit.
       await discordLog({
-        title: "🚫 Unsolvable Problem",
-        description: `Model reported that problem **${label}** cannot be solved.\n**Reason:** ${reason}`,
-        color: DISCORD_COLORS.error,
+        content: `🚫 **${label}** reported unsolvable: ${reason.slice(0, 1500)}\n${SITE_URL}/problem/${problem.contestId}/${problem.index}`,
       });
 
       return { processed: 1, outcome: "unsolvable" };

@@ -3,7 +3,6 @@
 import { updateTag } from "next/cache";
 import { PROBLEM_LIST_TAG, problemTag } from "@/lib/cache-tags";
 import { sendAdminLog } from "@/lib/discord";
-import { DISCORD_COLORS } from "@/lib/discord-webhook";
 import { SITE_URL, verifyAdminPassword } from "@/lib/env";
 import { deleteGenerationTranscript } from "@/lib/generation-transcript";
 import { prisma } from "@/lib/prisma";
@@ -61,21 +60,15 @@ export async function setProblemReviewStatus(
   const tag = `${problem.contestId}${problem.index}`;
   const link = `${SITE_URL}/problem/${problem.contestId}/${problem.index}`;
   const logConfig = {
-    VERIFIED: { title: "✅ Problem Verified", color: DISCORD_COLORS.success },
-    INCORRECT: {
-      title: "⚠️ Marked Incorrect",
-      color: DISCORD_COLORS.warning,
-    },
+    VERIFIED: `✅ Verified **${tag}**`,
+    INCORRECT: `⚠️ Marked **${tag}** incorrect`,
   } as const;
-  const log = logConfig[reviewStatus];
   const reportSummary =
     resolvedReports.count > 0
       ? `\n${resolvedReports.count} open report${resolvedReports.count === 1 ? " was" : "s were"} resolved by this action.`
       : "";
   await sendAdminLog({
-    title: log.title,
-    description: `**[${tag} — ${problem.name}](${link})**${reportSummary}`,
-    color: log.color,
+    content: `${logConfig[reviewStatus]}${reportSummary}\n${link}`,
   });
 
   return { success: true } as const;
@@ -172,9 +165,7 @@ export async function regenerateProblemContent(
       ? `\n${resolvedReportCount} open report${resolvedReportCount === 1 ? " was" : "s were"} resolved by this regeneration.`
       : "";
   await sendAdminLog({
-    title: "♻️ Queued Regeneration",
-    description: `**[${tag} — ${problem.name}](${link})**\nExisting generated content was deleted and the problem was queued for a future local generation run.${reportSummary}`,
-    color: DISCORD_COLORS.info,
+    content: `♻️ Queued regeneration for **${tag}** — existing content deleted${reportSummary}\n${link}`,
   });
 
   return { success: true } as const;

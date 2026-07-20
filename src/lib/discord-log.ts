@@ -1,4 +1,4 @@
-import { type DiscordEmbed, sendDiscordWebhook } from "./discord-webhook";
+import { type DiscordMessage, sendDiscordWebhook } from "./discord-webhook";
 import { getOptionalEnv } from "./env";
 
 const MAX_DISCORD_LOG_ATTEMPTS = 3;
@@ -11,7 +11,7 @@ function wait(ms: number) {
 }
 
 // Best-effort logger; keeps jobs and local runs successful if Discord is unavailable.
-export async function discordLog(embed: DiscordEmbed): Promise<void> {
+export async function discordLog(message: DiscordMessage): Promise<void> {
   const webhookUrl = getOptionalEnv("DISCORD_WEBHOOK_URL");
 
   if (!webhookUrl) {
@@ -23,7 +23,7 @@ export async function discordLog(embed: DiscordEmbed): Promise<void> {
   }
 
   for (let attempt = 1; attempt <= MAX_DISCORD_LOG_ATTEMPTS; attempt++) {
-    const sent = await sendDiscordWebhook(webhookUrl, embed);
+    const sent = await sendDiscordWebhook(webhookUrl, message);
 
     if (sent) {
       return;

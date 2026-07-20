@@ -1,9 +1,9 @@
-import { type DiscordEmbed, sendDiscordWebhook } from "./discord-webhook";
+import { type DiscordMessage, sendDiscordWebhook } from "./discord-webhook";
 import { getOptionalEnv } from "./env";
 
 let warnedAboutMissingWebhook = false;
 
-export async function sendAdminLog(embed: DiscordEmbed): Promise<void> {
+export async function sendAdminLog(message: DiscordMessage): Promise<void> {
   const webhookUrl = getOptionalEnv("DISCORD_WEBHOOK_URL");
 
   if (!webhookUrl) {
@@ -15,5 +15,5 @@ export async function sendAdminLog(embed: DiscordEmbed): Promise<void> {
   }
 
   // Do not throw so admin actions still succeed if Discord is down.
-  await sendDiscordWebhook(webhookUrl, embed);
+  await sendDiscordWebhook(webhookUrl, message);
 }
