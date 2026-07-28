@@ -211,7 +211,9 @@ export async function executeProblemGeneration({
       clearInterval(heartbeat);
     }
     if (response.transcriptPath) {
-      log.info(`Saved full OpenCode transcript to ${response.transcriptPath}`);
+      log.info(
+        `Saved full generation transcript to ${response.transcriptPath}`,
+      );
       try {
         transcriptUrl = await publishGenerationTranscript({
           problemId: problem.id,
@@ -219,7 +221,7 @@ export async function executeProblemGeneration({
           responseId: response.responseId,
           transcriptPath: response.transcriptPath,
         });
-        log.info(`Published full OpenCode transcript to ${transcriptUrl}`);
+        log.info(`Published full generation transcript to ${transcriptUrl}`);
         if (
           problem.generationTranscriptUrl &&
           problem.generationTranscriptUrl !== transcriptUrl
@@ -234,7 +236,7 @@ export async function executeProblemGeneration({
         }
       } catch (error) {
         log.warn(
-          `Could not publish OpenCode transcript: ${toErrorMessage(error)}`,
+          `Could not publish generation transcript: ${toErrorMessage(error)}`,
         );
       }
     } else if (response.transcriptWarning) {

@@ -7,6 +7,7 @@ import {
   type Config,
   createOpencode,
 } from "@opencode-ai/sdk/v2";
+import { MAX_CODEFORCES_IMAGE_BYTES } from "./codeforces-images";
 import { OPEN_CODE_GENERATION_CONFIG } from "./config";
 import { buildOpenCodePromptParts } from "./opencode-assets";
 import { mirrorOpenCodeTranscript } from "./opencode-transcript";
@@ -16,7 +17,6 @@ import type { GenerateOptions, StructuredResponse } from "./types";
 const GENERATION_AGENT = "nudge-generation";
 const GENERATION_TIMEOUT_MS = 60 * 60 * 1000;
 const SERVER_STARTUP_TIMEOUT_MS = 30 * 1000;
-const MAX_CODEFORCES_IMAGE_BYTES = 20 * 1024 * 1024;
 const require = createRequire(import.meta.url);
 
 type OpenCodeInstance = Awaited<ReturnType<typeof createOpencode>>;
