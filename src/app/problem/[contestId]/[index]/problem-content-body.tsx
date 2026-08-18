@@ -261,7 +261,7 @@ export function ProblemContentBody({ problem }: { problem: ProblemView }) {
                 <SolutionCode
                   code={problem.solution.content}
                   downloadFileName={`codeforces-${problem.contestId}-${problem.index}.cpp`}
-                  preHighlightedHtml={problem.solution.preHighlightedHtml}
+                  parsedDocument={problem.solution.parsedDocument}
                 />
               </CollapsibleSection>
             )}

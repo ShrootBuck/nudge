@@ -1,10 +1,12 @@
 "use client";
 
+import { MarkdownDocument as MarkdownDocumentRenderer } from "@comark/react";
+import type { MarkdownDocument } from "comark";
 import { type ComponentType, useId, useState } from "react";
 import { CodeBlock } from "@/components/code-block";
 import { parseSolutionContent } from "@/lib/problem-solution";
 import { cn } from "@/lib/utils";
-import { ProblemMarkdown } from "./problem-markdown";
+import { ProblemMarkdown, StyledPre } from "./problem-markdown";
 import { HINT_LABELS, type ProblemView } from "./problem-view-types";
 
 export function AnimatedCollapse({
@@ -103,11 +105,11 @@ export function HintCard({
 export function SolutionCode({
   code,
   downloadFileName,
-  preHighlightedHtml,
+  parsedDocument,
 }: {
   code: string;
   downloadFileName: string;
-  preHighlightedHtml?: { light: string; dark: string } | null;
+  parsedDocument?: MarkdownDocument | null;
 }) {
   const parsedSolution = parseSolutionContent(code);
 
@@ -121,8 +123,18 @@ export function SolutionCode({
       language={parsedSolution.language}
       showActions
       downloadFileName={downloadFileName}
-      preHighlightedHtml={preHighlightedHtml ?? undefined}
-    />
+    >
+      {parsedDocument ? (
+        <MarkdownDocumentRenderer
+          value={parsedDocument}
+          components={{ pre: StyledPre }}
+        />
+      ) : (
+        <StyledPre>
+          <code>{parsedSolution.code}</code>
+        </StyledPre>
+      )}
+    </CodeBlock>
   );
 }
 

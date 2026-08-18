@@ -1,8 +1,11 @@
 import { getDownloadUrl } from "@vercel/blob";
+import type { MarkdownDocument } from "comark";
+import { parseMarkdown } from "comark";
 import type { Metadata } from "next";
 import { cacheLife, cacheTag } from "next/cache";
 import { notFound } from "next/navigation";
 import { problemTag } from "@/lib/cache-tags";
+import { markdownPlugins } from "@/lib/markdown";
 import { prisma } from "@/lib/prisma";
 import { getProblemSocialData } from "@/lib/problem-read-cache";
 import {
@@ -13,11 +16,6 @@ import {
   problemSocialTitle,
 } from "@/lib/problem-social";
 import { parseSolutionContent } from "@/lib/problem-solution";
-import {
-  highlightCodeHtml,
-  SHIKI_DARK_THEME,
-  SHIKI_LIGHT_THEME,
-} from "@/lib/shiki";
 import { createPageMetadata, OG_IMAGE_SIZE } from "@/lib/site-metadata";
 import { ProblemContent } from "./problem-content";
 import type { ProblemView } from "./problem-view-types";
@@ -99,28 +97,19 @@ async function getProblemView(
 
   const modelDisplayName = problem.generatedByDisplayName ?? null;
 
-  let preHighlightedSolutionHtml: { light: string; dark: string } | null = null;
+  let parsedSolutionDocument: MarkdownDocument | null = null;
 
   if (problem.solution) {
     const parsedSolution = parseSolutionContent(problem.solution.content);
 
     if (parsedSolution.kind === "code") {
       try {
-        const [light, dark] = await Promise.all([
-          highlightCodeHtml(
-            parsedSolution.code,
-            parsedSolution.language,
-            SHIKI_LIGHT_THEME,
-          ),
-          highlightCodeHtml(
-            parsedSolution.code,
-            parsedSolution.language,
-            SHIKI_DARK_THEME,
-          ),
-        ]);
-        preHighlightedSolutionHtml = { light, dark };
+        parsedSolutionDocument = await parseMarkdown(
+          `\`\`\`${parsedSolution.language}\n${parsedSolution.code}\n\`\`\``,
+          { plugins: markdownPlugins },
+        );
       } catch {
-        preHighlightedSolutionHtml = null;
+        parsedSolutionDocument = null;
       }
     }
   }
@@ -145,7 +134,7 @@ async function getProblemView(
       ? {
           id: problem.solution.id,
           content: problem.solution.content,
-          preHighlightedHtml: preHighlightedSolutionHtml,
+          parsedDocument: parsedSolutionDocument,
         }
       : null,
   };

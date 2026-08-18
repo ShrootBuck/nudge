@@ -1,4 +1,5 @@
 import type { RunState } from "@prisma/client";
+import type { MarkdownDocument } from "comark";
 import { BadgeCheck, Ban, LoaderCircle, ShieldAlert, X } from "lucide-react";
 import type { ComponentType } from "react";
 
@@ -27,7 +28,7 @@ export type ProblemView = {
   solution: {
     id: string;
     content: string;
-    preHighlightedHtml?: { light: string; dark: string } | null;
+    parsedDocument?: MarkdownDocument | null;
   } | null;
 };
 

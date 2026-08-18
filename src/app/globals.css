@@ -179,4 +179,13 @@
     display: inline-block;
     min-width: max-content;
   }
+  /* Comark/Shiki dual-theme output (`.shiki-themes`): light colors are inline, dark via --shiki-* vars */
+  .dark .shiki-themes,
+  .dark .shiki-themes span {
+    color: var(--shiki-dark) !important;
+    background-color: var(--shiki-dark-bg) !important;
+    font-style: var(--shiki-dark-font-style) !important;
+    font-weight: var(--shiki-dark-font-weight) !important;
+    text-decoration: var(--shiki-dark-text-decoration) !important;
+  }
 }
