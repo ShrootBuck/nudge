@@ -10,6 +10,7 @@
         "@opencode-ai/sdk": "1.18.3",
         "@prisma/adapter-pg": "^7.8.0",
         "@prisma/client": "^7.8.0",
+        "@shikijs/colorized-brackets": "^4.4.3",
         "@shikijs/langs": "^4.4.3",
         "@shikijs/themes": "^4.4.3",
         "@tailwindcss/typography": "^0.5.19",
@@ -427,6 +428,8 @@
     "@s2-dev/streamstore": ["@s2-dev/streamstore@0.22.5", "", { "dependencies": { "@protobuf-ts/runtime": "^2.11.1", "debug": "^4.4.3" } }, "sha512-GqdOKIbIoIxT+40fnKzHbrsHB6gBqKdECmFe7D3Ojk4FoN1Hu0LhFzZv6ZmVMjoHHU+55debS1xSWjZwQmbIyQ=="],
 
     "@sec-ant/readable-stream": ["@sec-ant/readable-stream@0.4.1", "", {}, "sha512-831qok9r2t8AlxLko40y2ebgSDhenenCatLVeW/uBtnHPyhHOvG0C7TvfgecV+wHzIm5KUICgzmVpWS+IMEAeg=="],
+
+    "@shikijs/colorized-brackets": ["@shikijs/colorized-brackets@4.4.3", "", { "dependencies": { "shiki": "4.4.3" } }, "sha512-7+G9lY/EDD84MzO6jU2SkS/kmZmyshesuDTPXi/vioULBv5/cAsLM4vwRmb2Rsup89zj4jASOnoZQvDkj0/ZqA=="],
 
     "@shikijs/core": ["@shikijs/core@4.4.3", "", { "dependencies": { "@shikijs/primitive": "4.4.3", "@shikijs/types": "4.4.3", "@shikijs/vscode-textmate": "^10.0.2", "@types/hast": "^3.0.5", "hast-util-to-html": "^9.0.5" } }, "sha512-QCR4q2ZO/ILJEuwiBMel4wdcTDb1JGwfjKTxPDF6x8ixOaluPrVqIn06C99AcRPhmYlBR56d/Fb+GN58GzExpg=="],
 
