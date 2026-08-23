@@ -8,8 +8,9 @@ function Slider({
   value,
   min = 0,
   max = 100,
+  thumbLabels,
   ...props
-}: SliderPrimitive.Root.Props) {
+}: SliderPrimitive.Root.Props & { thumbLabels?: readonly string[] }) {
   const _values = Array.isArray(value)
     ? value
     : Array.isArray(defaultValue)
@@ -42,6 +43,15 @@ function Slider({
             data-slot="slider-thumb"
             // biome-ignore lint/suspicious/noArrayIndexKey: thumbs are positional, length is fixed per render
             key={index}
+            index={index}
+            aria-label={
+              thumbLabels?.[index] ??
+              (_values.length === 2
+                ? index === 0
+                  ? "Minimum value"
+                  : "Maximum value"
+                : "Value")
+            }
             className="relative block size-3 shrink-0 cursor-pointer rounded-full border border-ring bg-white ring-ring/50 transition-[color,box-shadow] select-none after:absolute after:-inset-2 hover:ring-3 focus-visible:ring-3 focus-visible:outline-hidden active:ring-3 disabled:pointer-events-none disabled:cursor-default disabled:opacity-50"
           />
         ))}

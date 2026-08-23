@@ -48,7 +48,6 @@ export async function getProblemSocialData(
 ): Promise<ProblemSocialData | null> {
   "use cache";
 
-  cacheLife("days");
   cacheTag(problemTag(contestId, index));
 
   const problem = await prisma.problem.findUnique({
@@ -69,7 +68,16 @@ export async function getProblemSocialData(
     },
   });
 
-  if (!problem) return null;
+  if (!problem) {
+    cacheLife("minutes");
+    return null;
+  }
+
+  if (problem.runState === "SUCCEEDED") {
+    cacheLife("days");
+  } else {
+    cacheLife("seconds");
+  }
 
   return {
     contestId: problem.contestId,
@@ -95,16 +103,25 @@ export async function getCachedProblemSearchResults(query: string) {
 
   const completedWhere = listableWhere();
   const contestMatch = query.match(/^(\d+)([A-Za-z]\d?)?$/);
-  const whereClause = contestMatch
-    ? {
-        ...completedWhere,
-        contestId: Number(contestMatch[1]),
-        ...(contestMatch[2] ? { index: contestMatch[2].toUpperCase() } : {}),
-      }
-    : {
-        ...completedWhere,
-        name: { contains: query, mode: "insensitive" as const },
-      };
+  const parsedContestId = contestMatch ? Number(contestMatch[1]) : null;
+  const contestIdIsValid =
+    parsedContestId !== null &&
+    Number.isSafeInteger(parsedContestId) &&
+    parsedContestId > 0 &&
+    parsedContestId <= 2_147_483_647;
+  const whereClause =
+    contestMatch && contestIdIsValid
+      ? {
+          ...completedWhere,
+          contestId: parsedContestId,
+          ...(contestMatch[2] ? { index: contestMatch[2].toUpperCase() } : {}),
+        }
+      : contestMatch
+        ? { ...completedWhere, contestId: 0 }
+        : {
+            ...completedWhere,
+            name: { contains: query, mode: "insensitive" as const },
+          };
 
   return prisma.problem.findMany({
     where: whereClause,

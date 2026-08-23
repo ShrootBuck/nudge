@@ -1,7 +1,7 @@
 import type { Prisma } from "@prisma/client";
 import type { GenerateOptions, StructuredResponse } from "../ai";
 import { recordGenerationUsage } from "../ai/usage";
-import { safeRevalidateTag } from "../cache-revalidate";
+import { safeRevalidateTags } from "../cache-revalidate";
 import { PROBLEM_LIST_TAG, problemTag } from "../cache-tags";
 import { discordLog } from "../discord-log";
 import { SITE_URL } from "../env";
@@ -88,11 +88,18 @@ function generationAuditData(
   };
 }
 
-function revalidateProblem(
+async function revalidateProblem(
   problem: Pick<AutomaticGenerationProblem, "contestId" | "index">,
 ) {
-  safeRevalidateTag(PROBLEM_LIST_TAG, "max");
-  safeRevalidateTag(problemTag(problem.contestId, problem.index), "max");
+  const cacheUpdated = await safeRevalidateTags(
+    [PROBLEM_LIST_TAG, problemTag(problem.contestId, problem.index)],
+    "expire",
+  );
+  if (!cacheUpdated) {
+    console.warn(
+      `Updated ${toProblemLabel(problem)}, but cache invalidation failed`,
+    );
+  }
 }
 
 export async function markClaimedProblemFailed({
@@ -122,7 +129,7 @@ export async function markClaimedProblemFailed({
   });
 
   if (updated.count > 0) {
-    revalidateProblem(problem);
+    await revalidateProblem(problem);
   }
 }
 
@@ -144,7 +151,7 @@ async function releaseClaimedProblemAfterStatementFailure({
   });
 
   if (updated.count > 0) {
-    revalidateProblem(problem);
+    await revalidateProblem(problem);
   }
 }
 
@@ -266,7 +273,7 @@ export async function executeProblemGeneration({
         }),
       });
 
-      revalidateProblem(problem);
+      await revalidateProblem(problem);
 
       // Keep the whole message under Discord's 2000-char content limit.
       await discordLog({

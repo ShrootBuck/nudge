@@ -1,6 +1,8 @@
 import { extname } from "node:path";
+import { readResponseBytesWithLimit } from "../http";
 
 export const MAX_CODEFORCES_IMAGE_BYTES = 20 * 1024 * 1024;
+const CODEFORCES_IMAGE_TIMEOUT_MS = 15_000;
 
 export type FetchImplementation = (
   input: string | URL | Request,
@@ -64,50 +66,63 @@ export async function downloadCodeforcesImage({
   fetchImplementation: FetchImplementation;
 }) {
   assertCodeforcesImageUrl(url);
+  const timeoutSignal = AbortSignal.timeout(CODEFORCES_IMAGE_TIMEOUT_MS);
+  const signal = abortSignal
+    ? AbortSignal.any([abortSignal, timeoutSignal])
+    : timeoutSignal;
 
-  const response = await fetchImplementation(url, {
-    headers: {
-      "User-Agent":
-        "nudge-bot/1.0 (+https://nudge.zaydkrunz.com; contact@zaydkrunz.com)",
-    },
-    signal: abortSignal,
-  });
+  try {
+    const response = await fetchImplementation(url, {
+      headers: {
+        "User-Agent":
+          "nudge-bot/1.0 (+https://nudge.zaydkrunz.com; contact@zaydkrunz.com)",
+      },
+      redirect: "error",
+      signal,
+    });
 
-  if (!response.ok) {
-    throw new Error(
-      `Failed to download Codeforces image ${url.href}: ${response.status} ${response.statusText}`,
+    if (!response.ok) {
+      throw new Error(
+        `Failed to download Codeforces image ${url.href}: ${response.status} ${response.statusText}`,
+      );
+    }
+
+    if (response.redirected && response.url) {
+      assertCodeforcesImageUrl(new URL(response.url));
+    }
+
+    const data = await readResponseBytesWithLimit(
+      response,
+      MAX_CODEFORCES_IMAGE_BYTES,
+      `Codeforces image ${url.href}`,
     );
-  }
+    if (data.byteLength === 0) {
+      throw new Error(`Codeforces image is empty: ${url.href}`);
+    }
 
-  if (response.redirected && response.url) {
-    assertCodeforcesImageUrl(new URL(response.url));
-  }
+    const responseMediaType = response.headers
+      .get("content-type")
+      ?.split(";", 1)[0]
+      ?.trim();
+    const mediaType =
+      (responseMediaType?.startsWith("image/") ? responseMediaType : null) ??
+      detectImageMediaType(data);
+    if (!mediaType) {
+      throw new Error(
+        `Codeforces image has an unknown media type: ${url.href}`,
+      );
+    }
 
-  const contentLength = Number(response.headers.get("content-length"));
-  if (
-    Number.isFinite(contentLength) &&
-    contentLength > MAX_CODEFORCES_IMAGE_BYTES
-  ) {
-    throw new Error(`Codeforces image is too large: ${url.href}`);
-  }
+    return { data, mediaType };
+  } catch (error) {
+    if (timeoutSignal.aborted && !abortSignal?.aborted) {
+      throw new Error(
+        `Codeforces image timed out after ${CODEFORCES_IMAGE_TIMEOUT_MS}ms: ${url.href}`,
+      );
+    }
 
-  const data = new Uint8Array(await response.arrayBuffer());
-  if (data.byteLength > MAX_CODEFORCES_IMAGE_BYTES) {
-    throw new Error(`Codeforces image is too large: ${url.href}`);
+    throw error;
   }
-
-  const responseMediaType = response.headers
-    .get("content-type")
-    ?.split(";", 1)[0]
-    ?.trim();
-  const mediaType =
-    (responseMediaType?.startsWith("image/") ? responseMediaType : null) ??
-    detectImageMediaType(data);
-  if (!mediaType) {
-    throw new Error(`Codeforces image has an unknown media type: ${url.href}`);
-  }
-
-  return { data, mediaType };
 }
 
 export function extensionForImage(url: URL, mediaType: string) {

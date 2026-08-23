@@ -3,7 +3,7 @@
 import { MarkdownClient } from "@comark/react";
 import { Math as MathBlock } from "@comark/react/plugins/math";
 import type { ComponentProps } from "react";
-import { markdownPlugins } from "@/lib/markdown";
+import { markdownOptions, markdownPlugins } from "@/lib/markdown";
 import { cn } from "@/lib/utils";
 
 export function StyledPre({
@@ -52,6 +52,7 @@ export function ProblemMarkdown({ content }: { content: string }) {
     <div className="prose prose-neutral max-w-full min-w-0 overflow-hidden text-[0.95rem] leading-7 dark:prose-invert sm:text-[0.98rem] prose-headings:font-semibold prose-headings:tracking-tight prose-p:break-words prose-p:text-foreground/80 prose-li:break-words prose-li:text-foreground/80 prose-strong:text-foreground prose-a:break-words prose-a:font-medium prose-a:text-foreground prose-a:underline prose-code:break-words prose-code:rounded-md prose-code:bg-muted/70 prose-code:px-1.5 prose-code:py-0.5 prose-code:font-mono prose-code:text-[0.9em] prose-code:before:content-none prose-code:after:content-none prose-pre:max-w-full prose-pre:bg-transparent prose-pre:p-0 prose-pre:shadow-none prose-blockquote:border-l-2 prose-blockquote:border-border prose-blockquote:text-muted-foreground [&_.katex-display]:max-w-full [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto">
       <MarkdownClient
         value={content}
+        options={markdownOptions}
         plugins={markdownPlugins}
         components={{ Math: MathBlock, pre: ProsePre, a: ProseLink }}
       />

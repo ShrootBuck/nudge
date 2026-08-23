@@ -1,4 +1,4 @@
-import { safeRevalidateTag } from "../cache-revalidate";
+import { safeRevalidateTags } from "../cache-revalidate";
 import { PROBLEM_LIST_TAG, problemTag } from "../cache-tags";
 import { prisma } from "../prisma";
 import { pipelineStateData, problemUpdateData } from "../problem-pipeline-db";
@@ -74,9 +74,16 @@ export async function saveProblemContent(
     },
   );
 
-  safeRevalidateTag(PROBLEM_LIST_TAG, "max");
-  safeRevalidateTag(
-    problemTag(updatedProblem.contestId, updatedProblem.index),
-    "max",
+  const cacheUpdated = await safeRevalidateTags(
+    [
+      PROBLEM_LIST_TAG,
+      problemTag(updatedProblem.contestId, updatedProblem.index),
+    ],
+    "expire",
   );
+  if (!cacheUpdated) {
+    console.warn(
+      `Saved ${updatedProblem.contestId}${updatedProblem.index}, but cache invalidation failed`,
+    );
+  }
 }

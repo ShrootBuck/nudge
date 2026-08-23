@@ -56,12 +56,6 @@ type ReviewState = {
   summary: string;
 };
 
-export function resolveProblemRunState(problem: {
-  runState: RunState;
-}): RunState {
-  return problem.runState;
-}
-
 export function generationState(
   status: RunState,
   reviewStatus?: ReviewStatus,
@@ -118,17 +112,17 @@ export function reviewState(status: ReviewStatus): ReviewState {
         icon: BadgeCheck,
         label: "Verified",
         badgeClassName:
-          "border-emerald-500/20 bg-emerald-500/10 text-emerald-300 dark:text-emerald-200",
+          "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200",
         panelClassName:
           "border-emerald-500/20 bg-emerald-500/10 text-emerald-700 dark:text-emerald-200",
-        summary: "Marked verified and guaranteed to pass.",
+        summary: "Manually checked against the available problem evidence.",
       };
     case "INCORRECT":
       return {
         icon: X,
         label: "Solution incorrect",
         badgeClassName:
-          "border-rose-500/20 bg-rose-500/10 text-rose-300 dark:text-rose-200",
+          "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-200",
         panelClassName:
           "border-rose-500/20 bg-rose-500/10 text-rose-700 dark:text-rose-200",
         summary:
@@ -139,7 +133,7 @@ export function reviewState(status: ReviewStatus): ReviewState {
         icon: Ban,
         label: "Unsolvable",
         badgeClassName:
-          "border-amber-500/20 bg-amber-500/10 text-amber-300 dark:text-amber-200",
+          "border-amber-500/20 bg-amber-500/10 text-amber-800 dark:text-amber-200",
         panelClassName:
           "border-amber-500/20 bg-amber-500/10 text-amber-700 dark:text-amber-200",
         summary:

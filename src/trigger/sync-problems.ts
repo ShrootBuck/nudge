@@ -1,42 +1,43 @@
 import { logger, schedules } from "@trigger.dev/sdk";
-import { safeRevalidateTag } from "../lib/cache-revalidate";
+import { z } from "zod";
+import { safeRevalidateTags } from "../lib/cache-revalidate";
 import { PROBLEM_LIST_TAG, problemTag } from "../lib/cache-tags";
 import { discordLog } from "../lib/discord-log";
 import { DISCORD_COLORS } from "../lib/discord-webhook";
 import { resetStaleRunningGenerations } from "../lib/generation-queue";
-import { fetchWithTimeout } from "../lib/http";
+import { fetchWithTimeout, readResponseTextWithLimit } from "../lib/http";
 import { prisma } from "../lib/prisma";
 import {
   pipelineStateData,
   problemCreateData,
 } from "../lib/problem-pipeline-db";
 
-interface CFProblem {
-  contestId: number;
-  index: string;
-  name: string;
-  type: string;
-  rating?: number;
-  tags: string[];
-}
+const codeforcesProblemSchema = z.object({
+  contestId: z.number().int().positive().max(2_147_483_647),
+  index: z
+    .string()
+    .trim()
+    .toUpperCase()
+    .regex(/^[A-Z][A-Z0-9]{0,9}$/),
+  name: z.string().trim().min(1).max(500),
+  type: z.literal("PROGRAMMING"),
+  rating: z.number().int().min(0).max(10_000).optional(),
+  tags: z
+    .array(z.string().trim().min(1).max(100))
+    .max(50)
+    .transform((tags) => Array.from(new Set(tags)).sort()),
+});
 
-interface CFResponse {
-  status: string;
-  result: {
-    problems: CFProblem[];
-  };
-}
+type CFProblem = z.infer<typeof codeforcesProblemSchema>;
 
-function isValidProblem(problem: CFProblem) {
-  return (
-    Number.isSafeInteger(problem.contestId) &&
-    problem.contestId > 0 &&
-    typeof problem.index === "string" &&
-    problem.index.trim().length > 0 &&
-    typeof problem.name === "string" &&
-    problem.name.trim().length > 0
-  );
-}
+const codeforcesResponseSchema = z.object({
+  status: z.literal("OK"),
+  result: z.object({
+    problems: z.array(z.unknown()).max(100_000),
+  }),
+});
+
+const MAX_CODEFORCES_API_BYTES = 32 * 1024 * 1024;
 
 function tagsEqual(a: string[], b: string[]): boolean {
   if (a.length !== b.length) return false;
@@ -46,6 +47,7 @@ function tagsEqual(a: string[], b: string[]): boolean {
 
 export const syncProblems = schedules.task({
   id: "sync-problems",
+  queue: { concurrencyLimit: 1 },
   cron: {
     pattern: "0 0 * * *",
     timezone: "America/Phoenix",
@@ -54,9 +56,17 @@ export const syncProblems = schedules.task({
     const staleGenerationReset = await resetStaleRunningGenerations();
 
     if (staleGenerationReset.resetCount > 0) {
-      safeRevalidateTag(PROBLEM_LIST_TAG, "max");
-      for (const problem of staleGenerationReset.problems) {
-        safeRevalidateTag(problemTag(problem.contestId, problem.index), "max");
+      const cacheUpdated = await safeRevalidateTags(
+        [
+          PROBLEM_LIST_TAG,
+          ...staleGenerationReset.problems.map((problem) =>
+            problemTag(problem.contestId, problem.index),
+          ),
+        ],
+        "expire",
+      );
+      if (!cacheUpdated) {
+        logger.warn("Cache invalidation failed after resetting stale runs");
       }
 
       const shownProblems = staleGenerationReset.problems.slice(0, 10);
@@ -100,6 +110,7 @@ export const syncProblems = schedules.task({
       "https://codeforces.com/api/problemset.problems",
       {
         timeoutMs: 20_000,
+        redirect: "error",
         headers: {
           "User-Agent":
             "nudge-bot/1.0 (+https://nudge.zaydkrunz.com; contact@zaydkrunz.com)",
@@ -113,13 +124,36 @@ export const syncProblems = schedules.task({
       );
     }
 
-    const data = (await res.json()) as CFResponse;
-    if (data.status !== "OK") {
-      throw new Error("Codeforces API returned non-OK status");
+    const responseText = await readResponseTextWithLimit(
+      res,
+      MAX_CODEFORCES_API_BYTES,
+      "Codeforces problemset response",
+    );
+    const data = codeforcesResponseSchema.parse(JSON.parse(responseText));
+    const parsedProblems: CFProblem[] = [];
+    let skippedProblems = 0;
+
+    for (const candidate of data.result.problems) {
+      const parsed = codeforcesProblemSchema.safeParse(candidate);
+      if (parsed.success) {
+        parsedProblems.push(parsed.data);
+      } else {
+        skippedProblems++;
+      }
     }
 
-    const problems = data.result.problems.filter(isValidProblem);
-    logger.info(`Fetched ${problems.length} valid problems from Codeforces`);
+    const uniqueProblems = new Map(
+      parsedProblems.map((problem) => [
+        `${problem.contestId}-${problem.index}`,
+        problem,
+      ]),
+    );
+    const problems = Array.from(uniqueProblems.values());
+    const duplicateProblems = parsedProblems.length - problems.length;
+    logger.info(`Fetched ${problems.length} valid problems from Codeforces`, {
+      skipped: skippedProblems,
+      duplicates: duplicateProblems,
+    });
 
     // Process in batches to avoid excessive concurrent DB operations.
     let created = 0;
@@ -226,9 +260,12 @@ export const syncProblems = schedules.task({
     }
 
     if (created > 0 || updated > 0) {
-      safeRevalidateTag(PROBLEM_LIST_TAG, "max");
-      for (const tag of touchedProblemTags) {
-        safeRevalidateTag(tag, "max");
+      const cacheUpdated = await safeRevalidateTags(
+        [PROBLEM_LIST_TAG, ...touchedProblemTags],
+        "max",
+      );
+      if (!cacheUpdated) {
+        logger.warn("Cache invalidation failed after syncing problems");
       }
     }
 
@@ -237,12 +274,12 @@ export const syncProblems = schedules.task({
     );
 
     await discordLog({
-      title: "🔄 Problem Sync Complete",
-      description:
+      title:
         failed > 0
-          ? `Synced **${problems.length.toLocaleString()}** problems from Codeforces API with **${failed}** failures.`
-          : `Synced **${problems.length.toLocaleString()}** problems from Codeforces API.`,
-      color: failed > 0 ? DISCORD_COLORS.warning : DISCORD_COLORS.sky,
+          ? "Problem Sync Completed With Errors"
+          : "Problem Sync Complete",
+      description: `Synced **${problems.length.toLocaleString()}** problems from Codeforces API.`,
+      color: failed > 0 ? DISCORD_COLORS.error : DISCORD_COLORS.sky,
       fields: [
         { name: "New", value: `${created}`, inline: true },
         { name: "Updated", value: `${updated}`, inline: true },

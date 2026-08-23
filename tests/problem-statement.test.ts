@@ -99,4 +99,21 @@ describe("Codeforces problem statement fetching", () => {
       "Tutorial (en): https://codeforces.com/blog/entry/148452 returned 403 Forbidden (cf-mitigated: challenge)",
     ]);
   });
+
+  test("does not fetch external tutorial links or expose external images", async () => {
+    const requestedUrls: string[] = [];
+    const result = await fetchProblemStatement(2209, "D", async (input) => {
+      requestedUrls.push(String(input));
+      return new Response(
+        '<a href="http://127.0.0.1/admin">Editorial</a><div class="problem-statement"><img src="https://example.com/tracker.png"><p>Safe statement</p></div>',
+      );
+    });
+
+    expect(requestedUrls).toEqual([cfProblemsetUrl(2209, "D")]);
+    expect(result.sourceStatuses).toEqual([
+      "No tutorial/editorial link found on the Codeforces problem page.",
+    ]);
+    expect(result.images).toEqual([]);
+    expect(result.html).not.toContain("example.com");
+  });
 });

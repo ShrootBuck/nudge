@@ -8,7 +8,10 @@ export function Footer() {
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="flex flex-col items-center justify-between gap-6 sm:flex-row">
           <div className="flex min-w-0 flex-wrap items-center justify-center gap-2 text-center text-sm text-muted-foreground sm:justify-start sm:text-left">
-            <span className="inline-flex size-5 items-center justify-center rounded bg-foreground text-background text-[10px] font-bold">
+            <span
+              aria-hidden="true"
+              className="inline-flex size-5 items-center justify-center rounded bg-foreground text-background text-[10px] font-bold"
+            >
               N
             </span>
             <span>
@@ -24,7 +27,10 @@ export function Footer() {
             </span>
           </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-3 sm:justify-end">
+          <nav
+            aria-label="Footer"
+            className="flex flex-wrap items-center justify-center gap-x-5 gap-y-3 sm:justify-end"
+          >
             {NAV_LINKS.map((link) => (
               <Link
                 key={link.href}
@@ -38,12 +44,12 @@ export function Footer() {
               href="https://github.com/ShrootBuck/nudge"
               target="_blank"
               rel="noopener noreferrer"
-              className="text-muted-foreground transition hover:text-foreground"
+              className="inline-flex size-8 items-center justify-center rounded-full text-muted-foreground transition hover:bg-foreground/[0.05] hover:text-foreground"
             >
               <span className="sr-only">GitHub</span>
               <GitHubIcon className="size-4" />
             </a>
-          </div>
+          </nav>
         </div>
       </div>
     </footer>

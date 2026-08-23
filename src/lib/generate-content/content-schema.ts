@@ -1,9 +1,14 @@
 import { z } from "zod";
 import type { OutputSchema } from "../ai";
 
+const MAX_HINT_LENGTH = 10_000;
+const MAX_EDITORIAL_LENGTH = 100_000;
+const MAX_SOLUTION_LENGTH = 200_000;
+const MAX_REASON_LENGTH = 2_000;
+
 const hintSchema = z.object({
   order: z.number().int().min(1).max(5),
-  content: z.string().trim().min(1),
+  content: z.string().trim().min(1).max(MAX_HINT_LENGTH),
 });
 
 export const contentSchema = z
@@ -11,8 +16,8 @@ export const contentSchema = z
     status: z.literal("success"),
     reason: z.null(),
     hints: z.array(hintSchema).length(5),
-    editorial: z.string().trim().min(1),
-    solution: z.string().trim().min(1),
+    editorial: z.string().trim().min(1).max(MAX_EDITORIAL_LENGTH),
+    solution: z.string().trim().min(1).max(MAX_SOLUTION_LENGTH),
   })
   .superRefine(({ hints }, ctx) => {
     const orders = [...hints.map((hint) => hint.order)].sort((a, b) => a - b);
@@ -36,6 +41,7 @@ const unsolvableContentSchema = z.object({
     .string()
     .trim()
     .min(1)
+    .max(MAX_REASON_LENGTH)
     .refine(
       (reason) =>
         !/\b(can['’]?t|cannot)\s+(honestly\s+)?guarantee\b/i.test(reason) &&
@@ -73,7 +79,10 @@ export const problemOutputSchema: OutputSchema = {
           "Set to 'success' when the supplied statement defines a solvable programming problem. Set to 'unsolvable' only if the statement is fundamentally incomplete, contradictory, or depends on an inaccessible required resource.",
       },
       reason: {
-        anyOf: [{ type: "string" }, { type: "null" }],
+        anyOf: [
+          { type: "string", minLength: 1, maxLength: MAX_REASON_LENGTH },
+          { type: "null" },
+        ],
         description:
           "If status is 'unsolvable', provide a detailed failure message to show users. Name the concrete statement/resource blocker and any relevant source lookup/access status, such as missing official tutorial, 403/Cloudflare challenge, 404, or unavailable accepted submissions. Otherwise null.",
       },
@@ -81,17 +90,23 @@ export const problemOutputSchema: OutputSchema = {
         anyOf: [
           {
             type: "array",
+            minItems: 5,
+            maxItems: 5,
             description:
               "Exactly 5 progressive hints, each building on the last.",
             items: {
               type: "object",
               properties: {
                 order: {
-                  type: "number",
+                  type: "integer",
+                  minimum: 1,
+                  maximum: 5,
                   description: "Hint number, 1 through 5.",
                 },
                 content: {
                   type: "string",
+                  minLength: 1,
+                  maxLength: MAX_HINT_LENGTH,
                   description: "Markdown hint text.",
                 },
               },
@@ -105,12 +120,18 @@ export const problemOutputSchema: OutputSchema = {
           "If status is 'success', provide exactly 5 progressive hints. Otherwise null.",
       },
       editorial: {
-        anyOf: [{ type: "string" }, { type: "null" }],
+        anyOf: [
+          { type: "string", minLength: 1, maxLength: MAX_EDITORIAL_LENGTH },
+          { type: "null" },
+        ],
         description:
           "If status is 'success', a prose editorial explaining the solution in Nudge's own voice, with no links, citations, or source/research notes. Otherwise null.",
       },
       solution: {
-        anyOf: [{ type: "string" }, { type: "null" }],
+        anyOf: [
+          { type: "string", minLength: 1, maxLength: MAX_SOLUTION_LENGTH },
+          { type: "null" },
+        ],
         description:
           "If status is 'success', a complete C++ solution. Otherwise null.",
       },

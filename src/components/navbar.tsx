@@ -29,17 +29,20 @@ export function Navbar() {
             href="/"
             className="flex min-w-0 items-center gap-2 text-lg font-semibold tracking-tight transition hover:opacity-80"
           >
-            <span className="inline-flex size-7 items-center justify-center rounded-sm bg-foreground text-background text-xs font-bold">
+            <span
+              aria-hidden="true"
+              className="inline-flex size-7 items-center justify-center rounded-sm bg-foreground text-background text-xs font-bold"
+            >
               N
             </span>
             <span className="truncate">Nudge</span>
           </Link>
 
-          <div className="hidden items-center gap-1 sm:flex">
+          <div className="hidden items-center gap-1 md:flex">
             {NAV_LINKS.map((link) => {
               const isActive =
                 link.href === "/"
-                  ? pathname === "/"
+                  ? pathname === "/" || pathname.startsWith("/problem/")
                   : pathname.startsWith(link.href);
 
               return (
@@ -68,8 +71,8 @@ export function Navbar() {
               aria-label="Search problems"
             >
               <Search className="size-3.5" />
-              <span className="hidden sm:inline-block">Search...</span>
-              <kbd className="hidden pointer-events-none h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 sm:flex">
+              <span className="hidden lg:inline-block">Search...</span>
+              <kbd className="hidden pointer-events-none h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium opacity-100 xl:flex">
                 <span className="text-xs">⌘</span>K
               </kbd>
             </button>
@@ -89,7 +92,7 @@ export function Navbar() {
               onClick={() => setMobileOpen(!mobileOpen)}
               aria-expanded={mobileOpen}
               aria-controls="site-mobile-nav"
-              className="inline-flex size-8 items-center justify-center rounded-full border border-border/60 bg-background/60 text-muted-foreground transition hover:border-foreground/15 hover:text-foreground sm:hidden"
+              className="inline-flex size-8 items-center justify-center rounded-full border border-border/60 bg-background/60 text-muted-foreground transition hover:border-foreground/15 hover:text-foreground md:hidden"
               aria-label="Toggle menu"
             >
               {mobileOpen ? (
@@ -105,13 +108,13 @@ export function Navbar() {
       {mobileOpen && (
         <div
           id="site-mobile-nav"
-          className="border-b border-border/50 bg-background/80 backdrop-blur-xl sm:hidden"
+          className="border-b border-border/50 bg-background/80 backdrop-blur-xl md:hidden"
         >
           <div className="mx-auto flex max-w-6xl flex-col gap-1 px-4 pb-4 pt-2">
             {NAV_LINKS.map((link) => {
               const isActive =
                 link.href === "/"
-                  ? pathname === "/"
+                  ? pathname === "/" || pathname.startsWith("/problem/")
                   : pathname.startsWith(link.href);
 
               return (

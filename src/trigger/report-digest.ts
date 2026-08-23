@@ -2,8 +2,10 @@ import { logger, schedules } from "@trigger.dev/sdk";
 import { DISCORD_COLORS, sendDiscordWebhook } from "../lib/discord-webhook";
 import { getRequiredEnv, SITE_URL } from "../lib/env";
 import { prisma } from "../lib/prisma";
+import { chunkReportDigest } from "../lib/report-digest";
 
 const RESOLVED_REPORT_RETENTION_DAYS = 30;
+const REPORT_BATCH_SIZE = 100;
 
 const RESOLUTION_LABELS = {
   VERIFIED: "dismissed after verification",
@@ -13,6 +15,7 @@ const RESOLUTION_LABELS = {
 
 export const reportDigest = schedules.task({
   id: "report-digest",
+  queue: { concurrencyLimit: 1 },
   cron: {
     pattern: "0 0 * * *",
     timezone: "America/Phoenix",
@@ -41,7 +44,8 @@ export const reportDigest = schedules.task({
       include: {
         problem: { select: { contestId: true, index: true, name: true } },
       },
-      orderBy: { createdAt: "desc" },
+      orderBy: { createdAt: "asc" },
+      take: REPORT_BATCH_SIZE,
     });
 
     if (reports.length === 0) {
@@ -72,7 +76,7 @@ export const reportDigest = schedules.task({
       return `**${i + 1}.** [${tag} — ${entry.problem.name}](${link}) — **${entry.count}** report${entry.count === 1 ? "" : "s"}`;
     });
 
-    const lines = reports.map((r) => {
+    const entries = reports.map((r) => {
       const tag = `${r.problem.contestId}${r.problem.index}`;
       const link = `${SITE_URL}/problem/${r.problem.contestId}/${r.problem.index}`;
       const reason = r.reason ?? "_No reason given_";
@@ -80,43 +84,53 @@ export const reportDigest = schedules.task({
       const resolution = r.resolution
         ? `\n_Already handled: ${RESOLUTION_LABELS[r.resolution]}._`
         : "";
-      return `**[${tag} — ${r.problem.name}](${link})**\n${reason}\n${time}${resolution}`;
+      return {
+        id: r.id,
+        text: `**[${tag} — ${r.problem.name}](${link})**\n${reason}\n${time}${resolution}`,
+      };
     });
 
-    const description = [
+    const summary = [
       "**🔥 Top Reported Problems**",
       top5Lines.join("\n"),
       "",
       "**📋 All Reports**",
-      ...lines,
     ].join("\n");
+    const chunks = chunkReportDigest({ summary, entries });
+    const webhookUrl = getRequiredEnv("DISCORD_WEBHOOK_URL");
+    let markedDigestedCount = 0;
 
-    await sendDiscordWebhook(
-      getRequiredEnv("DISCORD_WEBHOOK_URL"),
-      {
-        title: `🚩 ${reports.length} new report${reports.length === 1 ? "" : "s"} today`,
-        description,
-        color: DISCORD_COLORS.warning,
-      },
-      { throwOnError: true },
-    );
+    for (const [index, chunk] of chunks.entries()) {
+      const partLabel =
+        chunks.length > 1 ? ` (${index + 1}/${chunks.length})` : "";
+      await sendDiscordWebhook(
+        webhookUrl,
+        {
+          title: `🚩 ${reports.length} new report${reports.length === 1 ? "" : "s"}${partLabel}`,
+          description: chunk.description,
+          color: DISCORD_COLORS.warning,
+        },
+        { throwOnError: true },
+      );
 
-    const digestedAt = new Date();
-    const markedDigested = await prisma.report.updateMany({
-      where: {
-        id: { in: reports.map((report) => report.id) },
-        digestedAt: null,
-      },
-      data: { digestedAt },
-    });
+      const markedDigested = await prisma.report.updateMany({
+        where: {
+          id: { in: chunk.reportIds },
+          digestedAt: null,
+        },
+        data: { digestedAt: new Date() },
+      });
+      markedDigestedCount += markedDigested.count;
+    }
 
     logger.info(
-      `Sent digest with ${reports.length} report(s); marked ${markedDigested.count} as digested`,
+      `Sent ${chunks.length} digest message(s) with ${reports.length} report(s); marked ${markedDigestedCount} as digested`,
     );
     return {
       sent: true,
       count: reports.length,
-      markedDigested: markedDigested.count,
+      markedDigested: markedDigestedCount,
+      messages: chunks.length,
       deleted: deletedReports.count,
     };
   },

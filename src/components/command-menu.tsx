@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { searchProblems } from "@/app/actions";
 import {
   Command,
@@ -23,6 +23,8 @@ type SearchResult = {
   tags: string[];
 };
 
+type SearchStatus = "idle" | "loading" | "success" | "error";
+
 export function CommandMenu({
   open,
   setOpen,
@@ -33,7 +35,9 @@ export function CommandMenu({
   const router = useRouter();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResult[]>([]);
-  const [isPending, startTransition] = useTransition();
+  const [status, setStatus] = useState<SearchStatus>("idle");
+  const requestSequence = useRef(0);
+  const [, startTransition] = useTransition();
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -47,16 +51,30 @@ export function CommandMenu({
   }, [setOpen]);
 
   useEffect(() => {
-    if (query.trim().length === 0) {
+    const normalizedQuery = query.trim();
+    const requestId = ++requestSequence.current;
+
+    if (normalizedQuery.length === 0) {
       setResults([]);
+      setStatus("idle");
       return;
     }
 
+    setStatus("loading");
     const delayDebounceFn = setTimeout(() => {
-      startTransition(async () => {
-        const data = await searchProblems(query);
-        setResults(data);
-      });
+      void searchProblems(normalizedQuery)
+        .then((data) => {
+          if (requestSequence.current !== requestId) return;
+          startTransition(() => {
+            setResults(data);
+            setStatus("success");
+          });
+        })
+        .catch(() => {
+          if (requestSequence.current !== requestId) return;
+          setResults([]);
+          setStatus("error");
+        });
     }, 200);
 
     return () => clearTimeout(delayDebounceFn);
@@ -69,16 +87,27 @@ export function CommandMenu({
   };
 
   return (
-    <CommandDialog open={open} onOpenChange={setOpen}>
-      <Command>
+    <CommandDialog
+      open={open}
+      onOpenChange={setOpen}
+      title="Search problems"
+      description="Search completed Codeforces problems by ID or name."
+      showCloseButton
+    >
+      <Command shouldFilter={false}>
         <CommandInput
           placeholder="Search by ID (e.g. 1500A) or name..."
           value={query}
           onValueChange={setQuery}
         />
         <CommandList>
-          <CommandEmpty>
-            {isPending ? "Searching..." : "No problems found."}
+          <CommandEmpty
+            className={status === "error" ? "text-destructive" : ""}
+          >
+            {status === "idle" && "Start typing to search."}
+            {status === "loading" && "Searching..."}
+            {status === "success" && "No problems found."}
+            {status === "error" && "Search failed. Try again."}
           </CommandEmpty>
           {results.length > 0 && (
             <CommandGroup heading="Results">
@@ -86,6 +115,7 @@ export function CommandMenu({
                 <CommandItem
                   key={problem.id}
                   value={`${problem.contestId}${problem.index} ${problem.name}`}
+                  aria-label={`${problem.contestId}${problem.index}: ${problem.name}`}
                   onSelect={() => onSelect(problem)}
                 >
                   <div className="flex min-w-0 flex-1 items-center gap-2">
@@ -94,7 +124,7 @@ export function CommandMenu({
                       {problem.index}
                     </span>
                     <span className="min-w-0 truncate">{problem.name}</span>
-                    {problem.rating && (
+                    {problem.rating !== null && (
                       <span
                         className={`ml-auto inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 font-mono text-[10px] font-semibold ${ratingTone(
                           problem.rating,

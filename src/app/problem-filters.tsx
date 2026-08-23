@@ -32,6 +32,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -39,6 +40,7 @@ import {
 import {
   InputGroup,
   InputGroupAddon,
+  InputGroupButton,
   InputGroupInput,
 } from "@/components/ui/input-group";
 import {
@@ -64,6 +66,7 @@ export function ProblemFilters({
   sort,
   availableTags,
   totalCount,
+  maxTagFilters,
 }: {
   query: string;
   tags: string[];
@@ -72,11 +75,14 @@ export function ProblemFilters({
   sort: ProblemSort;
   availableTags: string[];
   totalCount: number;
+  maxTagFilters: number;
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const pathname = usePathname();
   const searchTimeoutRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const paramsRef = useRef(searchParams.toString());
+  const tagsRef = useRef(tags);
   const [searchValue, setSearchValue] = useState(query);
   const [isPending, startTransition] = useTransition();
 
@@ -98,6 +104,14 @@ export function ProblemFilters({
   }, [query]);
 
   useEffect(() => {
+    paramsRef.current = searchParams.toString();
+  }, [searchParams]);
+
+  useEffect(() => {
+    tagsRef.current = tags;
+  }, [tags]);
+
+  useEffect(() => {
     setSliderValue([minRating, maxRating]);
   }, [minRating, maxRating]);
 
@@ -107,7 +121,7 @@ export function ProblemFilters({
 
   const updateParams = useCallback(
     (updates: Record<string, string | null>) => {
-      const params = new URLSearchParams(searchParams.toString());
+      const params = new URLSearchParams(paramsRef.current);
       for (const [key, value] of Object.entries(updates)) {
         if (value === null || value === "") {
           params.delete(key);
@@ -119,11 +133,12 @@ export function ProblemFilters({
       // Drop legacy single-tag param if we're writing the new one.
       if ("tags" in updates) params.delete("tag");
       const qs = params.toString();
+      paramsRef.current = qs;
       startTransition(() => {
         router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
       });
     },
-    [pathname, router, searchParams],
+    [pathname, router],
   );
 
   function handleSearch(term: string) {
@@ -149,13 +164,19 @@ export function ProblemFilters({
   }
 
   function toggleTag(tag: string) {
-    const next = tags.includes(tag)
-      ? tags.filter((t) => t !== tag)
-      : [...tags, tag];
+    const currentTags = tagsRef.current;
+    if (!currentTags.includes(tag) && currentTags.length >= maxTagFilters) {
+      return;
+    }
+    const next = currentTags.includes(tag)
+      ? currentTags.filter((t) => t !== tag)
+      : [...currentTags, tag];
+    tagsRef.current = next;
     updateParams({ tags: next.length === 0 ? null : next.join(",") });
   }
 
   function clearTags() {
+    tagsRef.current = [];
     updateParams({ tags: null });
   }
 
@@ -177,6 +198,7 @@ export function ProblemFilters({
     setRatingPopoverOpen(false);
     setTagDialogOpen(false);
     setTagPopoverOpen(false);
+    tagsRef.current = [];
     updateParams({
       q: null,
       tags: null,
@@ -254,6 +276,7 @@ export function ProblemFilters({
               value={option.value}
               onSelect={() => updateSort(option.value)}
               data-checked={option.value === sort}
+              aria-label={`${option.label}${option.value === sort ? ", current sort" : ""}`}
               className="cursor-pointer"
             >
               <div className="min-w-0">
@@ -289,6 +312,7 @@ export function ProblemFilters({
         max={MAX_RATING}
         step={RATING_STEP}
         minStepsBetweenValues={1}
+        thumbLabels={["Minimum rating", "Maximum rating"]}
         value={sliderValue}
         onValueChange={(value) => {
           if (Array.isArray(value)) {
@@ -318,14 +342,17 @@ export function ProblemFilters({
       <CommandInput placeholder="Search tags..." />
       <CommandList className="max-h-[min(22rem,calc(100dvh-9rem))]">
         <CommandEmpty>No tags found.</CommandEmpty>
-        <CommandGroup heading="Tags">
+        <CommandGroup heading={`Tags (match any, max ${maxTagFilters})`}>
           {sortedTagList.map((tag) => {
             const selected = tags.includes(tag);
+            const disabled = !selected && tags.length >= maxTagFilters;
             return (
               <CommandItem
                 key={tag}
                 value={tag}
                 onSelect={() => toggleTag(tag)}
+                disabled={disabled}
+                aria-label={`${tag}${selected ? ", selected" : ""}`}
                 className="cursor-pointer"
               >
                 <span
@@ -352,28 +379,36 @@ export function ProblemFilters({
       <div className="flex flex-col gap-3 xl:flex-row xl:items-start">
         <div className="min-w-0 flex-1">
           <InputGroup className="h-11 rounded-xl border-border/60 bg-background/80 shadow-sm">
+            <label htmlFor="problem-search" className="sr-only">
+              Search problems by name or contest ID
+            </label>
             <InputGroupInput
+              id="problem-search"
               placeholder="Search by name or contest ID..."
               value={searchValue}
               onChange={(e) => handleSearch(e.target.value)}
-              className="text-sm placeholder:text-muted-foreground/50"
+              className="text-base placeholder:text-muted-foreground md:text-sm"
             />
-            <InputGroupAddon align="inline-start">
+            <InputGroupAddon align="inline-start" aria-hidden="true">
               <Search />
             </InputGroupAddon>
             {searchValue && (
-              <InputGroupAddon
-                align="inline-end"
-                aria-label="Clear search"
-                className="cursor-pointer pr-2"
-                onClick={clearSearch}
-              >
-                <X />
+              <InputGroupAddon align="inline-end">
+                <InputGroupButton
+                  size="icon-xs"
+                  aria-label="Clear search"
+                  onClick={clearSearch}
+                >
+                  <X />
+                </InputGroupButton>
               </InputGroupAddon>
             )}
           </InputGroup>
 
-          <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <div
+            aria-live="polite"
+            className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
+          >
             <span>
               <span className="tabular-nums">
                 {totalCount.toLocaleString()}
@@ -416,6 +451,7 @@ export function ProblemFilters({
                     </DialogDescription>
                   </DialogHeader>
                   {sortMenu}
+                  <DialogFooter showCloseButton />
                 </DialogContent>
               </Dialog>
             </div>
@@ -468,6 +504,7 @@ export function ProblemFilters({
                     </DialogDescription>
                   </DialogHeader>
                   {ratingPanel}
+                  <DialogFooter showCloseButton />
                 </DialogContent>
               </Dialog>
             </div>
@@ -524,6 +561,7 @@ export function ProblemFilters({
                     </DialogDescription>
                   </DialogHeader>
                   {tagMenu}
+                  <DialogFooter showCloseButton />
                 </DialogContent>
               </Dialog>
             </div>
@@ -556,7 +594,7 @@ export function ProblemFilters({
             <Button
               variant="ghost"
               size="lg"
-              className="col-span-2 w-full md:col-span-1 xl:w-auto"
+              className="col-span-2 w-full md:col-span-3 xl:col-span-1 xl:w-auto"
               onClick={clearFilters}
             >
               Clear filters
@@ -571,7 +609,13 @@ export function ProblemFilters({
             <Badge
               variant="outline"
               className="h-7 cursor-pointer gap-1 border-foreground/25 bg-background/80 pr-1.5 text-xs"
-              render={<button type="button" onClick={resetRating} />}
+              render={
+                <button
+                  type="button"
+                  aria-label={`Remove ${minRating} to ${maxRating} rating filter`}
+                  onClick={resetRating}
+                />
+              }
             >
               {minRating} - {maxRating}
               <X data-icon="inline-end" />
@@ -583,7 +627,13 @@ export function ProblemFilters({
               key={tag}
               variant="outline"
               className="h-7 cursor-pointer gap-1 border-foreground/25 bg-background/80 pr-1.5 text-xs"
-              render={<button type="button" onClick={() => toggleTag(tag)} />}
+              render={
+                <button
+                  type="button"
+                  aria-label={`Remove ${tag} tag filter`}
+                  onClick={() => toggleTag(tag)}
+                />
+              }
             >
               {tag}
               <X data-icon="inline-end" />

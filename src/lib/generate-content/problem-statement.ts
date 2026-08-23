@@ -1,5 +1,5 @@
 import * as cheerio from "cheerio";
-import { fetchWithTimeout } from "../http";
+import { fetchWithTimeout, readResponseTextWithLimit } from "../http";
 import { cfProblemsetUrl, cfProblemUrl } from "../utils";
 
 type ProblemStatementFetch = typeof fetchWithTimeout;
@@ -8,6 +8,18 @@ type SourceLink = {
   label: string;
   url: string;
 };
+
+const MAX_STATEMENT_IMAGES = 12;
+const MAX_SOURCE_LINKS = 3;
+const MAX_CODEFORCES_PAGE_BYTES = 2 * 1024 * 1024;
+
+function isTrustedCodeforcesUrl(url: URL) {
+  const hostname = url.hostname.toLowerCase();
+  return (
+    url.protocol === "https:" &&
+    (hostname === "codeforces.com" || hostname.endsWith(".codeforces.com"))
+  );
+}
 
 export class ProblemStatementUnavailableError extends Error {
   override name = "ProblemStatementUnavailableError";
@@ -33,7 +45,17 @@ function sourceLinks($: cheerio.CheerioAPI, baseUrl: string) {
       return;
     }
 
-    const url = new URL(href, baseUrl).href;
+    let parsedUrl: URL;
+    try {
+      parsedUrl = new URL(href, baseUrl);
+    } catch {
+      return;
+    }
+    if (!isTrustedCodeforcesUrl(parsedUrl)) {
+      return;
+    }
+
+    const url = parsedUrl.href;
     if (seen.has(url)) {
       return;
     }
@@ -58,50 +80,46 @@ async function sourceStatusLines({
     return ["No tutorial/editorial link found on the Codeforces problem page."];
   }
 
-  const statuses: string[] = [];
+  return Promise.all(
+    links.slice(0, MAX_SOURCE_LINKS).map(async (link) => {
+      try {
+        const res = await fetchPage(link.url, {
+          timeoutMs: 15_000,
+          redirect: "error",
+          headers: {
+            "User-Agent":
+              "nudge-bot/1.0 (+https://nudge.zaydkrunz.com; contact@zaydkrunz.com)",
+          },
+        });
+        const challenge = res.headers.get("cf-mitigated");
 
-  for (const link of links.slice(0, 3)) {
-    try {
-      const res = await fetchPage(link.url, {
-        timeoutMs: 15_000,
-        headers: {
-          "User-Agent":
-            "nudge-bot/1.0 (+https://nudge.zaydkrunz.com; contact@zaydkrunz.com)",
-        },
-      });
-      const challenge = res.headers.get("cf-mitigated");
-
-      if (!res.ok) {
-        statuses.push(
-          `${link.label}: ${link.url} returned ${res.status} ${res.statusText}${
+        if (!res.ok) {
+          return `${link.label}: ${link.url} returned ${res.status} ${res.statusText}${
             challenge ? ` (cf-mitigated: ${challenge})` : ""
-          }`,
+          }`;
+        }
+
+        const html = await readResponseTextWithLimit(
+          res,
+          MAX_CODEFORCES_PAGE_BYTES,
+          `Codeforces source page ${link.url}`,
         );
-        continue;
-      }
+        const sourcePage = cheerio.load(html);
+        const title = normalizeText(sourcePage("title").text()) || "untitled";
+        const mentionsProblem = sourcePage.root().text().includes(problemLabel);
 
-      const html = await res.text();
-      const sourcePage = cheerio.load(html);
-      const title = normalizeText(sourcePage("title").text()) || "untitled";
-      const mentionsProblem = sourcePage.root().text().includes(problemLabel);
-
-      statuses.push(
-        `${link.label}: ${link.url} loaded (${res.status} ${res.statusText}; title: "${title}"; ${
+        return `${link.label}: ${link.url} loaded (${res.status} ${res.statusText}; title: "${title}"; ${
           mentionsProblem
             ? `mentions ${problemLabel}`
             : `does not mention ${problemLabel}`
-        })`,
-      );
-    } catch (error) {
-      statuses.push(
-        `${link.label}: ${link.url} failed: ${
+        })`;
+      } catch (error) {
+        return `${link.label}: ${link.url} failed: ${
           error instanceof Error ? error.message : String(error)
-        }`,
-      );
-    }
-  }
-
-  return statuses;
+        }`;
+      }
+    }),
+  );
 }
 
 export async function fetchProblemStatement(
@@ -115,6 +133,7 @@ export async function fetchProblemStatement(
     try {
       const res = await fetchPage(url, {
         timeoutMs: 15_000,
+        redirect: "error",
         headers: {
           "User-Agent":
             "nudge-bot/1.0 (+https://nudge.zaydkrunz.com; contact@zaydkrunz.com)",
@@ -126,7 +145,11 @@ export async function fetchProblemStatement(
         continue;
       }
 
-      const html = await res.text();
+      const html = await readResponseTextWithLimit(
+        res,
+        MAX_CODEFORCES_PAGE_BYTES,
+        `Codeforces problem page ${url}`,
+      );
       const $ = cheerio.load(html);
       const statementDiv = $(".problem-statement");
       if (statementDiv.length === 0) {
@@ -135,13 +158,33 @@ export async function fetchProblemStatement(
       }
 
       const images: string[] = [];
+      const seenImages = new Set<string>();
       statementDiv.find("img").each((_, img) => {
         const src = $(img).attr("src");
-        if (src) {
-          const absoluteUrl = new URL(src, url).href;
-          images.push(absoluteUrl);
-          $(img).attr("src", absoluteUrl);
+        if (!src) return;
+        if (images.length >= MAX_STATEMENT_IMAGES) {
+          $(img).remove();
+          return;
         }
+
+        let imageUrl: URL;
+        try {
+          imageUrl = new URL(src, url);
+        } catch {
+          $(img).remove();
+          return;
+        }
+        if (
+          !isTrustedCodeforcesUrl(imageUrl) ||
+          seenImages.has(imageUrl.href)
+        ) {
+          $(img).remove();
+          return;
+        }
+
+        seenImages.add(imageUrl.href);
+        images.push(imageUrl.href);
+        $(img).attr("src", imageUrl.href);
       });
 
       const cleanHtml = statementDiv.html();

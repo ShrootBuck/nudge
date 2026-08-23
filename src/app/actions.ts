@@ -13,6 +13,8 @@ export async function getRandomProblem() {
 }
 
 export async function searchProblems(query: string) {
-  const normalizedQuery = query.trim().toLowerCase();
+  if (typeof query !== "string") return [];
+
+  const normalizedQuery = query.trim().toLowerCase().slice(0, 100);
   return getCachedProblemSearchResults(normalizedQuery);
 }

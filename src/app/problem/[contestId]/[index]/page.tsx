@@ -5,7 +5,7 @@ import type { Metadata } from "next";
 import { cacheLife, cacheTag } from "next/cache";
 import { notFound } from "next/navigation";
 import { problemTag } from "@/lib/cache-tags";
-import { markdownPlugins } from "@/lib/markdown";
+import { markdownOptions, markdownPlugins } from "@/lib/markdown";
 import { prisma } from "@/lib/prisma";
 import { getProblemSocialData } from "@/lib/problem-read-cache";
 import {
@@ -17,7 +17,7 @@ import {
 } from "@/lib/problem-social";
 import { parseSolutionContent } from "@/lib/problem-solution";
 import { createPageMetadata, OG_IMAGE_SIZE } from "@/lib/site-metadata";
-import { ProblemContent } from "./problem-content";
+import { ProblemContentBody } from "./problem-content-body";
 import type { ProblemView } from "./problem-view-types";
 
 type ProblemPageProps = {
@@ -79,7 +79,6 @@ async function getProblemView(
 ): Promise<ProblemView | null> {
   "use cache";
 
-  cacheLife("days");
   cacheTag(problemTag(contestId, index));
 
   const problem = await prisma.problem.findUnique({
@@ -93,7 +92,16 @@ async function getProblemView(
     },
   });
 
-  if (!problem) return null;
+  if (!problem) {
+    cacheLife("minutes");
+    return null;
+  }
+
+  if (problem.runState === "SUCCEEDED") {
+    cacheLife("days");
+  } else {
+    cacheLife("seconds");
+  }
 
   const modelDisplayName = problem.generatedByDisplayName ?? null;
 
@@ -106,7 +114,7 @@ async function getProblemView(
       try {
         parsedSolutionDocument = await parseMarkdown(
           `\`\`\`${parsedSolution.language}\n${parsedSolution.code}\n\`\`\``,
-          { plugins: markdownPlugins },
+          { ...markdownOptions, plugins: markdownPlugins },
         );
       } catch {
         parsedSolutionDocument = null;
@@ -127,7 +135,12 @@ async function getProblemView(
     transcriptDownloadUrl: problem.generationTranscriptUrl
       ? getDownloadUrl(problem.generationTranscriptUrl)
       : null,
-    lastGenerationError: problem.lastGenerationError,
+    lastGenerationError:
+      problem.lastGenerationError && problem.reviewStatus === "UNSOLVABLE"
+        ? problem.lastGenerationError.slice(0, 500)
+        : problem.lastGenerationError
+          ? "The last generation attempt failed. A retry is needed."
+          : null,
     hints: problem.hints,
     editorial: problem.editorial,
     solution: problem.solution
@@ -148,5 +161,5 @@ export default async function ProblemPage({ params }: ProblemPageProps) {
 
   if (!problem) notFound();
 
-  return <ProblemContent problem={problem} />;
+  return <ProblemContentBody problem={problem} />;
 }

@@ -21,7 +21,7 @@ export default function RequestPage() {
   const [state, formAction] = useActionState(requestProblem, null);
 
   return (
-    <main className="min-h-screen pb-16">
+    <main id="main-content" tabIndex={-1} className="min-h-screen pb-16">
       <div className="mx-auto max-w-3xl px-4 py-6 sm:px-6 sm:py-12 lg:px-8">
         <section className="relative overflow-hidden rounded-[1.5rem] border border-border/70 bg-card/80 p-5 shadow-[0_28px_70px_-40px_rgba(15,23,42,0.45)] backdrop-blur sm:rounded-[2rem] sm:p-10">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.12),transparent_32%),radial-gradient(circle_at_85%_15%,rgba(245,158,11,0.16),transparent_28%)]" />
@@ -38,7 +38,8 @@ export default function RequestPage() {
 
             <p className="mt-4 max-w-2xl text-base/7 text-muted-foreground sm:text-lg/8">
               Enter a Codeforces problem ID or URL. Requests queue up for the
-              next local generation run.
+              next local generation run, but there is no guaranteed completion
+              time.
             </p>
           </div>
         </section>
@@ -57,6 +58,7 @@ export default function RequestPage() {
                   id="problem"
                   name="problem"
                   placeholder="e.g. 123A, 123 A, or https://codeforces.com/problemset/problem/123/A"
+                  maxLength={2048}
                   required
                 />
               </div>
@@ -64,7 +66,7 @@ export default function RequestPage() {
               {state?.error && (
                 <div
                   role="alert"
-                  className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-200"
+                  className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-700 dark:text-rose-200"
                 >
                   {state.error}
                 </div>
@@ -72,13 +74,13 @@ export default function RequestPage() {
               {state?.message && (
                 <output
                   aria-live="polite"
-                  className="flex w-full flex-col gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200"
+                  className="flex w-full flex-col gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-200"
                 >
                   <span>{state.message}</span>
                   {state.problemHref ? (
                     <Link
                       href={state.problemHref}
-                      className="mt-2 inline-flex items-center gap-2 font-medium text-emerald-100 underline decoration-emerald-400/40 underline-offset-4 transition hover:decoration-emerald-200"
+                      className="mt-2 inline-flex items-center gap-2 font-medium text-emerald-800 underline decoration-emerald-600/40 underline-offset-4 transition hover:decoration-emerald-800 dark:text-emerald-100 dark:decoration-emerald-400/40 dark:hover:decoration-emerald-200"
                     >
                       Open the problem page
                       <ArrowUpRight className="size-3.5" />

@@ -1,7 +1,8 @@
 import type { ReviewStatus, RunState } from "@prisma/client";
 
 const MAX_DESCRIPTION_LENGTH = 160;
-const PROBLEM_INDEX_PATTERN = /^[A-Z][A-Z0-9]*$/;
+const MAX_POSTGRES_INT = 2_147_483_647;
+const PROBLEM_INDEX_PATTERN = /^[A-Z][A-Z0-9]{0,9}$/;
 
 export type ProblemSocialData = {
   contestId: number;
@@ -31,6 +32,7 @@ export function parseProblemRouteParams({
   if (
     !Number.isSafeInteger(parsedContestId) ||
     parsedContestId <= 0 ||
+    parsedContestId > MAX_POSTGRES_INT ||
     !PROBLEM_INDEX_PATTERN.test(normalizedIndex)
   ) {
     return null;

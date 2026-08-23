@@ -66,7 +66,7 @@
   --accent-foreground: oklch(0.255 0.019 255);
   --destructive: oklch(0.577 0.245 27.325);
   --border: oklch(0.885 0.008 84);
-  --input: oklch(0.905 0.008 84);
+  --input: oklch(0.78 0.01 84);
   --ring: oklch(0.62 0.08 241);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
@@ -101,7 +101,7 @@
   --accent-foreground: oklch(0.95 0.008 84);
   --destructive: oklch(0.704 0.191 22.216);
   --border: oklch(1 0 0 / 10%);
-  --input: oklch(1 0 0 / 14%);
+  --input: oklch(1 0 0 / 24%);
   --ring: oklch(0.78 0.045 92);
   --chart-1: oklch(0.87 0 0);
   --chart-2: oklch(0.556 0 0);
@@ -154,17 +154,16 @@
   }
   button:not(:disabled):focus-visible,
   [role="button"]:not(:disabled):focus-visible {
-    @apply outline-none ring-1 ring-ring/40;
-  }
-  button[aria-expanded]:not(:disabled):focus-visible,
-  [role="button"][aria-expanded]:not(:disabled):focus-visible {
-    @apply ring-0;
+    @apply outline-none ring-2 ring-ring/70 ring-offset-2 ring-offset-background;
   }
   ::selection {
     background: oklch(0.74 0.09 92 / 0.35);
   }
   a {
     text-underline-offset: 0.18em;
+  }
+  a:focus-visible {
+    @apply rounded-sm outline-none ring-2 ring-ring/70 ring-offset-2 ring-offset-background;
   }
   .katex {
     color: inherit;
@@ -187,5 +186,16 @@
     font-style: var(--shiki-dark-font-style) !important;
     font-weight: var(--shiki-dark-font-weight) !important;
     text-decoration: var(--shiki-dark-text-decoration) !important;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

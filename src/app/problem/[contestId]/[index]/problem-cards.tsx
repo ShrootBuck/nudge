@@ -18,15 +18,14 @@ export function AnimatedCollapse({
   id?: string;
   children: React.ReactNode;
 }) {
+  if (!open) return null;
+
   return (
     <div
       id={id}
-      className={cn(
-        "grid overflow-hidden transition-all duration-300 ease-out",
-        open ? "grid-rows-[1fr] opacity-100" : "grid-rows-[0fr] opacity-0",
-      )}
+      className="animate-in fade-in slide-in-from-top-1 overflow-hidden duration-200"
     >
-      <div className="min-h-0 min-w-0 overflow-hidden">{children}</div>
+      <div className="min-w-0">{children}</div>
     </div>
   );
 }
@@ -73,22 +72,22 @@ export function HintCard({
     >
       <button
         type="button"
-        onClick={() => setOpen(!open)}
+        onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-controls={panelId}
         className="flex w-full cursor-pointer items-center justify-between gap-3 px-4 py-3.5 text-left sm:gap-4 sm:px-6 sm:py-4"
       >
-        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+        <span className="flex min-w-0 items-center gap-3 sm:gap-4">
           <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl border border-border/70 bg-background/80 font-mono text-sm font-semibold shadow-sm sm:size-10 sm:rounded-2xl">
             {hint.order}
           </span>
 
-          <div className="min-w-0">
-            <p className="text-base font-semibold tracking-tight">
+          <span className="min-w-0">
+            <span className="block text-base font-semibold tracking-tight">
               {HINT_LABELS[index] ?? `Hint ${hint.order}`}
-            </p>
-          </div>
-        </div>
+            </span>
+          </span>
+        </span>
 
         <ChevronIcon open={open} />
       </button>
@@ -191,29 +190,33 @@ export function CollapsibleSection({
         open ? "border-foreground/15" : "border-border/70",
       )}
     >
-      <button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={open}
-        aria-controls={panelId}
-        className="flex w-full cursor-pointer items-center justify-between gap-3 p-4 text-left sm:gap-4 sm:p-6"
-      >
-        <div className="flex min-w-0 items-start gap-3 sm:gap-4">
-          <div className="rounded-xl border border-border/60 bg-background/80 p-2.5 text-muted-foreground shadow-sm sm:rounded-2xl sm:p-3">
-            <Icon className="size-5" />
-          </div>
-          <div className="min-w-0">
-            <p className="text-xs font-semibold tracking-[0.24em] text-muted-foreground uppercase">
-              {eyebrow}
-            </p>
-            <h2 className="mt-2 text-xl font-semibold tracking-tight">
-              {title}
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
-          </div>
-        </div>
-        <ChevronIcon open={open} />
-      </button>
+      <h2>
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={open}
+          aria-controls={panelId}
+          className="flex w-full cursor-pointer items-center justify-between gap-3 p-4 text-left sm:gap-4 sm:p-6"
+        >
+          <span className="flex min-w-0 items-start gap-3 sm:gap-4">
+            <span className="rounded-xl border border-border/60 bg-background/80 p-2.5 text-muted-foreground shadow-sm sm:rounded-2xl sm:p-3">
+              <Icon className="size-5" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-xs font-semibold tracking-[0.24em] text-muted-foreground uppercase">
+                {eyebrow}
+              </span>
+              <span className="mt-2 block text-xl font-semibold tracking-tight">
+                {title}
+              </span>
+              <span className="mt-1 block text-sm text-muted-foreground">
+                {description}
+              </span>
+            </span>
+          </span>
+          <ChevronIcon open={open} />
+        </button>
+      </h2>
 
       <AnimatedCollapse open={open} id={panelId}>
         <div className="min-w-0 border-t border-border/60 px-4 pb-4 pt-4 sm:px-6 sm:pb-5">

@@ -26,7 +26,6 @@ import { ProblemMarkdown } from "./problem-markdown";
 import {
   generationState,
   type ProblemView,
-  resolveProblemRunState,
   reviewState,
   solutionSectionDescription,
 } from "./problem-view-types";
@@ -36,11 +35,10 @@ export function ProblemContentBody({ problem }: { problem: ProblemView }) {
   const [showSolution, setShowSolution] = useState(false);
 
   const cfUrl = cfProblemUrl(problem.contestId, problem.index);
-  const resolvedRunState = resolveProblemRunState(problem);
-  const hasContent = resolvedRunState === "SUCCEEDED";
+  const hasContent = problem.runState === "SUCCEEDED";
   const isUnsolvable = problem.reviewStatus === "UNSOLVABLE";
 
-  const state = generationState(resolvedRunState, problem.reviewStatus);
+  const state = generationState(problem.runState, problem.reviewStatus);
   const StateIcon = state.icon;
   const showGenerationBadge = !hasContent && !isUnsolvable;
 
@@ -48,7 +46,7 @@ export function ProblemContentBody({ problem }: { problem: ProblemView }) {
   const ReviewIcon = review.icon;
 
   return (
-    <main className="min-h-screen pb-20">
+    <main id="main-content" tabIndex={-1} className="min-h-screen pb-20">
       <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         <nav className="mb-5 sm:mb-6">
           <Link
@@ -274,9 +272,7 @@ export function ProblemContentBody({ problem }: { problem: ProblemView }) {
         />
 
         <div className="mt-8 flex flex-col gap-3">
-          {hasContent && problem.reviewStatus !== "VERIFIED" && (
-            <ReportSection problemId={problem.id} />
-          )}
+          {hasContent && <ReportSection problemId={problem.id} />}
 
           <ReviewSection
             problemId={problem.id}

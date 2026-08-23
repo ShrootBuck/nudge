@@ -32,6 +32,12 @@ describe("problem social metadata", () => {
     expect(
       parseProblemRouteParams({ contestId: "2209", index: "../D" }),
     ).toBeNull();
+    expect(
+      parseProblemRouteParams({ contestId: "2147483648", index: "A" }),
+    ).toBeNull();
+    expect(
+      parseProblemRouteParams({ contestId: "2209", index: "A1234567890" }),
+    ).toBeNull();
   });
 
   test("builds concise, problem-specific titles and descriptions", () => {

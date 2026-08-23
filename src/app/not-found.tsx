@@ -9,7 +9,11 @@ export const metadata: Metadata = {
 
 export default function NotFound() {
   return (
-    <main className="flex min-h-[60vh] flex-1 items-center justify-center p-4">
+    <main
+      id="main-content"
+      tabIndex={-1}
+      className="flex min-h-[60vh] flex-1 items-center justify-center p-4"
+    >
       <div className="mx-auto w-full max-w-md text-center">
         <div className="relative mx-auto mb-6 flex size-20 items-center justify-center rounded-full border border-border/70 bg-card/80 shadow-[0_28px_70px_-40px_rgba(15,23,42,0.45)] backdrop-blur sm:mb-8 sm:size-24">
           <div className="absolute inset-0 rounded-full bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.12),transparent_32%)]" />

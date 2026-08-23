@@ -14,7 +14,7 @@ import { PROBLEM_LIST_TAG } from "@/lib/cache-tags";
 import { prisma } from "@/lib/prisma";
 import { completedContentWhere, problemWhere } from "@/lib/problem-pipeline-db";
 import { getAvailableProblemTags } from "@/lib/problem-read-cache";
-import { ratingTone } from "@/lib/utils";
+import { cn, ratingTone } from "@/lib/utils";
 import { LuckyButton } from "./lucky-button";
 import { ProblemFilters } from "./problem-filters";
 import {
@@ -25,6 +25,9 @@ import {
 import { MAX_RATING, MIN_RATING } from "./rating-constants";
 
 const PAGE_SIZE = 10;
+const MAX_SEARCH_QUERY_LENGTH = 100;
+const MAX_TAG_FILTERS = 10;
+const MAX_TAG_LENGTH = 100;
 
 function listableWhere(): Prisma.ProblemWhereInput {
   return problemWhere({
@@ -43,9 +46,17 @@ function parseTagsParam(value: string | string[] | undefined): string[] {
       raw
         .split(",")
         .map((t) => t.trim())
-        .filter(Boolean),
+        .filter((tag) => tag.length > 0 && tag.length <= MAX_TAG_LENGTH),
     ),
-  ).sort((a, b) => a.localeCompare(b));
+  )
+    .sort((a, b) => a.localeCompare(b))
+    .slice(0, MAX_TAG_FILTERS);
+}
+
+function parsePageParam(value: string | string[] | undefined) {
+  if (typeof value !== "string" || !/^\d+$/.test(value)) return 1;
+  const page = Number(value);
+  return Number.isSafeInteger(page) && page > 0 ? page : 1;
 }
 
 function parseRatingBound(
@@ -97,7 +108,12 @@ function problemOrderBy(
         { index: "asc" },
       ];
     case "quality":
-      return [{ reviewStatus: "desc" }, { updatedAt: "desc" }];
+      return [
+        { reviewStatus: "desc" },
+        { updatedAt: "desc" },
+        { contestId: "desc" },
+        { index: "asc" },
+      ];
   }
 }
 
@@ -108,7 +124,10 @@ function buildPageUrl(
   const params = new URLSearchParams();
 
   for (const [key, value] of Object.entries(searchParams)) {
-    if (key !== "page" && typeof value === "string") {
+    if (key === "page" || value === undefined) continue;
+    if (Array.isArray(value)) {
+      for (const item of value) params.append(key, item);
+    } else {
       params.set(key, value);
     }
   }
@@ -161,8 +180,14 @@ function buildProblemFilters({
   if (query) {
     const contestMatch = query.match(/^(\d+)([A-Za-z]\d?)?$/);
     if (contestMatch) {
-      where.contestId = Number(contestMatch[1]);
-      if (contestMatch[2]) {
+      const contestId = Number(contestMatch[1]);
+      where.contestId =
+        Number.isSafeInteger(contestId) &&
+        contestId > 0 &&
+        contestId <= 2_147_483_647
+          ? contestId
+          : 0;
+      if (where.contestId !== 0 && contestMatch[2]) {
         where.index = contestMatch[2].toUpperCase();
       }
     } else {
@@ -205,7 +230,7 @@ async function getHomePageData({
   const [totalCount, verifiedCount] = await Promise.all([
     prisma.problem.count({ where }),
     prisma.problem.count({
-      where: { ...listableWhere(), reviewStatus: "VERIFIED" },
+      where: { AND: [where, { reviewStatus: "VERIFIED" }] },
     }),
   ]);
 
@@ -241,7 +266,7 @@ function reviewBadge(status: string) {
   switch (status) {
     case "VERIFIED":
       return (
-        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-300 dark:text-emerald-200">
+        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-200">
           <BadgeCheck className="size-3" />
           Verified
         </span>
@@ -258,8 +283,11 @@ export default async function Home({
 }) {
   const params = await searchParams;
 
-  const page = Math.max(1, Number(params.page) || 1);
-  const query = typeof params.q === "string" ? params.q.trim() : "";
+  const page = parsePageParam(params.page);
+  const query =
+    typeof params.q === "string"
+      ? params.q.trim().slice(0, MAX_SEARCH_QUERY_LENGTH)
+      : "";
   const tags = parseTagsParam(params.tags ?? params.tag);
   let minRating = parseRatingBound(params.minRating, MIN_RATING);
   let maxRating = parseRatingBound(params.maxRating, MAX_RATING);
@@ -288,7 +316,7 @@ export default async function Home({
   });
 
   return (
-    <main className="min-h-screen pb-16">
+    <main id="main-content" tabIndex={-1} className="min-h-screen pb-16">
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         <section className="relative overflow-hidden rounded-[1.5rem] border border-border/70 bg-card/80 p-5 shadow-[0_28px_70px_-40px_rgba(15,23,42,0.45)] backdrop-blur sm:rounded-[2rem] sm:p-8">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.12),transparent_32%),radial-gradient(circle_at_85%_15%,rgba(245,158,11,0.16),transparent_28%)]" />
@@ -315,7 +343,7 @@ export default async function Home({
               </div>
             </div>
 
-            <div className="grid gap-2 sm:grid-cols-3 sm:gap-3 lg:grid-cols-1">
+            <div className="grid gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-1">
               <StatCard
                 label={
                   activeFilterCount ? "Matching problems" : "Completed problems"
@@ -328,7 +356,9 @@ export default async function Home({
                 }
               />
               <StatCard
-                label="Verified writeups"
+                label={
+                  activeFilterCount ? "Verified matches" : "Verified writeups"
+                }
                 value={verifiedCount.toLocaleString()}
                 detail="manually checked so far"
               />
@@ -345,10 +375,11 @@ export default async function Home({
             sort={sort}
             availableTags={availableTags}
             totalCount={totalCount}
+            maxTagFilters={MAX_TAG_FILTERS}
           />
         </section>
 
-        <section className="mt-8">
+        <section id="problem-list" className="mt-8 scroll-mt-20">
           <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <h2 className="text-lg font-semibold tracking-tight">
@@ -474,17 +505,23 @@ function Pagination({
   }
 
   return (
-    <nav className="mt-10 flex flex-wrap items-center justify-center gap-1.5">
+    <nav
+      aria-label="Problem list pages"
+      className="mt-10 flex flex-wrap items-center justify-center gap-1.5"
+    >
       {currentPage > 1 ? (
         <Link
           href={buildPageUrl(searchParams, currentPage - 1)}
-          scroll={false}
+          aria-label="Previous page"
           className="inline-flex size-9 items-center justify-center rounded-full border border-border/60 bg-card/75 text-muted-foreground transition hover:border-foreground/15 hover:text-foreground sm:size-10"
         >
           <ChevronLeft className="size-4" />
         </Link>
       ) : (
-        <span className="inline-flex size-9 items-center justify-center rounded-full border border-border/40 bg-card/40 text-muted-foreground/30 sm:size-10">
+        <span
+          aria-hidden="true"
+          className="inline-flex size-9 items-center justify-center rounded-full border border-border/40 bg-card/40 text-muted-foreground/30 sm:size-10"
+        >
           <ChevronLeft className="size-4" />
         </span>
       )}
@@ -493,6 +530,7 @@ function Pagination({
         p === "ellipsis-left" || p === "ellipsis-right" ? (
           <span
             key={p}
+            aria-hidden="true"
             className="inline-flex size-9 items-center justify-center text-sm text-muted-foreground/40 sm:size-10"
           >
             ...
@@ -501,12 +539,14 @@ function Pagination({
           <Link
             key={p}
             href={buildPageUrl(searchParams, p)}
-            scroll={false}
-            className={`inline-flex size-9 items-center justify-center rounded-full border text-sm transition sm:size-10 ${
+            aria-label={`Page ${p}`}
+            aria-current={p === currentPage ? "page" : undefined}
+            className={cn(
+              "inline-flex size-9 items-center justify-center rounded-full border text-sm transition sm:size-10",
               p === currentPage
                 ? "border-foreground bg-foreground font-medium text-background shadow-sm"
-                : "border-border/60 bg-card/75 text-muted-foreground hover:border-foreground/15 hover:text-foreground"
-            }`}
+                : "border-border/60 bg-card/75 text-muted-foreground hover:border-foreground/15 hover:text-foreground",
+            )}
           >
             {p}
           </Link>
@@ -516,13 +556,16 @@ function Pagination({
       {currentPage < totalPages ? (
         <Link
           href={buildPageUrl(searchParams, currentPage + 1)}
-          scroll={false}
+          aria-label="Next page"
           className="inline-flex size-9 items-center justify-center rounded-full border border-border/60 bg-card/75 text-muted-foreground transition hover:border-foreground/15 hover:text-foreground sm:size-10"
         >
           <ChevronRight className="size-4" />
         </Link>
       ) : (
-        <span className="inline-flex size-9 items-center justify-center rounded-full border border-border/40 bg-card/40 text-muted-foreground/30 sm:size-10">
+        <span
+          aria-hidden="true"
+          className="inline-flex size-9 items-center justify-center rounded-full border border-border/40 bg-card/40 text-muted-foreground/30 sm:size-10"
+        >
           <ChevronRight className="size-4" />
         </span>
       )}

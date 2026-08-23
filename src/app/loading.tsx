@@ -1,6 +1,12 @@
 export default function Loading() {
   return (
-    <main className="min-h-[60vh] px-4 py-10 sm:px-6 sm:py-16 lg:px-8">
+    <main
+      id="main-content"
+      tabIndex={-1}
+      aria-busy="true"
+      className="min-h-[60vh] px-4 py-10 sm:px-6 sm:py-16 lg:px-8"
+    >
+      <output className="sr-only">Loading page...</output>
       <div className="mx-auto max-w-4xl">
         <div className="rounded-[1.5rem] border border-border/70 bg-card/75 p-5 shadow-[0_18px_50px_-36px_rgba(15,23,42,0.45)] backdrop-blur sm:rounded-[2rem] sm:p-8">
           <div className="h-6 w-40 animate-pulse rounded-full bg-muted/70" />

@@ -11,6 +11,9 @@ import type { UserPromptInput } from "./types";
 
 type PromptPart = TextPartInput | FilePartInput;
 
+const MAX_PROMPT_IMAGES = 12;
+const MAX_PROMPT_IMAGE_BYTES = 50 * 1024 * 1024;
+
 export async function buildOpenCodePromptParts({
   input,
   workingDirectory,
@@ -28,39 +31,50 @@ export async function buildOpenCodePromptParts({
 
   const assetDirectory = join(workingDirectory, "assets");
   let imageIndex = 0;
+  let totalImageBytes = 0;
+  const imageCount = input.filter((item) => item.type === "image_url").length;
+  if (imageCount > MAX_PROMPT_IMAGES) {
+    throw new Error(`Prompt contains more than ${MAX_PROMPT_IMAGES} images`);
+  }
 
-  return Promise.all(
-    input.map(async (item) => {
-      if (item.type === "text") {
-        return { type: "text", text: item.text ?? "" } satisfies TextPartInput;
-      }
+  const parts: PromptPart[] = [];
+  for (const item of input) {
+    if (item.type === "text") {
+      parts.push({ type: "text", text: item.text ?? "" });
+      continue;
+    }
 
-      const imageUrl = item.image_url?.url;
-      if (!imageUrl) {
-        throw new Error("Image prompt item is missing a URL");
-      }
+    const imageUrl = item.image_url?.url;
+    if (!imageUrl) {
+      throw new Error("Image prompt item is missing a URL");
+    }
 
-      const url = new URL(imageUrl);
-      const currentImageIndex = imageIndex++;
-      const { data, mediaType } = await downloadCodeforcesImage({
-        url,
-        abortSignal,
-        fetchImplementation,
-      });
-      await mkdir(assetDirectory, { recursive: true });
-      const filename = `image-${currentImageIndex + 1}${extensionForImage(
-        url,
-        mediaType,
-      )}`;
-      const filePath = join(assetDirectory, filename);
-      await writeFile(filePath, data);
+    const url = new URL(imageUrl);
+    const currentImageIndex = imageIndex++;
+    const { data, mediaType } = await downloadCodeforcesImage({
+      url,
+      abortSignal,
+      fetchImplementation,
+    });
+    totalImageBytes += data.byteLength;
+    if (totalImageBytes > MAX_PROMPT_IMAGE_BYTES) {
+      throw new Error("Prompt images exceed the 50 MB aggregate limit");
+    }
 
-      return {
-        type: "file",
-        mime: mediaType,
-        filename,
-        url: pathToFileURL(filePath).href,
-      } satisfies FilePartInput;
-    }),
-  );
+    await mkdir(assetDirectory, { recursive: true });
+    const filename = `image-${currentImageIndex + 1}${extensionForImage(
+      url,
+      mediaType,
+    )}`;
+    const filePath = join(assetDirectory, filename);
+    await writeFile(filePath, data);
+    parts.push({
+      type: "file",
+      mime: mediaType,
+      filename,
+      url: pathToFileURL(filePath).href,
+    });
+  }
+
+  return parts;
 }

@@ -83,13 +83,16 @@ function NavbarFallback() {
             href="/"
             className="flex items-center gap-2 text-lg font-semibold tracking-tight transition hover:opacity-80"
           >
-            <span className="inline-flex size-7 items-center justify-center rounded-sm bg-foreground text-xs font-bold text-background">
+            <span
+              aria-hidden="true"
+              className="inline-flex size-7 items-center justify-center rounded-sm bg-foreground text-xs font-bold text-background"
+            >
               N
             </span>
             Nudge
           </Link>
 
-          <div className="hidden items-center gap-1 sm:flex">
+          <div className="hidden items-center gap-1 md:flex">
             {NAV_LINKS.map((link) => (
               <Link
                 key={link.href}
@@ -103,7 +106,7 @@ function NavbarFallback() {
 
           <div className="flex items-center gap-2">
             <div className="size-8 rounded-full border border-border/60 bg-background/60" />
-            <div className="size-8 rounded-full border border-border/60 bg-background/60 sm:hidden" />
+            <div className="size-8 rounded-full border border-border/60 bg-background/60 md:hidden" />
           </div>
         </nav>
       </div>
@@ -123,6 +126,12 @@ export default function RootLayout({
       suppressHydrationWarning
     >
       <body className="flex min-h-dvh flex-col">
+        <a
+          href="#main-content"
+          className="fixed top-3 left-3 z-[100] -translate-y-20 rounded-full bg-foreground px-4 py-2 text-sm font-medium text-background shadow-lg transition-transform focus:translate-y-0"
+        >
+          Skip to main content
+        </a>
         <Script id="theme-init" strategy="beforeInteractive">
           {themeInitScript}
         </Script>

@@ -16,22 +16,6 @@ export function problemUpdateData<T extends Prisma.ProblemUpdateInput>(
   return input;
 }
 
-export function problemUpdateManyData<
-  T extends Prisma.ProblemUpdateManyMutationInput,
->(input: T): T {
-  return input;
-}
-
-export function problemOrderBy<
-  T extends Prisma.ProblemOrderByWithRelationInput[],
->(input: T): T {
-  return input;
-}
-
-export function problemSelect<T extends Prisma.ProblemSelect>(input: T): T {
-  return input;
-}
-
 export function pipelineStateData(runState: RunState) {
   return {
     runState,

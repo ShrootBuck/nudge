@@ -26,10 +26,11 @@ export type DiscordMessage = DiscordEmbed | DiscordContentMessage;
 
 function toWebhookBody(message: DiscordMessage) {
   if ("content" in message) {
-    return { content: message.content };
+    return { content: message.content, allowed_mentions: { parse: [] } };
   }
 
   return {
+    allowed_mentions: { parse: [] },
     embeds: [
       {
         ...message,

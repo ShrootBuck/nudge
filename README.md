@@ -12,6 +12,23 @@ Progressive hints, clean editorials, and full C++ solutions for Codeforces probl
 
 ---
 
+## Development
+
+Install dependencies and start the app with Bun:
+
+```bash
+bun install
+bun run dev
+```
+
+Copy the variables documented in `.env.example` into your local environment. The app requires a PostgreSQL database whose schema matches `prisma/schema.prisma`.
+
+Run the full local quality gate before shipping:
+
+```bash
+bun run check
+```
+
 ## What is this?
 
 Most editorial sites give you the whole answer or nothing. Nudge sits in between: every problem has **progressive hints** that go from a gentle nudge toward the right area all the way to the key insight, plus a prose editorial and the full C++ solution when you're ready.
@@ -25,7 +42,8 @@ Generation is local-only. Trigger.dev does not run OpenCode and there is no enco
 1. Sign in with `opencode auth login`, choose OpenAI, and select ChatGPT Plus/Pro. Confirm `opencode auth list` shows OpenAI OAuth.
 2. Make sure `DATABASE_URL` points at the Nudge database.
 3. Connect a public Vercel Blob store to the project and set `BLOB_READ_WRITE_TOKEN` locally. `bunx vercel env pull` can pull the connected store credentials.
-4. Configure the model, reasoning variant, and public display label in `nudge.config.json` (see [Switching models or providers](#switching-models-or-providers)).
+4. Set `CACHE_REVALIDATION_URL` to the deployed app URL. Set the same strong `CACHE_REVALIDATION_SECRET` locally, in Trigger.dev, and in the deployed Next.js app. Local generation and Trigger.dev use these values to expire deployed problem caches after database writes.
+5. Configure the model, reasoning variant, and public display label in `nudge.config.json` (see [Switching models or providers](#switching-models-or-providers)).
 
    ```json
    {
@@ -38,7 +56,7 @@ Generation is local-only. Trigger.dev does not run OpenCode and there is no enco
    }
    ```
 
-5. Run one queued generation:
+6. Run one queued generation:
 
    ```bash
    bun run opencode:next

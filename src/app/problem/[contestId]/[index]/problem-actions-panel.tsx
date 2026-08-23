@@ -154,26 +154,26 @@ export function ReportSection({ problemId }: { problemId: string }) {
     >
       <button
         type="button"
-        onClick={() => setOpen(!open)}
+        onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-controls={panelId}
         className="flex w-full cursor-pointer items-center justify-between gap-3 px-4 py-3.5 text-left sm:gap-4 sm:px-6 sm:py-4"
       >
-        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+        <span className="flex min-w-0 items-center gap-3 sm:gap-4">
           <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl border border-border/70 bg-background/80 text-muted-foreground shadow-sm sm:size-10 sm:rounded-2xl">
             <Flag className="size-4" />
           </span>
 
-          <div className="min-w-0">
-            <p className="text-base font-semibold tracking-tight">
+          <span className="min-w-0">
+            <span className="block text-base font-semibold tracking-tight">
               Report an issue
-            </p>
-            <p className="mt-0.5 text-sm text-muted-foreground">
+            </span>
+            <span className="mt-0.5 block text-sm text-muted-foreground">
               Something wrong with the hints, editorial, or solution? Let us
               know.
-            </p>
-          </div>
-        </div>
+            </span>
+          </span>
+        </span>
 
         <ChevronIcon open={open} />
       </button>
@@ -181,10 +181,10 @@ export function ReportSection({ problemId }: { problemId: string }) {
       <AnimatedCollapse open={open} id={panelId}>
         <div className="border-t border-border/60 px-4 pb-4 pt-4 sm:px-6 sm:pb-5">
           {submitted ? (
-            <div className="flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+            <output className="flex items-center gap-3 rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-200">
               <Check className="size-4 shrink-0" />
               Thanks for the report — we&apos;ll take a look.
-            </div>
+            </output>
           ) : (
             <form onSubmit={handleSubmit} className="flex flex-col gap-4">
               <div>
@@ -201,7 +201,7 @@ export function ReportSection({ problemId }: { problemId: string }) {
                   placeholder="e.g. The solution gives WA on test 3, hint 2 spoils the full approach..."
                   rows={3}
                   maxLength={1000}
-                  className="w-full resize-none rounded-xl border border-border/50 bg-background/65 px-4 py-3 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] placeholder:text-muted-foreground/70 focus-visible:border-foreground/15 focus-visible:ring-0 focus-visible:outline-none"
+                  className="w-full resize-none rounded-xl border border-input bg-background/65 px-4 py-3 text-base shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:outline-none md:text-sm"
                 />
               </div>
 
@@ -211,14 +211,17 @@ export function ReportSection({ problemId }: { problemId: string }) {
                   size="sm"
                   variant="outline"
                   disabled={isPending || !reason.trim()}
-                  className="h-10 rounded-xl border-amber-500/20 bg-amber-500/10 px-4 text-amber-200 shadow-sm hover:bg-amber-500/15 hover:text-amber-100 disabled:border-amber-500/10 disabled:bg-amber-500/10 disabled:text-amber-200/55"
+                  className="h-10 rounded-xl border-amber-500/25 bg-amber-500/10 px-4 text-amber-800 shadow-sm hover:bg-amber-500/15 hover:text-amber-900 disabled:border-amber-500/10 disabled:bg-amber-500/10 disabled:text-amber-800/55 dark:text-amber-200 dark:hover:text-amber-100 dark:disabled:text-amber-200/55"
                 >
                   {isPending ? "Submitting..." : "Submit report"}
                 </Button>
               </div>
 
               {error && (
-                <p className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
+                <p
+                  role="alert"
+                  className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-700 dark:text-rose-200"
+                >
                   {error}
                 </p>
               )}
@@ -300,6 +303,14 @@ export function ReviewSection({
   }
 
   function handleRegenerate() {
+    if (
+      !window.confirm(
+        "Regenerate this problem? The current hints, editorial, solution, and transcript will be deleted.",
+      )
+    ) {
+      return;
+    }
+
     setError(null);
     setPendingAction("REGENERATE");
 
@@ -336,27 +347,27 @@ export function ReviewSection({
     >
       <button
         type="button"
-        onClick={() => setOpen(!open)}
+        onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         aria-controls={panelId}
         className="flex w-full cursor-pointer items-center justify-between gap-3 px-4 py-3.5 text-left sm:gap-4 sm:px-6 sm:py-4"
       >
-        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+        <span className="flex min-w-0 items-center gap-3 sm:gap-4">
           <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-xl border border-border/70 bg-background/80 text-muted-foreground shadow-sm sm:size-10 sm:rounded-2xl">
             <ShieldCheck className="size-4" />
           </span>
 
-          <div className="min-w-0">
-            <p className="text-base font-semibold tracking-tight">
+          <span className="min-w-0">
+            <span className="block text-base font-semibold tracking-tight">
               Review this problem
-            </p>
-            <p className="mt-0.5 text-sm text-muted-foreground">
+            </span>
+            <span className="mt-0.5 block text-sm text-muted-foreground">
               Update the review status for this problem
-            </p>
-          </div>
-        </div>
+            </span>
+          </span>
+        </span>
 
-        <div className="flex items-center gap-3">
+        <span className="flex items-center gap-3">
           <span
             className={cn(
               "hidden items-center rounded-full border px-2.5 py-1 text-[0.7rem] font-semibold uppercase tracking-[0.16em] sm:inline-flex",
@@ -366,7 +377,7 @@ export function ReviewSection({
             {review.label}
           </span>
           <ChevronIcon open={open} />
-        </div>
+        </span>
       </button>
 
       <AnimatedCollapse open={open} id={panelId}>
@@ -396,7 +407,7 @@ export function ReviewSection({
                   }
                 }}
                 placeholder="Review password"
-                className="h-10 rounded-xl border-border/50 bg-background/65 px-4 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] placeholder:text-muted-foreground/70 focus-visible:border-foreground/15 focus-visible:ring-0 focus-visible:outline-none"
+                className="h-10 rounded-xl border-input bg-background/65 px-4 text-base shadow-[inset_0_1px_0_rgba(255,255,255,0.03)] placeholder:text-muted-foreground md:text-sm"
               />
             </div>
 
@@ -406,7 +417,7 @@ export function ReviewSection({
                 size="sm"
                 variant="outline"
                 disabled={isPending || !hasPassword}
-                className="h-10 w-full rounded-xl border-emerald-500/20 bg-emerald-500/10 px-4 text-emerald-200 shadow-sm hover:bg-emerald-500/15 hover:text-emerald-100 disabled:border-emerald-500/10 disabled:bg-emerald-500/10 disabled:text-emerald-200/55 sm:w-auto"
+                className="h-10 w-full rounded-xl border-emerald-500/25 bg-emerald-500/10 px-4 text-emerald-700 shadow-sm hover:bg-emerald-500/15 hover:text-emerald-800 disabled:border-emerald-500/10 disabled:bg-emerald-500/10 disabled:text-emerald-700/55 sm:w-auto dark:text-emerald-200 dark:hover:text-emerald-100 dark:disabled:text-emerald-200/55"
               >
                 {pendingAction === "VERIFIED"
                   ? "Verifying..."
@@ -417,7 +428,7 @@ export function ReviewSection({
                 size="sm"
                 variant="outline"
                 disabled={isPending || !hasPassword}
-                className="h-10 w-full rounded-xl border-rose-500/20 bg-rose-500/10 px-4 text-rose-200 shadow-sm hover:bg-rose-500/15 hover:text-rose-100 disabled:border-rose-500/10 disabled:bg-rose-500/10 disabled:text-rose-200/55 sm:w-auto"
+                className="h-10 w-full rounded-xl border-rose-500/25 bg-rose-500/10 px-4 text-rose-700 shadow-sm hover:bg-rose-500/15 hover:text-rose-800 disabled:border-rose-500/10 disabled:bg-rose-500/10 disabled:text-rose-700/55 sm:w-auto dark:text-rose-200 dark:hover:text-rose-100 dark:disabled:text-rose-200/55"
                 onClick={() => handleReview("INCORRECT")}
               >
                 {pendingAction === "INCORRECT"
@@ -429,7 +440,7 @@ export function ReviewSection({
                 size="sm"
                 variant="outline"
                 disabled={isPending || !hasPassword}
-                className="h-10 w-full rounded-xl border-sky-500/20 bg-sky-500/10 px-4 text-sky-200 shadow-sm hover:bg-sky-500/15 hover:text-sky-100 disabled:border-sky-500/10 disabled:bg-sky-500/10 disabled:text-sky-200/55 sm:w-auto"
+                className="h-10 w-full rounded-xl border-sky-500/25 bg-sky-500/10 px-4 text-sky-700 shadow-sm hover:bg-sky-500/15 hover:text-sky-800 disabled:border-sky-500/10 disabled:bg-sky-500/10 disabled:text-sky-700/55 sm:w-auto dark:text-sky-200 dark:hover:text-sky-100 dark:disabled:text-sky-200/55"
                 onClick={handleRegenerate}
               >
                 {pendingAction === "REGENERATE" ? "Queueing..." : "Regenerate"}
@@ -438,7 +449,10 @@ export function ReviewSection({
           </form>
 
           {error && (
-            <p className="mt-4 rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-300">
+            <p
+              role="alert"
+              className="mt-4 rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-700 dark:text-rose-200"
+            >
               {error}
             </p>
           )}
