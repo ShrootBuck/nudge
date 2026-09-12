@@ -2,7 +2,9 @@ import { describe, expect, test } from "bun:test";
 import type { AssistantMessage } from "@opencode-ai/sdk/v2";
 import { OPEN_CODE_GENERATION_CONFIG } from "../src/lib/ai/config";
 import {
+  buildOpenCodeOutputRequest,
   buildOpenCodeRuntimeConfig,
+  extractOpenCodeJson,
   toStructuredResponse,
 } from "../src/lib/ai/opencode";
 import { buildStructuredOutputFormat } from "../src/lib/ai/request";
@@ -32,14 +34,45 @@ const assistantMessage = {
 } satisfies AssistantMessage;
 
 describe("OpenCode generation", () => {
-  test("builds the configured public display name", () => {
-    expect(OPEN_CODE_GENERATION_CONFIG).toMatchObject({
-      model: "openai/gpt-5.6-sol",
-      variant: "max",
-      modelDisplayName: "GPT-5.6 Sol",
-      reasoningDisplayName: "max",
-      displayName: "GPT-5.6 Sol (max)",
-    });
+  test("builds a display name from the selected configuration", () => {
+    expect(OPEN_CODE_GENERATION_CONFIG.model).toBe(
+      `${OPEN_CODE_GENERATION_CONFIG.providerId}/${OPEN_CODE_GENERATION_CONFIG.modelId}`,
+    );
+    expect(OPEN_CODE_GENERATION_CONFIG.displayName).toContain(
+      OPEN_CODE_GENERATION_CONFIG.modelDisplayName,
+    );
+  });
+
+  test("uses JSON text for Alibaba while retaining native output elsewhere", () => {
+    const options = {
+      systemPrompt: "Solve carefully",
+      userPrompt: "problem",
+      outputSchema: {
+        name: "result",
+        description: "Result",
+        schema: { type: "object" },
+      },
+    };
+    const request = buildOpenCodeOutputRequest(options, "alibaba-token-plan");
+    expect(request.format).toEqual({ type: "text" });
+    expect(request.system).toContain("Solve carefully");
+    expect(request.system).toContain('"title":"result"');
+    expect(buildOpenCodeOutputRequest(options, "openai").format.type).toBe(
+      "json_schema",
+    );
+  });
+
+  test("extracts JSON without including reasoning and rejects malformed output", () => {
+    const base = { id: "part", sessionID: "session", messageID: "message" };
+    expect(
+      extractOpenCodeJson([
+        { ...base, type: "reasoning", text: "thinking", time: { start: 1 } },
+        { ...base, type: "text", text: '```json\n{"value":"ok"}\n```' },
+      ]),
+    ).toBe('{"value":"ok"}');
+    expect(() =>
+      extractOpenCodeJson([{ ...base, type: "text", text: "not JSON" }]),
+    ).toThrow();
   });
 
   test("locks the generation agent down to web research", () => {
@@ -65,7 +98,7 @@ describe("OpenCode generation", () => {
       outputText: '{"value":"ok"}',
       responseId: "message-1",
       transcriptPath: "/tmp/session.json",
-      displayName: "GPT-5.6 Sol (max)",
+      displayName: OPEN_CODE_GENERATION_CONFIG.displayName,
       resolvedModel: "openai/gpt-5.6-sol",
       finishReason: "stop",
       nativeFinishReason: "tool-calls",

@@ -6,6 +6,7 @@ import {
   type AssistantMessage,
   type Config,
   createOpencode,
+  type Part,
 } from "@opencode-ai/sdk/v2";
 import { MAX_CODEFORCES_IMAGE_BYTES } from "./codeforces-images";
 import { OPEN_CODE_GENERATION_CONFIG } from "./config";
@@ -85,6 +86,35 @@ export function buildOpenCodeRuntimeConfig(): Config {
   };
 }
 
+// Alibaba thinking models reject the forced tool choice used by json_schema.
+export function buildOpenCodeOutputRequest(
+  options: GenerateOptions,
+  providerId = OPEN_CODE_GENERATION_CONFIG.providerId,
+) {
+  const format = buildStructuredOutputFormat(options);
+  if (providerId.startsWith("alibaba")) {
+    return {
+      format: { type: "text" as const },
+      system: [
+        options.systemPrompt,
+        "Return your final answer as a single JSON object matching this schema. Do not wrap it in Markdown or add commentary. You may use research tools before answering.",
+        JSON.stringify(format.type === "json_schema" ? format.schema : {}),
+      ].join("\n\n"),
+    };
+  }
+  return { format, system: options.systemPrompt };
+}
+
+export function extractOpenCodeJson(parts: readonly Part[]) {
+  const text = parts
+    .filter((part) => part.type === "text" && !part.ignored && !part.synthetic)
+    .map((part) => (part.type === "text" ? part.text : ""))
+    .join("\n")
+    .trim();
+  const fenced = /^```(?:json)?\s*([\s\S]*?)\s*```$/i.exec(text);
+  return JSON.stringify(JSON.parse(fenced?.[1] ?? text));
+}
+
 function describeError(error: unknown) {
   if (error instanceof Error) {
     return error.message;
@@ -127,22 +157,27 @@ export function toStructuredResponse({
   message,
   providerName,
   transcriptPath,
+  textOutput,
 }: {
   message: AssistantMessage;
+  textOutput?: string;
   providerName?: string;
   transcriptPath?: string | null;
 }): StructuredResponse {
   if (message.error) {
     throw new Error(assistantErrorMessage(message.error));
   }
-  if (message.structured === undefined) {
+  if (message.structured === undefined && textOutput === undefined) {
     throw new Error(
       `OpenCode response missing structured output (id: ${message.id}, finish_reason: ${message.finish ?? "unknown"})`,
     );
   }
 
   return {
-    outputText: JSON.stringify(message.structured),
+    outputText:
+      message.structured === undefined
+        ? (textOutput ?? "")
+        : JSON.stringify(message.structured),
     responseId: message.id,
     ...(transcriptPath ? { transcriptPath } : {}),
     ...(!transcriptPath
@@ -389,6 +424,7 @@ class LocalOpenCodeRuntime implements OpenCodeRuntime {
         workingDirectory,
         abortSignal: generationAbort.signal,
       });
+      const outputRequest = buildOpenCodeOutputRequest(options);
       const promptResult = await this.instance.client.session.prompt(
         {
           sessionID: sessionId,
@@ -401,8 +437,7 @@ class LocalOpenCodeRuntime implements OpenCodeRuntime {
           ...(OPEN_CODE_GENERATION_CONFIG.variant
             ? { variant: OPEN_CODE_GENERATION_CONFIG.variant }
             : {}),
-          system: options.systemPrompt,
-          format: buildStructuredOutputFormat(options),
+          ...outputRequest,
           parts,
         },
         { throwOnError: true, signal: generationAbort.signal },
@@ -414,6 +449,10 @@ class LocalOpenCodeRuntime implements OpenCodeRuntime {
         promptResult.data.info.providerID;
       return toStructuredResponse({
         message: promptResult.data.info,
+        ...(outputRequest.format.type === "text" &&
+        !promptResult.data.info.error
+          ? { textOutput: extractOpenCodeJson(promptResult.data.parts) }
+          : {}),
         providerName,
         transcriptPath,
       });

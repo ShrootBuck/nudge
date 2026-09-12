@@ -88,16 +88,36 @@ async function revalidateRemotely(
           timeoutMs: 10_000,
         });
 
-        const detail = (
-          await readResponseTextWithLimit(
-            response,
-            4_096,
-            "Cache invalidation response",
-          )
-        ).slice(0, 500);
+        let detail: string;
+        try {
+          detail = (
+            await readResponseTextWithLimit(
+              response,
+              4_096,
+              "Cache invalidation response",
+            )
+          ).slice(0, 500);
+        } catch (error) {
+          throw new Error(
+            `Remote cache invalidation returned HTTP ${response.status} (${response.headers.get("content-type") ?? "unknown content type"}): ${error instanceof Error ? error.message : String(error)}. Check CACHE_REVALIDATION_URL and deployment access.`,
+            { cause: error },
+          );
+        }
         if (!response.ok) {
           throw new Error(
             `Remote cache invalidation failed (${response.status}): ${detail}`,
+          );
+        }
+        const result: unknown = JSON.parse(detail);
+        if (
+          !result ||
+          typeof result !== "object" ||
+          !("revalidated" in result) ||
+          result.revalidated !==
+            tags.slice(index, index + REMOTE_BATCH_SIZE).length
+        ) {
+          throw new Error(
+            "Remote cache invalidation returned an invalid acknowledgement; check CACHE_REVALIDATION_URL and deployment access",
           );
         }
         break;
