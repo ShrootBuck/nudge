@@ -1,8 +1,8 @@
 {
-  "model": "openai/gpt-5.6-sol",
-  "variant": "max",
+  "model": "alibaba-token-plan/qwen3.8-max",
+  "variant": "xhigh",
   "display": {
-    "model": "GPT-5.6 Sol",
-    "reasoning": "max"
+    "model": "Qwen3.8 Max",
+    "reasoning": "xhigh"
   }
 }
