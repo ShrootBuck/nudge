@@ -24,7 +24,11 @@ export type ProblemView = {
   transcriptDownloadUrl: string | null;
   lastGenerationError: string | null;
   hints: { id: string; order: number; content: string }[];
-  editorial: { id: string; content: string } | null;
+  editorial: {
+    id: string;
+    content: string;
+    parsedDocument?: MarkdownDocument | null;
+  } | null;
   solution: {
     id: string;
     content: string;

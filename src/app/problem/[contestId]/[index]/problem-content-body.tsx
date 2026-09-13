@@ -243,7 +243,10 @@ export function ProblemContentBody({ problem }: { problem: ProblemView }) {
                 description="Open this when you want the whole argument, complexity included."
                 icon={BookOpenText}
               >
-                <ProblemMarkdown content={problem.editorial.content} />
+                <ProblemMarkdown
+                  content={problem.editorial.content}
+                  parsedDocument={problem.editorial.parsedDocument}
+                />
               </CollapsibleSection>
             )}
 

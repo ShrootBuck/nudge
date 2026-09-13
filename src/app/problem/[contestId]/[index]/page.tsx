@@ -6,6 +6,7 @@ import { cacheLife, cacheTag } from "next/cache";
 import { notFound } from "next/navigation";
 import { problemTag } from "@/lib/cache-tags";
 import { markdownOptions, markdownPlugins } from "@/lib/markdown";
+import { prepareMarkdown } from "@/lib/prepare-markdown";
 import { prisma } from "@/lib/prisma";
 import { getProblemSocialData } from "@/lib/problem-read-cache";
 import {
@@ -142,7 +143,12 @@ async function getProblemView(
           ? "The last generation attempt failed. A retry is needed."
           : null,
     hints: problem.hints,
-    editorial: problem.editorial,
+    editorial: problem.editorial
+      ? {
+          ...problem.editorial,
+          parsedDocument: await prepareMarkdown(problem.editorial.content),
+        }
+      : null,
     solution: problem.solution
       ? {
           id: problem.solution.id,
