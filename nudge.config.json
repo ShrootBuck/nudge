@@ -1,8 +1,8 @@
 {
-  "model": "alibaba-token-plan/qwen3.8-max",
-  "variant": "xhigh",
+  "model": "openai/gpt-6-astra",
+  "variant": "low",
   "display": {
-    "model": "Qwen3.8 Max",
-    "reasoning": "xhigh"
+    "model": "GPT-6 Astra",
+    "reasoning": "low"
   }
 }

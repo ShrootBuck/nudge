@@ -20,7 +20,7 @@
   "dependencies": {
     "@base-ui/react": "^1.4.1",
     "@comark/react": "^0.6.2",
-    "@opencode-ai/sdk": "1.18.3",
+    "@opencode-ai/sdk": "1.18.30",
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "@shikijs/colorized-brackets": "^4.4.3",
@@ -39,7 +39,7 @@
     "katex": "^0.17.0",
     "lucide-react": "^1.16.0",
     "next": "^16.2.6",
-    "opencode-ai": "1.18.3",
+    "opencode-ai": "1.18.30",
     "prisma": "^7.8.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
