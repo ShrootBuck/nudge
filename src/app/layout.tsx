@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import Link from "next/link";
 import Script from "next/script";
 import { Suspense } from "react";
+import { BrandMark } from "@/components/brand-mark";
 import { Footer } from "@/components/footer";
 import { Navbar } from "@/components/navbar";
 import { SITE_URL } from "@/lib/env";
@@ -83,12 +84,7 @@ function NavbarFallback() {
             href="/"
             className="flex items-center gap-2 text-lg font-semibold tracking-tight transition hover:opacity-80"
           >
-            <span
-              aria-hidden="true"
-              className="inline-flex size-7 items-center justify-center rounded-sm bg-foreground text-xs font-bold text-background"
-            >
-              N
-            </span>
+            <BrandMark className="size-7 shrink-0" />
             Nudge
           </Link>
 

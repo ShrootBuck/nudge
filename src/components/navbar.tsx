@@ -4,6 +4,7 @@ import { Menu, Search, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
+import { BrandMark } from "@/components/brand-mark";
 import { CommandMenu } from "@/components/command-menu";
 import { GitHubIcon } from "@/components/github-icon";
 import { NAV_LINKS } from "@/lib/nav-links";
@@ -29,12 +30,7 @@ export function Navbar() {
             href="/"
             className="flex min-w-0 items-center gap-2 text-lg font-semibold tracking-tight transition hover:opacity-80"
           >
-            <span
-              aria-hidden="true"
-              className="inline-flex size-7 items-center justify-center rounded-sm bg-foreground text-background text-xs font-bold"
-            >
-              N
-            </span>
+            <BrandMark className="size-7 shrink-0" />
             <span className="truncate">Nudge</span>
           </Link>
 

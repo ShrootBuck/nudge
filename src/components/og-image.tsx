@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { BrandMark } from "@/components/brand-mark";
 
 export const OG_COLORS = {
   background: "#101720",
@@ -66,24 +67,7 @@ export function OgFrame({ children }: { children: ReactNode }) {
 export function OgBrand() {
   return (
     <div style={{ display: "flex", alignItems: "center" }}>
-      <div
-        style={{
-          width: 44,
-          height: 44,
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          borderRadius: 8.25,
-          backgroundColor: "#ffffff",
-          color: "#000000",
-          fontFamily: "system-ui, sans-serif",
-          fontSize: 27.5,
-          fontWeight: 700,
-          lineHeight: 1,
-        }}
-      >
-        N
-      </div>
+      <BrandMark size={44} />
       <div
         style={{
           display: "flex",

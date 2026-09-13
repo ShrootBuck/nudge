@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { BrandMark } from "@/components/brand-mark";
 import { GitHubIcon } from "@/components/github-icon";
 import { NAV_LINKS } from "@/lib/nav-links";
 
@@ -8,12 +9,7 @@ export function Footer() {
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <div className="flex flex-col items-center justify-between gap-6 sm:flex-row">
           <div className="flex min-w-0 flex-wrap items-center justify-center gap-2 text-center text-sm text-muted-foreground sm:justify-start sm:text-left">
-            <span
-              aria-hidden="true"
-              className="inline-flex size-5 items-center justify-center rounded bg-foreground text-background text-[10px] font-bold"
-            >
-              N
-            </span>
+            <BrandMark className="size-5 shrink-0" />
             <span>
               Nudge &mdash; built by{" "}
               <a
