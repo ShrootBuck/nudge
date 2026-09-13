@@ -1,5 +1,13 @@
 import { cfProblemUrl } from "../utils";
 
+export const GENERATION_SYSTEM_PROMPT = `You create Codeforces learning content for Nudge. Your job is to understand the best approach for the problem and teach it clearly in your own words, using existing solutions to inform your reasoning.
+
+Start with a brief, targeted web search for existing solutions so relevant editorials are in context before substantial independent problem-solving. Use any supplied tutorial links first; otherwise search by contest ID and problem index. Prefer the official tutorial/editorial, and read relevant explanations rather than relying on search snippets. Look at accessible alternatives when useful, especially if the official explanation is missing, unclear, or unnecessarily complicated. Accepted submissions can also help clarify an approach. Respect supplied source lookup statuses and avoid repeatedly retrying blocked sources. If no usable source is accessible, proceed from the supplied statement.
+
+Treat existing solutions as a starting point, not a constraint. If an approach is clear and suitable, build on it without unnecessary re-derivation. If an explanation has gaps, seems incorrect, or uses a harder method than necessary, reason through it and derive a better or simpler approach when worthwhile. Choose a correct approach that is easy to teach and fits the constraints. Verify it against the supplied statement and edge cases before writing the hints, editorial, and C++ solution.
+
+The editorial must be self-contained: explain the key insight, algorithm, why it works, complexity, and implementation details a learner needs, filling in steps the source skips. Keep research and verification concise; spend the output on teaching the solution, not narrating the research process. Follow the user prompt and output schema exactly.`;
+
 export type PromptProblem = {
   contestId: number;
   index: string;
@@ -32,7 +40,7 @@ export function buildPrompt(
 
   return `Generate Codeforces learning content: five progressive hints, an original editorial, and AC-quality C++.
 
-Solve from the supplied statement first. For very hard problems, do a quick source check for the official Codeforces tutorial/editorial and accepted submissions when they would help you derive or verify the solution. If a source is blocked, missing, Cloudflare-challenged, 404, or otherwise unavailable, keep solving from the supplied statement and remember that source status. If you still can't solve after that, it's ok.
+Follow the editorial-first research workflow in the system instructions. Use the supplied statement to verify that the source solves this exact problem.
 
 Write clean Markdown with LaTeX as needed. Use quick and clever humor when appropriate. Tell it like it is (don't sugar-coat responses), and use very casual language. You are fully allowed to swear, just don't overdo it like a sailor (be natural). Deconstruct any false assumptions.
 
@@ -49,7 +57,7 @@ Known problem metadata:
 Use the rating and tags as weak signals only. The supplied statement is the source of truth.${statementSection}${sourceStatusSection}
 Generate:
 1. Five progressive hints, from a gentle nudge to the key insight.
-2. A deep editorial explaining like literally everything.
+2. A self-contained editorial that teaches the solution clearly, including the key insight, algorithm, correctness argument, complexity, and necessary implementation details. Explain non-obvious steps without padding or a discovery-process transcript.
 3. A complete C++26 solution that gets AC on Codeforces.
 
 Formatting & Style Rules:
