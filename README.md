@@ -23,6 +23,10 @@ bun run dev
 
 Copy the variables documented in `.env.example` into your local environment. The app requires a PostgreSQL database whose schema matches `prisma/schema.prisma`.
 
+After schema changes, apply them with `bunx prisma db push` and regenerate the client with `bunx prisma generate`.
+
+The navbar displays the model and reasoning effort from the latest successfully saved generation. Its display string is stored in the singleton `SiteState` row and updated in the same transaction as the generated content. The indicator stays hidden until the first successful save; it does not query generation history or control model selection.
+
 Run the full local quality gate before shipping:
 
 ```bash

@@ -3,14 +3,14 @@
 import { Menu, Search, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { type ReactNode, useEffect, useState } from "react";
 import { BrandMark } from "@/components/brand-mark";
 import { CommandMenu } from "@/components/command-menu";
 import { GitHubIcon } from "@/components/github-icon";
 import { NAV_LINKS } from "@/lib/nav-links";
 import { cn } from "@/lib/utils";
 
-export function Navbar() {
+export function Navbar({ currentModel }: { currentModel?: ReactNode }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
@@ -26,13 +26,16 @@ export function Navbar() {
     <header className="sticky top-0 z-50 w-full">
       <div className="border-b border-border/50 bg-background/60 backdrop-blur-xl">
         <nav className="mx-auto flex h-14 max-w-6xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
-          <Link
-            href="/"
-            className="flex min-w-0 items-center gap-2 text-lg font-semibold tracking-tight transition hover:opacity-80"
-          >
-            <BrandMark className="size-7 shrink-0" />
-            <span className="truncate">Nudge</span>
-          </Link>
+          <div className="flex min-w-0 flex-col items-start gap-0.5 lg:flex-row lg:items-center lg:gap-3">
+            <Link
+              href="/"
+              className="flex min-w-0 items-center gap-2 text-lg font-semibold tracking-tight transition hover:opacity-80"
+            >
+              <BrandMark className="size-7 shrink-0" />
+              <span className="truncate">Nudge</span>
+            </Link>
+            {currentModel}
+          </div>
 
           <div className="hidden items-center gap-1 md:flex">
             {NAV_LINKS.map((link) => {

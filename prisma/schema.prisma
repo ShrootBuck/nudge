@@ -26,6 +26,11 @@ enum ReportResolution {
   REGENERATED
 }
 
+model SiteState {
+  id           String @id
+  currentModel String
+}
+
 model Problem {
   id        String   @id @default(cuid())
   contestId Int

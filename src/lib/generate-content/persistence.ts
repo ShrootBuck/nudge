@@ -1,5 +1,5 @@
 import { safeRevalidateTags } from "../cache-revalidate";
-import { PROBLEM_LIST_TAG, problemTag } from "../cache-tags";
+import { CURRENT_MODEL_TAG, PROBLEM_LIST_TAG, problemTag } from "../cache-tags";
 import { prisma } from "../prisma";
 import { pipelineStateData, problemUpdateData } from "../problem-pipeline-db";
 import type { ParsedContent } from "./content-schema";
@@ -47,7 +47,7 @@ export async function saveProblemContent(
         data: { problemId, content: parsed.solution },
       });
 
-      return tx.problem.update({
+      const problem = await tx.problem.update({
         where: { id: problemId },
         data: problemUpdateData({
           ...pipelineStateData("SUCCEEDED"),
@@ -67,6 +67,14 @@ export async function saveProblemContent(
           index: true,
         },
       });
+
+      await tx.siteState.upsert({
+        where: { id: "global" },
+        create: { id: "global", currentModel: generation.displayName },
+        update: { currentModel: generation.displayName },
+      });
+
+      return problem;
     },
     {
       maxWait: CONTENT_SAVE_TRANSACTION_MAX_WAIT_MS,
@@ -77,6 +85,7 @@ export async function saveProblemContent(
   const cacheUpdated = await safeRevalidateTags(
     [
       PROBLEM_LIST_TAG,
+      CURRENT_MODEL_TAG,
       problemTag(updatedProblem.contestId, updatedProblem.index),
     ],
     "expire",

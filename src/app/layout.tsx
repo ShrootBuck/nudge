@@ -4,6 +4,7 @@ import Link from "next/link";
 import Script from "next/script";
 import { Suspense } from "react";
 import { BrandMark } from "@/components/brand-mark";
+import { CurrentModel } from "@/components/current-model";
 import { Footer } from "@/components/footer";
 import { Navbar } from "@/components/navbar";
 import { SITE_URL } from "@/lib/env";
@@ -132,7 +133,13 @@ export default function RootLayout({
           {themeInitScript}
         </Script>
         <Suspense fallback={<NavbarFallback />}>
-          <Navbar />
+          <Navbar
+            currentModel={
+              <Suspense fallback={null}>
+                <CurrentModel />
+              </Suspense>
+            }
+          />
         </Suspense>
         {children}
         <Footer />

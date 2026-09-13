@@ -1,4 +1,5 @@
 import { revalidateTag } from "next/cache";
+import { CURRENT_MODEL_TAG } from "./cache-tags";
 import { getOptionalEnv } from "./env";
 import { fetchWithTimeout, readResponseTextWithLimit } from "./http";
 
@@ -40,6 +41,7 @@ function isMissingStaticGenerationStore(error: unknown) {
 export function isSupportedCacheTag(tag: unknown): tag is string {
   return (
     tag === "problem-list" ||
+    tag === CURRENT_MODEL_TAG ||
     (typeof tag === "string" &&
       /^problem:\d{1,10}:[A-Z][A-Z0-9]{0,9}$/.test(tag))
   );
