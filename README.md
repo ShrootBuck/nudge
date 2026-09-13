@@ -37,7 +37,7 @@ All content is generated locally through OpenCode, then stored in Postgres and s
 
 ## Local OpenCode generation
 
-Generation is local-only. Trigger.dev does not run OpenCode and there is no encoded cloud credential path.
+Generation is local-only. Trigger.dev does not run OpenCode and there is no encoded cloud credential path. The generation agent runs with unrestricted OpenCode tool permissions (including `bash` and file edits); the only denial is `question`, so an unattended run can't hang waiting for a reply. Because the agent is otherwise unrestricted, real runs are refused on macOS — run them on a disposable Linux server. `bun run models` and `bun run opencode:next -- --dry-run` still work anywhere because they never prompt the agent.
 
 1. Sign in with `opencode auth login`, choose OpenAI, and select ChatGPT Plus/Pro. Confirm `opencode auth list` shows OpenAI OAuth.
 2. Make sure `DATABASE_URL` points at the Nudge database.

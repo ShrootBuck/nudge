@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { AssistantMessage } from "@opencode-ai/sdk/v2";
 import { OPEN_CODE_GENERATION_CONFIG } from "../src/lib/ai/config";
 import {
+  assertGenerationPlatformSupported,
   buildOpenCodeOutputRequest,
   buildOpenCodeRuntimeConfig,
   extractOpenCodeJson,
@@ -75,16 +76,23 @@ describe("OpenCode generation", () => {
     ).toThrow();
   });
 
-  test("locks the generation agent down to web research", () => {
+  test("allows every generation tool except question", () => {
     const config = buildOpenCodeRuntimeConfig();
     expect(config.share).toBe("disabled");
-    expect(config.agent?.["nudge-generation"]?.permission).toMatchObject({
-      edit: "deny",
-      bash: "deny",
-      question: "deny",
-      webfetch: "allow",
-      websearch: "allow",
-    });
+    const permission = config.permission;
+    const entries = Object.entries(permission as Record<string, string>);
+    expect(entries.length).toBe(15);
+    for (const [key, value] of entries) {
+      expect(value).toBe(key === "question" ? "deny" : "allow");
+    }
+    expect(config.agent?.["nudge-generation"]?.permission).toEqual(permission);
+  });
+
+  test("refuses to build the generation runtime on macOS", () => {
+    expect(() => assertGenerationPlatformSupported("darwin")).toThrow(
+      /disabled on macOS/,
+    );
+    expect(() => assertGenerationPlatformSupported("linux")).not.toThrow();
   });
 
   test("maps native structured output and audit metadata", () => {

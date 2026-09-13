@@ -38,22 +38,24 @@ export type OpenCodeRuntime = {
   close(): Promise<void>;
 };
 
+// Everything is allowed except `question`: an unattended generation has no
+// responder, so an ask would hang until the generation timeout.
 const GENERATION_PERMISSION = {
-  read: "deny",
-  edit: "deny",
-  glob: "deny",
-  grep: "deny",
-  list: "deny",
-  bash: "deny",
-  task: "deny",
-  external_directory: "deny",
-  todowrite: "deny",
+  read: "allow",
+  edit: "allow",
+  glob: "allow",
+  grep: "allow",
+  list: "allow",
+  bash: "allow",
+  task: "allow",
+  external_directory: "allow",
+  todowrite: "allow",
   question: "deny",
   webfetch: "allow",
   websearch: "allow",
-  lsp: "deny",
-  doom_loop: "deny",
-  skill: "deny",
+  lsp: "allow",
+  doom_loop: "allow",
+  skill: "allow",
 } as const;
 
 export function buildOpenCodeRuntimeConfig(): Config {
@@ -335,6 +337,7 @@ class LocalOpenCodeRuntime implements OpenCodeRuntime {
     if (this.closed) {
       throw new Error("OpenCode runtime is closed");
     }
+    assertGenerationPlatformSupported();
 
     const workingDirectory = await mkdtemp(
       join(tmpdir(), "nudge-opencode-generation-"),
@@ -488,6 +491,16 @@ class LocalOpenCodeRuntime implements OpenCodeRuntime {
     }
     this.closed = true;
     this.instance.server.close();
+  }
+}
+
+export function assertGenerationPlatformSupported(
+  platform: NodeJS.Platform = process.platform,
+) {
+  if (platform === "darwin") {
+    throw new Error(
+      "Nudge generation is disabled on macOS because the OpenCode agent runs with unrestricted tool permissions; run it on a disposable Linux server instead.",
+    );
   }
 }
 
