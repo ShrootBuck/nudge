@@ -1,5 +1,4 @@
 import {
-  assertGenerationPlatformSupported,
   createLocalOpenCodeRuntime,
   type OpenCodeRuntime,
 } from "../src/lib/ai/opencode";
@@ -115,7 +114,6 @@ async function main() {
     throw new Error("Missing required environment variable: DATABASE_URL");
   }
   if (!parsedArguments.dryRun) {
-    assertGenerationPlatformSupported();
     if (!hasVercelBlobReadWriteToken()) {
       throw new Error(
         "Missing usable BLOB_READ_WRITE_TOKEN for local transcript uploads",

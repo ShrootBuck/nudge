@@ -6,7 +6,6 @@ import {
   type AssistantMessage,
   type Config,
   createOpencode,
-  type Part,
 } from "@opencode-ai/sdk/v2";
 import { MAX_CODEFORCES_IMAGE_BYTES } from "./codeforces-images";
 import { OPEN_CODE_GENERATION_CONFIG } from "./config";
@@ -38,26 +37,6 @@ export type OpenCodeRuntime = {
   close(): Promise<void>;
 };
 
-// Everything is allowed except `question`: an unattended generation has no
-// responder, so an ask would hang until the generation timeout.
-const GENERATION_PERMISSION = {
-  read: "allow",
-  edit: "allow",
-  glob: "allow",
-  grep: "allow",
-  list: "allow",
-  bash: "allow",
-  task: "allow",
-  external_directory: "allow",
-  todowrite: "allow",
-  question: "deny",
-  webfetch: "allow",
-  websearch: "allow",
-  lsp: "allow",
-  doom_loop: "allow",
-  skill: "allow",
-} as const;
-
 export function buildOpenCodeRuntimeConfig(): Config {
   return {
     share: "disabled",
@@ -81,40 +60,11 @@ export function buildOpenCodeRuntimeConfig(): Config {
         ...(OPEN_CODE_GENERATION_CONFIG.variant
           ? { variant: OPEN_CODE_GENERATION_CONFIG.variant }
           : {}),
-        permission: GENERATION_PERMISSION,
+        permission: "allow",
       },
     },
-    permission: GENERATION_PERMISSION,
+    permission: "allow",
   };
-}
-
-// Alibaba thinking models reject the forced tool choice used by json_schema.
-export function buildOpenCodeOutputRequest(
-  options: GenerateOptions,
-  providerId = OPEN_CODE_GENERATION_CONFIG.providerId,
-) {
-  const format = buildStructuredOutputFormat(options);
-  if (providerId.startsWith("alibaba")) {
-    return {
-      format: { type: "text" as const },
-      system: [
-        options.systemPrompt,
-        "Return your final answer as a single JSON object matching this schema. Do not wrap it in Markdown or add commentary. You may use research tools before answering.",
-        JSON.stringify(format.type === "json_schema" ? format.schema : {}),
-      ].join("\n\n"),
-    };
-  }
-  return { format, system: options.systemPrompt };
-}
-
-export function extractOpenCodeJson(parts: readonly Part[]) {
-  const text = parts
-    .filter((part) => part.type === "text" && !part.ignored && !part.synthetic)
-    .map((part) => (part.type === "text" ? part.text : ""))
-    .join("\n")
-    .trim();
-  const fenced = /^```(?:json)?\s*([\s\S]*?)\s*```$/i.exec(text);
-  return JSON.stringify(JSON.parse(fenced?.[1] ?? text));
 }
 
 function describeError(error: unknown) {
@@ -159,27 +109,22 @@ export function toStructuredResponse({
   message,
   providerName,
   transcriptPath,
-  textOutput,
 }: {
   message: AssistantMessage;
-  textOutput?: string;
   providerName?: string;
   transcriptPath?: string | null;
 }): StructuredResponse {
   if (message.error) {
     throw new Error(assistantErrorMessage(message.error));
   }
-  if (message.structured === undefined && textOutput === undefined) {
+  if (message.structured === undefined) {
     throw new Error(
       `OpenCode response missing structured output (id: ${message.id}, finish_reason: ${message.finish ?? "unknown"})`,
     );
   }
 
   return {
-    outputText:
-      message.structured === undefined
-        ? (textOutput ?? "")
-        : JSON.stringify(message.structured),
+    outputText: JSON.stringify(message.structured),
     responseId: message.id,
     ...(transcriptPath ? { transcriptPath } : {}),
     ...(!transcriptPath
@@ -337,7 +282,6 @@ class LocalOpenCodeRuntime implements OpenCodeRuntime {
     if (this.closed) {
       throw new Error("OpenCode runtime is closed");
     }
-    assertGenerationPlatformSupported();
 
     const workingDirectory = await mkdtemp(
       join(tmpdir(), "nudge-opencode-generation-"),
@@ -427,7 +371,6 @@ class LocalOpenCodeRuntime implements OpenCodeRuntime {
         workingDirectory,
         abortSignal: generationAbort.signal,
       });
-      const outputRequest = buildOpenCodeOutputRequest(options);
       const promptResult = await this.instance.client.session.prompt(
         {
           sessionID: sessionId,
@@ -440,7 +383,8 @@ class LocalOpenCodeRuntime implements OpenCodeRuntime {
           ...(OPEN_CODE_GENERATION_CONFIG.variant
             ? { variant: OPEN_CODE_GENERATION_CONFIG.variant }
             : {}),
-          ...outputRequest,
+          format: buildStructuredOutputFormat(options),
+          system: options.systemPrompt,
           parts,
         },
         { throwOnError: true, signal: generationAbort.signal },
@@ -452,10 +396,6 @@ class LocalOpenCodeRuntime implements OpenCodeRuntime {
         promptResult.data.info.providerID;
       return toStructuredResponse({
         message: promptResult.data.info,
-        ...(outputRequest.format.type === "text" &&
-        !promptResult.data.info.error
-          ? { textOutput: extractOpenCodeJson(promptResult.data.parts) }
-          : {}),
         providerName,
         transcriptPath,
       });
@@ -491,16 +431,6 @@ class LocalOpenCodeRuntime implements OpenCodeRuntime {
     }
     this.closed = true;
     this.instance.server.close();
-  }
-}
-
-export function assertGenerationPlatformSupported(
-  platform: NodeJS.Platform = process.platform,
-) {
-  if (platform === "darwin") {
-    throw new Error(
-      "Nudge generation is disabled on macOS because the OpenCode agent runs with unrestricted tool permissions; run it on a disposable Linux server instead.",
-    );
   }
 }
 
