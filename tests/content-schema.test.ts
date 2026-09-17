@@ -45,6 +45,32 @@ const validContent = {
 };
 
 describe("generated text storage validation", () => {
+  test("recovers string hints in array order without changing the content", () => {
+    expect(
+      problemResultSchema.parse({
+        ...validContent,
+        hints: validContent.hints.map((hint) => hint.content),
+      }),
+    ).toEqual(problemResultSchema.parse(validContent));
+  });
+
+  test("still rejects invalid recovered hints and ambiguous mixed lists", () => {
+    const strings = validContent.hints.map((hint) => hint.content);
+    for (const hints of [
+      strings.slice(1),
+      [...strings, "extra"],
+      ["   ", ...strings.slice(1)],
+      ["bad\0text", ...strings.slice(1)],
+      ["x".repeat(10_001), ...strings.slice(1)],
+      [validContent.hints[0], ...strings.slice(1)],
+      validContent.hints.map((hint) => ({ ...hint, order: 1 })),
+    ]) {
+      expect(
+        problemResultSchema.safeParse({ ...validContent, hints }).success,
+      ).toBe(false);
+    }
+  });
+
   test("preserves Unicode, math, newlines, and C++ escaped null literals", () => {
     expect(problemResultSchema.parse(validContent)).toEqual({
       ...validContent,

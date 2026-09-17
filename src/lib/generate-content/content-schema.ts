@@ -23,7 +23,15 @@ export const contentSchema = z
   .object({
     status: z.literal("success"),
     reason: z.null(),
-    hints: z.array(hintSchema).length(5),
+    hints: z.preprocess(
+      // OpenCode can accept string hints despite the requested object schema.
+      // Only recover an unambiguous ordered string list; validate it normally.
+      (value) =>
+        Array.isArray(value) && value.every((hint) => typeof hint === "string")
+          ? value.map((content, index) => ({ order: index + 1, content }))
+          : value,
+      z.array(hintSchema).length(5),
+    ),
     editorial: generatedTextSchema.trim().min(1).max(MAX_EDITORIAL_LENGTH),
     solution: generatedTextSchema.trim().min(1).max(MAX_SOLUTION_LENGTH),
   })

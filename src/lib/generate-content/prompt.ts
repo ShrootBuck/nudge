@@ -72,7 +72,7 @@ Output strictness:
 - If the problem is solvable, return \`status: "success"\`, \`reason: null\`, and fill in \`hints\`, \`editorial\`, and \`solution\`.
 - Return \`status: "unsolvable"\`, a short \`reason\`, and set \`hints\`, \`editorial\`, and \`solution\` to null only when the supplied statement is fundamentally incomplete, contradictory, or dependent on an inaccessible resource needed to define the task. Missing research, high rating, uncertainty, or "can't guarantee AC" is not a reason to return unsolvable.
 - If you return \`status: "unsolvable"\`, the \`reason\` is shown directly to users. Be concrete: say what exact statement/resource blocker stopped you, and include relevant source lookup status if it mattered (for example: official tutorial missing, Codeforces returned 403/Cloudflare challenge, tutorial page 404, accepted submissions unavailable).
-- Each hint must be JUST the hint text. No "Hint 1:" or subtitles. The UI adds those automatically.
+- Each hint must be an object with \`order\` (1 through 5) and \`content\` (the Markdown hint text), not a plain string. The \`content\` must contain just the hint text, with no "Hint 1:" or subtitles. The UI adds those automatically.
 - Do not start the editorial with an "# Editorial" heading. The UI already adds that section. Feel free to add other headers as needed though.
 - Use styling in the editorial if needed! Just that first header is no good but any subheaders or bolding or whatever is good!
 
