@@ -92,11 +92,17 @@ export function HintCard({
         <ChevronIcon open={open} />
       </button>
 
-      <AnimatedCollapse open={open} id={panelId}>
-        <div className="min-w-0 border-t border-border/60 px-4 pb-4 pt-4 sm:px-6 sm:pb-5">
-          <ProblemMarkdown content={hint.content} />
+      {open && (
+        <div
+          id={panelId}
+          className="min-w-0 border-t border-border/60 px-4 pb-4 pt-4 sm:px-6 sm:pb-5"
+        >
+          <ProblemMarkdown
+            content={hint.content}
+            parsedDocument={hint.parsedDocument}
+          />
         </div>
-      </AnimatedCollapse>
+      )}
     </div>
   );
 }

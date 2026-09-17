@@ -142,7 +142,12 @@ async function getProblemView(
         : problem.lastGenerationError
           ? "The last generation attempt failed. A retry is needed."
           : null,
-    hints: problem.hints,
+    hints: await Promise.all(
+      problem.hints.map(async (hint) => ({
+        ...hint,
+        parsedDocument: await prepareMarkdown(hint.content),
+      })),
+    ),
     editorial: problem.editorial
       ? {
           ...problem.editorial,

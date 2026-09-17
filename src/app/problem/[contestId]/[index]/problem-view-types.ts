@@ -23,7 +23,12 @@ export type ProblemView = {
   modelDisplayName: string | null;
   transcriptDownloadUrl: string | null;
   lastGenerationError: string | null;
-  hints: { id: string; order: number; content: string }[];
+  hints: {
+    id: string;
+    order: number;
+    content: string;
+    parsedDocument: MarkdownDocument;
+  }[];
   editorial: {
     id: string;
     content: string;
