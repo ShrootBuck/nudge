@@ -1,5 +1,9 @@
 import { describe, expect, test } from "bun:test";
-import { problemResultSchema } from "../src/lib/generate-content/content-schema";
+import { buildStructuredOutputFormat } from "../src/lib/ai/request";
+import {
+  problemOutputSchema,
+  problemResultSchema,
+} from "../src/lib/generate-content/content-schema";
 
 describe("generated content schema", () => {
   test("rejects generic lack-of-confidence unsolvable reasons", () => {
@@ -27,4 +31,81 @@ describe("generated content schema", () => {
 
     expect(result.success).toBe(true);
   });
+});
+
+const validContent = {
+  status: "success" as const,
+  reason: null,
+  hints: Array.from({ length: 5 }, (_, index) => ({
+    order: index + 1,
+    content: "Use $p_i$ and $2\\equiv -1\\pmod 3$.",
+  })),
+  editorial: "Unicode is fine: π, ≤, 🚀.\n\n$$\\sum_i a_i$$",
+  solution: "int main() { char c = '\\0'; }\n",
+};
+
+describe("generated text storage validation", () => {
+  test("preserves Unicode, math, newlines, and C++ escaped null literals", () => {
+    expect(problemResultSchema.parse(validContent)).toEqual({
+      ...validContent,
+      solution: validContent.solution.trim(),
+    });
+  });
+
+  for (const field of ["hint", "editorial", "solution", "reason"]) {
+    test(`rejects JSON-escaped NUL in ${field} before persistence`, () => {
+      const content = structuredClone(validContent);
+      const malformed = "Before\0after";
+      if (field === "hint") content.hints[0].content = malformed;
+      if (field === "editorial") content.editorial = malformed;
+      if (field === "solution") content.solution = malformed;
+      const input =
+        field === "reason"
+          ? {
+              status: "unsolvable",
+              reason: malformed,
+              hints: null,
+              editorial: null,
+              solution: null,
+            }
+          : content;
+      const result = problemResultSchema.safeParse(
+        JSON.parse(JSON.stringify(input)),
+      );
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toContain("NUL (U+0000)");
+        expect(result.error.issues[0].path).toEqual(
+          field === "hint" ? ["hints", 0, "content"] : [field],
+        );
+      }
+    });
+  }
+});
+
+test("OpenCode receives NUL restrictions for every generated text field", () => {
+  const format = buildStructuredOutputFormat({
+    systemPrompt: "system",
+    userPrompt: "prompt",
+    outputSchema: problemOutputSchema,
+  });
+  if (format.type !== "json_schema") throw new Error("Expected JSON schema");
+  const patterns: string[] = [];
+  function visit(value: unknown) {
+    if (!value || typeof value !== "object") return;
+    const node = value as Record<string, unknown>;
+    if (node.type === "string" && node.minLength === 1) {
+      expect(typeof node.pattern).toBe("string");
+      patterns.push(node.pattern as string);
+    }
+    for (const child of Object.values(node)) visit(child);
+  }
+  visit(format.schema);
+  expect(patterns).toHaveLength(4);
+  for (const pattern of patterns) {
+    const regex = new RegExp(pattern);
+    expect(regex.test("Math $x$\nUnicode π\tC++ \\0")).toBe(true);
+    expect(regex.test("bad\0math")).toBe(false);
+    expect(regex.test("trailing\n\0")).toBe(false);
+  }
 });

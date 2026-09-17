@@ -68,6 +68,7 @@ Formatting & Style Rules:
 
 Output strictness:
 - Return JSON matching the provided schema exactly.
+- Never include NUL (U+0000) characters in any field. Use literal $ or $$ for math delimiters, never control characters.
 - If the problem is solvable, return \`status: "success"\`, \`reason: null\`, and fill in \`hints\`, \`editorial\`, and \`solution\`.
 - Return \`status: "unsolvable"\`, a short \`reason\`, and set \`hints\`, \`editorial\`, and \`solution\` to null only when the supplied statement is fundamentally incomplete, contradictory, or dependent on an inaccessible resource needed to define the task. Missing research, high rating, uncertainty, or "can't guarantee AC" is not a reason to return unsolvable.
 - If you return \`status: "unsolvable"\`, the \`reason\` is shown directly to users. Be concrete: say what exact statement/resource blocker stopped you, and include relevant source lookup status if it mattered (for example: official tutorial missing, Codeforces returned 403/Cloudflare challenge, tutorial page 404, accepted submissions unavailable).

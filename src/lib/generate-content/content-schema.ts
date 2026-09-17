@@ -6,9 +6,17 @@ const MAX_EDITORIAL_LENGTH = 100_000;
 const MAX_SOLUTION_LENGTH = 200_000;
 const MAX_REASON_LENGTH = 2_000;
 
+// JSON permits escaped NUL characters, but PostgreSQL text does not.
+// Validate before trimming so a forbidden character can never be hidden.
+const POSTGRES_TEXT_PATTERN = "^[^\\u0000]*$";
+const generatedTextSchema = z.string().refine((text) => !text.includes("\0"), {
+  message:
+    "Generated text must not contain NUL (U+0000) characters; use $ or $$ for LaTeX delimiters.",
+});
+
 const hintSchema = z.object({
   order: z.number().int().min(1).max(5),
-  content: z.string().trim().min(1).max(MAX_HINT_LENGTH),
+  content: generatedTextSchema.trim().min(1).max(MAX_HINT_LENGTH),
 });
 
 export const contentSchema = z
@@ -16,8 +24,8 @@ export const contentSchema = z
     status: z.literal("success"),
     reason: z.null(),
     hints: z.array(hintSchema).length(5),
-    editorial: z.string().trim().min(1).max(MAX_EDITORIAL_LENGTH),
-    solution: z.string().trim().min(1).max(MAX_SOLUTION_LENGTH),
+    editorial: generatedTextSchema.trim().min(1).max(MAX_EDITORIAL_LENGTH),
+    solution: generatedTextSchema.trim().min(1).max(MAX_SOLUTION_LENGTH),
   })
   .superRefine(({ hints }, ctx) => {
     const orders = [...hints.map((hint) => hint.order)].sort((a, b) => a - b);
@@ -37,8 +45,7 @@ export const contentSchema = z
 
 const unsolvableContentSchema = z.object({
   status: z.literal("unsolvable"),
-  reason: z
-    .string()
+  reason: generatedTextSchema
     .trim()
     .min(1)
     .max(MAX_REASON_LENGTH)
@@ -80,7 +87,12 @@ export const problemOutputSchema: OutputSchema = {
       },
       reason: {
         anyOf: [
-          { type: "string", minLength: 1, maxLength: MAX_REASON_LENGTH },
+          {
+            type: "string",
+            pattern: POSTGRES_TEXT_PATTERN,
+            minLength: 1,
+            maxLength: MAX_REASON_LENGTH,
+          },
           { type: "null" },
         ],
         description:
@@ -105,6 +117,7 @@ export const problemOutputSchema: OutputSchema = {
                 },
                 content: {
                   type: "string",
+                  pattern: POSTGRES_TEXT_PATTERN,
                   minLength: 1,
                   maxLength: MAX_HINT_LENGTH,
                   description: "Markdown hint text.",
@@ -121,7 +134,12 @@ export const problemOutputSchema: OutputSchema = {
       },
       editorial: {
         anyOf: [
-          { type: "string", minLength: 1, maxLength: MAX_EDITORIAL_LENGTH },
+          {
+            type: "string",
+            pattern: POSTGRES_TEXT_PATTERN,
+            minLength: 1,
+            maxLength: MAX_EDITORIAL_LENGTH,
+          },
           { type: "null" },
         ],
         description:
@@ -129,7 +147,12 @@ export const problemOutputSchema: OutputSchema = {
       },
       solution: {
         anyOf: [
-          { type: "string", minLength: 1, maxLength: MAX_SOLUTION_LENGTH },
+          {
+            type: "string",
+            pattern: POSTGRES_TEXT_PATTERN,
+            minLength: 1,
+            maxLength: MAX_SOLUTION_LENGTH,
+          },
           { type: "null" },
         ],
         description:
