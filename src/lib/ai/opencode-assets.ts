@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-import type { FilePartInput, TextPartInput } from "@opencode-ai/sdk/v2";
+import type { SessionPromptInput } from "@opencode/client";
 import {
   downloadCodeforcesImage,
   extensionForImage,
@@ -9,12 +9,12 @@ import {
 } from "./codeforces-images";
 import type { UserPromptInput } from "./types";
 
-type PromptPart = TextPartInput | FilePartInput;
+type PromptInput = Pick<SessionPromptInput, "text" | "files">;
 
 const MAX_PROMPT_IMAGES = 12;
 const MAX_PROMPT_IMAGE_BYTES = 50 * 1024 * 1024;
 
-export async function buildOpenCodePromptParts({
+export async function buildOpenCodePromptInput({
   input,
   workingDirectory,
   abortSignal,
@@ -24,9 +24,9 @@ export async function buildOpenCodePromptParts({
   workingDirectory: string;
   abortSignal?: AbortSignal;
   fetchImplementation?: FetchImplementation;
-}): Promise<PromptPart[]> {
+}): Promise<PromptInput> {
   if (typeof input === "string") {
-    return [{ type: "text", text: input }];
+    return { text: input, files: [] };
   }
 
   const assetDirectory = join(workingDirectory, "assets");
@@ -37,10 +37,11 @@ export async function buildOpenCodePromptParts({
     throw new Error(`Prompt contains more than ${MAX_PROMPT_IMAGES} images`);
   }
 
-  const parts: PromptPart[] = [];
+  const text: string[] = [];
+  const files: NonNullable<SessionPromptInput["files"]>[number][] = [];
   for (const item of input) {
     if (item.type === "text") {
-      parts.push({ type: "text", text: item.text ?? "" });
+      text.push(item.text ?? "");
       continue;
     }
 
@@ -68,13 +69,12 @@ export async function buildOpenCodePromptParts({
     )}`;
     const filePath = join(assetDirectory, filename);
     await writeFile(filePath, data);
-    parts.push({
-      type: "file",
-      mime: mediaType,
-      filename,
-      url: pathToFileURL(filePath).href,
+    text.push(`[Attached image: ${filename}]`);
+    files.push({
+      name: filename,
+      uri: pathToFileURL(filePath).href,
     });
   }
 
-  return parts;
+  return { text: text.join("\n\n"), files };
 }

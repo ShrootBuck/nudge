@@ -3,17 +3,17 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { buildOpenCodePromptParts } from "../src/lib/ai/opencode-assets";
+import { buildOpenCodePromptInput } from "../src/lib/ai/opencode-assets";
 
 describe("OpenCode prompt assets", () => {
-  test("downloads Codeforces images into local OpenCode file parts", async () => {
+  test("downloads Codeforces images into V2 file attachments", async () => {
     const workingDirectory = await mkdtemp(
       join(tmpdir(), "nudge-opencode-assets-test-"),
     );
     const calls: string[] = [];
 
     try {
-      const parts = await buildOpenCodePromptParts({
+      const prompt = await buildOpenCodePromptInput({
         input: [
           { type: "text", text: "Inspect this diagram" },
           {
@@ -39,20 +39,15 @@ describe("OpenCode prompt assets", () => {
       });
 
       expect(calls).toEqual(["https://espresso.codeforces.com/example.png"]);
-      expect(parts[0]).toEqual({
-        type: "text",
-        text: "Inspect this diagram",
-      });
-      expect(parts[1]).toMatchObject({
-        type: "file",
-        mime: "image/png",
-        filename: "image-1.png",
-      });
-      if (parts[1]?.type !== "file") {
-        throw new Error("Expected an OpenCode file part");
-      }
+      expect(prompt.text).toBe(
+        "Inspect this diagram\n\n[Attached image: image-1.png]",
+      );
+      expect(prompt.files).toHaveLength(1);
+      expect(prompt.files?.[0]?.name).toBe("image-1.png");
+      const file = prompt.files?.[0];
+      if (!file) throw new Error("Expected an OpenCode file attachment");
       expect([
-        ...new Uint8Array(await readFile(fileURLToPath(parts[1].url))),
+        ...new Uint8Array(await readFile(fileURLToPath(file.uri))),
       ]).toEqual([137, 80, 78, 71]);
     } finally {
       await rm(workingDirectory, { recursive: true, force: true });
@@ -66,7 +61,7 @@ describe("OpenCode prompt assets", () => {
 
     try {
       await expect(
-        buildOpenCodePromptParts({
+        buildOpenCodePromptInput({
           input: [
             {
               type: "image_url",
@@ -92,7 +87,7 @@ describe("OpenCode prompt assets", () => {
 
     try {
       await expect(
-        buildOpenCodePromptParts({
+        buildOpenCodePromptInput({
           input: [
             {
               type: "image_url",

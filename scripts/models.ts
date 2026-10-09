@@ -1,17 +1,20 @@
-import type { Model } from "@opencode-ai/sdk/v2";
-import { createLocalOpenCodeInstance } from "../src/lib/ai/opencode";
+import type { ModelInfo } from "@opencode/client";
+import {
+  createLocalOpenCodeInstance,
+  listOpenCodeModels,
+} from "../src/lib/ai/opencode";
 
 const USAGE = `Usage:
   bun run models                      List connected providers
   bun run models <provider>           List a provider's models (✓ = works with Nudge)
   bun run models <provider>/<model>   Show a model's variants and a ready-to-paste config`;
 
-function missingNudgeRequirements(model: Model) {
+function missingNudgeRequirements(model: ModelInfo) {
   const missing: string[] = [];
-  if (!model.capabilities.toolcall) {
+  if (!model.capabilities.tools) {
     missing.push("tool calls");
   }
-  if (!model.capabilities.input.image) {
+  if (!model.capabilities.input.includes("image")) {
     missing.push("image input");
   }
   return missing;
@@ -28,18 +31,17 @@ async function main() {
 
   const { instance } = await createLocalOpenCodeInstance();
   try {
-    const result = await instance.client.provider.list(
-      { directory: process.cwd() },
-      { throwOnError: true },
-    );
-    const connected = new Set(result.data.connected);
-    const providers = result.data.all.filter((provider) =>
-      connected.has(provider.id),
+    const catalog = await listOpenCodeModels(instance.client);
+    const enabledModels = catalog.models.filter((model) => model.enabled);
+    const providers = catalog.providers.filter((provider) =>
+      enabledModels.some((model) => model.providerID === provider.id),
     );
 
     if (!query) {
       if (providers.length === 0) {
-        console.log("No providers connected. Run `opencode auth login`.");
+        console.log(
+          "No providers connected. Run `bun run opencode -- auth login`.",
+        );
         return;
       }
 
@@ -61,14 +63,14 @@ async function main() {
     const provider = providers.find((candidate) => candidate.id === providerId);
     if (!provider) {
       throw new Error(
-        `Provider "${providerId}" is not connected. Run \`bun run models\` for connected providers, or \`opencode auth login\` to add one.`,
+        `Provider "${providerId}" is not connected. Run \`bun run models\` for connected providers, or \`bun run opencode -- auth login\` to add one.`,
       );
     }
 
     if (!modelId) {
-      const models = Object.values(provider.models).sort((a, b) =>
-        a.id.localeCompare(b.id),
-      );
+      const models = enabledModels
+        .filter((model) => model.providerID === provider.id)
+        .sort((a, b) => a.id.localeCompare(b.id));
 
       console.log(
         `${provider.name} (${provider.id}) — ${models.length} models:\n`,
@@ -89,7 +91,9 @@ async function main() {
       return;
     }
 
-    const model = provider.models[modelId];
+    const model = enabledModels.find(
+      (model) => model.providerID === provider.id && model.id === modelId,
+    );
     if (!model) {
       throw new Error(
         `Model "${query}" not found. Run \`bun run models ${providerId}\` to list available models.`,
@@ -97,7 +101,7 @@ async function main() {
     }
 
     const missing = missingNudgeRequirements(model);
-    const variants = Object.keys(model.variants ?? {});
+    const variants = model.variants.map((variant) => variant.id);
 
     console.log(`${provider.id}/${model.id} — ${model.name}\n`);
     console.log(
@@ -122,7 +126,7 @@ async function main() {
       console.log('\nAdd "variant": "<one of the variants above>" if desired.');
     }
   } finally {
-    instance.server.close();
+    await instance.server.close();
   }
 }
 

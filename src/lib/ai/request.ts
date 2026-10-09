@@ -1,5 +1,7 @@
-import type { OutputFormat } from "@opencode-ai/sdk/v2";
 import type { GenerateOptions } from "./types";
+
+export const STRUCTURED_OUTPUT_TOOL = "nudge_submit_result";
+export const STRUCTURED_OUTPUT_RETRIES = 2;
 
 export function toStrictJsonSchema(
   schema: Record<string, unknown>,
@@ -56,16 +58,12 @@ export function toStrictJsonSchema(
   return copy;
 }
 
-export function buildStructuredOutputFormat(
-  options: GenerateOptions,
-): OutputFormat {
-  return {
-    type: "json_schema",
-    retryCount: 2,
-    schema: {
-      ...toStrictJsonSchema(options.outputSchema.schema),
-      title: options.outputSchema.name,
-      description: options.outputSchema.description,
-    },
-  };
+export function buildStructuredOutputSchema(options: GenerateOptions) {
+  return z.record(z.string(), z.json()).parse({
+    ...toStrictJsonSchema(options.outputSchema.schema),
+    title: options.outputSchema.name,
+    description: options.outputSchema.description,
+  });
 }
+
+import { z } from "zod";

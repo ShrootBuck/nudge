@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { buildStructuredOutputFormat } from "../src/lib/ai/request";
+import { buildStructuredOutputSchema } from "../src/lib/ai/request";
 import {
   problemOutputSchema,
   problemResultSchema,
@@ -110,12 +110,11 @@ describe("generated text storage validation", () => {
 });
 
 test("OpenCode receives NUL restrictions for every generated text field", () => {
-  const format = buildStructuredOutputFormat({
+  const schema = buildStructuredOutputSchema({
     systemPrompt: "system",
     userPrompt: "prompt",
     outputSchema: problemOutputSchema,
   });
-  if (format.type !== "json_schema") throw new Error("Expected JSON schema");
   const patterns: string[] = [];
   function visit(value: unknown) {
     if (!value || typeof value !== "object") return;
@@ -126,7 +125,7 @@ test("OpenCode receives NUL restrictions for every generated text field", () => 
     }
     for (const child of Object.values(node)) visit(child);
   }
-  visit(format.schema);
+  visit(schema);
   expect(patterns).toHaveLength(4);
   for (const pattern of patterns) {
     const regex = new RegExp(pattern);
