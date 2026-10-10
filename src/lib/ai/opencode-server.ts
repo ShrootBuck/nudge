@@ -7,6 +7,25 @@ const require = createRequire(import.meta.url);
 const SERVER_STARTUP_TIMEOUT_MS = 30_000;
 const SERVER_SHUTDOWN_TIMEOUT_MS = 5_000;
 
+export function createOpenCodeClient(
+  options: Pick<OpenCode.ClientOptions, "baseUrl" | "headers">,
+) {
+  // session.wait sends no bytes until generation finishes. Bun's default
+  // five-minute socket idle timeout would otherwise interrupt healthy runs.
+  // Keep the caller's AbortSignal as the deadline and cancellation mechanism.
+  const transport: typeof fetch = Object.assign(
+    (
+      input: Parameters<typeof fetch>[0],
+      init?: Parameters<typeof fetch>[1],
+    ) => {
+      const request = { ...init, timeout: false };
+      return fetch(input, request);
+    },
+    { preconnect: fetch.preconnect },
+  );
+  return OpenCode.make({ ...options, fetch: transport });
+}
+
 async function* readChunks(stream: ReadableStream<Uint8Array>) {
   const reader = stream.getReader();
   try {
@@ -134,7 +153,7 @@ export async function startOpenCodeServer({
       executablePath,
       expectedVersion: metadata.version,
       environment: serverEnvironment,
-      client: OpenCode.make({ baseUrl: url, headers }),
+      client: createOpenCodeClient({ baseUrl: url, headers }),
       server: { url, close },
     };
   } catch (error) {

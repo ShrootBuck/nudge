@@ -43,7 +43,7 @@ All content is generated locally through OpenCode, then stored in Postgres and s
 
 Generation is local-only, using the project-pinned OpenCode V2 CLI, client, and plugin packages (2.0.26). Trigger.dev does not run OpenCode and there is no encoded cloud credential path. The generation agent allows tools automatically, including shell commands and file edits. Questions are disabled: the tool is removed and native permission rules deny it. Generation can run on macOS or Linux. Each run uses a temporary working directory and a one-hour timeout.
 
-Nudge starts its own authenticated server on a random loopback port and shuts it down when the command finishes. It does not attach to or replace your personal OpenCode background service. Use `bun run opencode -- <command>` for the bundled CLI; your global `opencode` installation can have a different version.
+Nudge starts its own authenticated server on a random loopback port and shuts it down when the command finishes. It does not attach to or replace your personal OpenCode background service. The local client disables Bun's five-minute socket idle timeout so a quiet session wait can last for the full one-hour generation deadline; cancellation still interrupts it. Use `bun run opencode -- <command>` for the bundled CLI; your global `opencode` installation can have a different version.
 
 1. Existing local provider credentials are reused. Check them with `bun run opencode -- auth list`. If needed, use `bun run opencode -- auth login` and select the provider/account you want to use. `bun run models` confirms which providers are available to Nudge.
 2. Make sure `DATABASE_URL` points at the Nudge database.
