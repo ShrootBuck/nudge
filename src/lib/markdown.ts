@@ -8,17 +8,20 @@ import python from "@shikijs/langs/python";
 import oneDarkPro from "@shikijs/themes/one-dark-pro";
 import oneLight from "@shikijs/themes/one-light";
 
-import { inlineMathFix } from "./markdown-math";
+import { mathParserFixes } from "./markdown-math";
 
 // Generated Markdown is untrusted. Comark enables raw HTML and custom
 // components by default, so opt in only to the syntax Nudge renders.
 export const markdownOptions = {
   registerDefaultPlugins: false,
+  // These are completed documents, not streaming fragments. Comark's
+  // auto-closer can append stray $$ to valid mixed-line math delimiters.
+  autoClose: false,
 } as const;
 
 export const markdownPlugins = [
   math(),
-  inlineMathFix,
+  mathParserFixes,
   shiki({
     registerDefaultLanguages: false,
     registerDefaultThemes: false,
