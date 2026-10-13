@@ -91,7 +91,7 @@ export const problemOutputSchema: OutputSchema = {
         type: "string",
         enum: ["success", "unsolvable"],
         description:
-          "Set to 'success' when the supplied statement defines a solvable programming problem. Set to 'unsolvable' only if the statement is fundamentally incomplete, contradictory, or depends on an inaccessible required resource.",
+          "Set to 'success' when the retrieved statement defines a solvable programming problem. Set to 'unsolvable' only if the statement is fundamentally incomplete, contradictory, remains inaccessible after retrieval attempts, or depends on an inaccessible required resource. PDF format or a missing editorial alone is not a blocker.",
       },
       reason: {
         anyOf: [

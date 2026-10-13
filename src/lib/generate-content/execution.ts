@@ -14,10 +14,6 @@ import { prisma } from "../prisma";
 import { pipelineStateData, problemUpdateData } from "../problem-pipeline-db";
 import { problemOutputSchema, problemResultSchema } from "./content-schema";
 import { type GenerationAuditInfo, saveProblemContent } from "./persistence";
-import {
-  fetchProblemStatement,
-  ProblemStatementUnavailableError,
-} from "./problem-statement";
 import { buildPrompt, GENERATION_SYSTEM_PROMPT } from "./prompt";
 
 export type StructuredResponseGenerator = (
@@ -133,28 +129,6 @@ export async function markClaimedProblemFailed({
   }
 }
 
-async function releaseClaimedProblemAfterStatementFailure({
-  problem,
-  reason,
-}: {
-  problem: Pick<AutomaticGenerationProblem, "id" | "contestId" | "index">;
-  reason: string;
-}) {
-  const updated = await prisma.problem.updateMany({
-    where: { id: problem.id, runState: "RUNNING" },
-    data: problemUpdateData({
-      ...pipelineStateData("IDLE"),
-      generationAttempts: { decrement: 1 },
-      generationStartedAt: null,
-      lastGenerationError: reason,
-    }),
-  });
-
-  if (updated.count > 0) {
-    await revalidateProblem(problem);
-  }
-}
-
 export async function executeProblemGeneration({
   problem,
   generate,
@@ -171,26 +145,6 @@ export async function executeProblemGeneration({
   let transcriptUrl: string | null = null;
 
   try {
-    const statement = await fetchProblemStatement(
-      problem.contestId,
-      problem.index,
-    );
-    const textPrompt = buildPrompt(
-      problem,
-      statement.html,
-      statement.sourceStatuses,
-    );
-    const userPrompt =
-      statement.images.length > 0
-        ? [
-            { type: "text" as const, text: textPrompt },
-            ...statement.images.map((url) => ({
-              type: "image_url" as const,
-              image_url: { url },
-            })),
-          ]
-        : textPrompt;
-
     log.info(`Running generation for ${label}`);
 
     const generationStartedAt = Date.now();
@@ -210,7 +164,7 @@ export async function executeProblemGeneration({
     try {
       response = await generate({
         systemPrompt: GENERATION_SYSTEM_PROMPT,
-        userPrompt,
+        userPrompt: buildPrompt(problem),
         outputSchema: problemOutputSchema,
         abortSignal,
       });
@@ -291,23 +245,15 @@ export async function executeProblemGeneration({
 
     return { processed: 1, outcome: "succeeded" };
   } catch (error) {
-    const statementUnavailable =
-      error instanceof ProblemStatementUnavailableError;
-    const reason = statementUnavailable
-      ? `Statement fetch failed for ${label}: ${toErrorMessage(error)}`
-      : `Generation failed for ${label}: ${toErrorMessage(error)}`;
+    const reason = `Generation failed for ${label}: ${toErrorMessage(error)}`;
     log.error(reason);
 
-    if (statementUnavailable) {
-      await releaseClaimedProblemAfterStatementFailure({ problem, reason });
-    } else {
-      await markClaimedProblemFailed({
-        problem,
-        reason,
-        response,
-        transcriptUrl,
-      });
-    }
+    await markClaimedProblemFailed({
+      problem,
+      reason,
+      response,
+      transcriptUrl,
+    });
 
     return { processed: 0, outcome: "failed", error: reason };
   }

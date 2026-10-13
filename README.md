@@ -88,6 +88,8 @@ bun run opencode:next -- --dry-run
 
 Each real run claims one eligible problem and creates an isolated OpenCode session. A local V2 plugin exposes `nudge_submit_result`, which validates the result against Nudge's JSON schema. Plain JSON text is not accepted as a submission; if the model finishes without submitting, Nudge sends at most two reminders before failing. The existing content validation still runs before persistence.
 
+The agent receives problem metadata and both Codeforces problem URLs, then retrieves the complete statement and researches solutions with its own tools. This includes PDF statements and relevant diagrams; Nudge does not scrape HTML or prefetch statement images/editorial pages before starting the session. Retrieval failures and fallback attempts appear in the generation transcript. A PDF or missing editorial alone is not an unsolvable result; the agent must identify a concrete statement/resource blocker after trying alternatives.
+
 Nudge persists the generated hints/editorial/solution, records whole-session token usage (including tool turns and cached tokens), mirrors the exact `opencode session export` bytes into `.opencode-runs`, uploads that file to the public Blob store, and prints both transcript locations. A session is deleted only after its transcript has been mirrored; export failures leave it available in OpenCode and report a warning. Ctrl-C, SIGTERM, and the one-hour timeout interrupt the V2 session before cleanup. OpenCode reads provider credentials from its normal local credential store; Nudge never copies them into project configuration.
 
 ## Switching models or providers

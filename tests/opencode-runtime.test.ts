@@ -175,6 +175,9 @@ describe("bundled OpenCode V2 runtime", () => {
       expect(
         requests[0].tools?.some((tool) => tool.function.name === "question"),
       ).toBe(false);
+      expect(requests[0].tools?.map((tool) => tool.function.name)).toEqual(
+        expect.arrayContaining(["webfetch", "websearch", "shell", "read"]),
+      );
       await expect(
         instance.client.session.get({ sessionID: transcript.info.id }),
       ).rejects.toThrow("not found");
