@@ -3,6 +3,7 @@ import type { GenerateOptions, StructuredResponse } from "../ai";
 import { recordGenerationUsage } from "../ai/usage";
 import { safeRevalidateTags } from "../cache-revalidate";
 import { PROBLEM_LIST_TAG, problemTag } from "../cache-tags";
+import { formatProblemId } from "../codeforces-problem";
 import { discordLog } from "../discord-log";
 import { SITE_URL } from "../env";
 import type { AutomaticGenerationProblem } from "../generation-queue";
@@ -37,7 +38,7 @@ function toErrorMessage(error: unknown) {
 export function toProblemLabel(
   problem: Pick<AutomaticGenerationProblem, "contestId" | "index">,
 ) {
-  return `${problem.contestId}${problem.index}`;
+  return formatProblemId(problem.contestId, problem.index);
 }
 
 function toGenerationAuditInfo(

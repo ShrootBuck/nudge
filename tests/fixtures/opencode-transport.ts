@@ -1,8 +1,24 @@
 import { OpenCode } from "@opencode/client";
 import { createOpenCodeClient } from "../../src/lib/ai/opencode-server";
 
-// Run in a separate Bun process so its socket idle timeout can be shortened
-// without changing other tests. The server models V2's silent session.wait.
+// Model an idle timeout at the fetch boundary in an isolated process. Bun's
+// environment-variable handling and coarse socket timer vary across versions;
+// the contract is that Nudge disables idle timeouts but preserves AbortSignals.
+const nativeFetch = globalThis.fetch;
+globalThis.fetch = Object.assign(
+  (input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) => {
+    const disablesIdleTimeout =
+      (init as { timeout?: boolean } | undefined)?.timeout === false;
+    const signal = disablesIdleTimeout
+      ? init?.signal
+      : AbortSignal.any([
+          AbortSignal.timeout(100),
+          ...(init?.signal ? [init.signal] : []),
+        ]);
+    return nativeFetch(input, { ...init, signal });
+  },
+  { preconnect: nativeFetch.preconnect },
+);
 const authorization = "Basic local-transport-test";
 const server = Bun.serve({
   hostname: "127.0.0.1",
@@ -19,9 +35,7 @@ const server = Bun.serve({
     ) {
       return new Response(null, { status: 404 });
     }
-    // Bun's socket timer has a coarse tick, so allow several seconds beyond
-    // the one-second idle timeout configured by the parent test.
-    await Bun.sleep(6_500);
+    await Bun.sleep(300);
     return new Response(null, { status: 204 });
   },
 });

@@ -1,5 +1,6 @@
 import { revalidateTag } from "next/cache";
 import { CURRENT_MODEL_TAG } from "./cache-tags";
+import { parseProblemRouteParams } from "./codeforces-problem";
 import { getOptionalEnv } from "./env";
 import { fetchWithTimeout, readResponseTextWithLimit } from "./http";
 
@@ -39,11 +40,12 @@ function isMissingStaticGenerationStore(error: unknown) {
 }
 
 export function isSupportedCacheTag(tag: unknown): tag is string {
+  if (tag === "problem-list" || tag === CURRENT_MODEL_TAG) return true;
+  if (typeof tag !== "string") return false;
+  const match = tag.match(/^problem:(\d{1,10}):([A-Z0-9]{1,10})$/);
   return (
-    tag === "problem-list" ||
-    tag === CURRENT_MODEL_TAG ||
-    (typeof tag === "string" &&
-      /^problem:\d{1,10}:[A-Z][A-Z0-9]{0,9}$/.test(tag))
+    match !== null &&
+    parseProblemRouteParams({ contestId: match[1], index: match[2] }) !== null
   );
 }
 

@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 export const metadata: Metadata = {
-  title: "404 Not Found | Nudge",
+  title: "404 Not Found",
   description: "The page you're looking for doesn't exist.",
 };
 

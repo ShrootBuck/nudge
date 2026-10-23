@@ -4,6 +4,7 @@ import {
   getCachedProblemSearchResults,
   getRandomProblemPool,
 } from "@/lib/problem-read-cache";
+import { normalizeProblemSearch } from "@/lib/problem-search";
 
 export async function getRandomProblem() {
   const pool = await getRandomProblemPool();
@@ -15,6 +16,6 @@ export async function getRandomProblem() {
 export async function searchProblems(query: string) {
   if (typeof query !== "string") return [];
 
-  const normalizedQuery = query.trim().toLowerCase().slice(0, 100);
+  const normalizedQuery = normalizeProblemSearch(query).toLowerCase();
   return getCachedProblemSearchResults(normalizedQuery);
 }

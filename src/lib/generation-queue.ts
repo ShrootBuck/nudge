@@ -51,7 +51,7 @@ export function automaticGenerationProblemWhere(): Prisma.ProblemWhereInput {
   return {
     generationAttempts: { lt: AUTOMATIC_GENERATION_MAX_ATTEMPTS },
     runState: { in: ["IDLE", "FAILED"] },
-    reviewStatus: { not: "UNSOLVABLE" },
+    reviewStatus: { notIn: ["UNSOLVABLE", "INCORRECT"] },
   };
 }
 

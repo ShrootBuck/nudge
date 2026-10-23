@@ -2,6 +2,7 @@ import { cacheLife, cacheTag } from "next/cache";
 import { PROBLEM_LIST_TAG, problemTag } from "@/lib/cache-tags";
 import { prisma } from "@/lib/prisma";
 import { completedContentWhere, problemWhere } from "@/lib/problem-pipeline-db";
+import { problemSearchWhere } from "@/lib/problem-search";
 import type { ProblemSocialData } from "@/lib/problem-social";
 
 function listableWhere() {
@@ -101,32 +102,14 @@ export async function getCachedProblemSearchResults(query: string) {
 
   if (!query || query.length < 1) return [];
 
-  const completedWhere = listableWhere();
-  const contestMatch = query.match(/^(\d+)([A-Za-z]\d?)?$/);
-  const parsedContestId = contestMatch ? Number(contestMatch[1]) : null;
-  const contestIdIsValid =
-    parsedContestId !== null &&
-    Number.isSafeInteger(parsedContestId) &&
-    parsedContestId > 0 &&
-    parsedContestId <= 2_147_483_647;
-  const whereClause =
-    contestMatch && contestIdIsValid
-      ? {
-          ...completedWhere,
-          contestId: parsedContestId,
-          ...(contestMatch[2] ? { index: contestMatch[2].toUpperCase() } : {}),
-        }
-      : contestMatch
-        ? { ...completedWhere, contestId: 0 }
-        : {
-            ...completedWhere,
-            name: { contains: query, mode: "insensitive" as const },
-          };
-
   return prisma.problem.findMany({
-    where: whereClause,
+    where: { AND: [listableWhere(), problemSearchWhere(query)] },
     take: 10,
-    orderBy: [{ reviewStatus: "desc" }, { updatedAt: "desc" }],
+    orderBy: [
+      { reviewStatus: "desc" },
+      { contestId: "desc" },
+      { index: "asc" },
+    ],
     select: {
       id: true,
       contestId: true,

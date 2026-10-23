@@ -49,6 +49,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Slider } from "@/components/ui/slider";
+import { MAX_PROBLEM_INPUT_LENGTH } from "@/lib/codeforces-problem";
 import { cn } from "@/lib/utils";
 import {
   DEFAULT_PROBLEM_SORT,
@@ -311,7 +312,7 @@ export function ProblemFilters({
         min={MIN_RATING}
         max={MAX_RATING}
         step={RATING_STEP}
-        minStepsBetweenValues={1}
+        minStepsBetweenValues={0}
         thumbLabels={["Minimum rating", "Maximum rating"]}
         value={sliderValue}
         onValueChange={(value) => {
@@ -380,11 +381,12 @@ export function ProblemFilters({
         <div className="min-w-0 flex-1">
           <InputGroup className="h-11 rounded-xl border-border/60 bg-background/80 shadow-sm">
             <label htmlFor="problem-search" className="sr-only">
-              Search problems by name or contest ID
+              Search problems by name, ID, or Codeforces URL
             </label>
             <InputGroupInput
               id="problem-search"
-              placeholder="Search by name or contest ID..."
+              placeholder="Problem ID, name, or Codeforces URL..."
+              maxLength={MAX_PROBLEM_INPUT_LENGTH}
               value={searchValue}
               onChange={(e) => handleSearch(e.target.value)}
               className="text-base placeholder:text-muted-foreground md:text-sm"

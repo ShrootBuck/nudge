@@ -2,31 +2,47 @@
 
 import { Dices } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useTransition } from "react";
+import { useState, useTransition } from "react";
+import { Button } from "@/components/ui/button";
 import { getRandomProblem } from "./actions";
 
 export function LuckyButton() {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
 
   function handleClick() {
+    setError(null);
     startTransition(async () => {
-      const result = await getRandomProblem();
-      if (result) {
-        router.push(`/problem/${result.contestId}/${result.index}`);
+      try {
+        const result = await getRandomProblem();
+        if (result) {
+          router.push(`/problem/${result.contestId}/${result.index}`);
+        } else {
+          setError("No problems are ready yet. Check back soon.");
+        }
+      } catch {
+        setError("Couldn't pick a problem. Please try again.");
       }
     });
   }
 
   return (
-    <button
-      type="button"
-      onClick={handleClick}
-      disabled={isPending}
-      className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-border/70 bg-background/80 px-4 py-2 text-sm font-medium text-muted-foreground shadow-sm transition hover:-translate-y-0.5 hover:border-foreground/15 hover:text-foreground hover:shadow-md disabled:pointer-events-none disabled:opacity-50"
-    >
-      <Dices className="size-4" />
-      {isPending ? "Finding..." : "I'm Feeling Lucky"}
-    </button>
+    <div className="flex flex-col items-start gap-2">
+      <Button
+        type="button"
+        variant="outline"
+        size="lg"
+        onClick={handleClick}
+        disabled={isPending}
+        className="rounded-full"
+      >
+        <Dices data-icon="inline-start" />
+        {isPending ? "Finding..." : "I'm Feeling Lucky"}
+      </Button>
+      {error && (
+        <output className="text-sm text-muted-foreground">{error}</output>
+      )}
+    </div>
   );
 }

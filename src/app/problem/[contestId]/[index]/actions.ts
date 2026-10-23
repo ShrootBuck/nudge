@@ -3,6 +3,7 @@
 import type { RunState } from "@prisma/client";
 import { updateTag } from "next/cache";
 import { PROBLEM_LIST_TAG, problemTag } from "@/lib/cache-tags";
+import { formatProblemId } from "@/lib/codeforces-problem";
 import { sendAdminLog } from "@/lib/discord";
 import { SITE_URL, verifyAdminPassword } from "@/lib/env";
 import { deleteGenerationTranscript } from "@/lib/generation-transcript";
@@ -91,7 +92,7 @@ export async function setProblemReviewStatus(
   updateTag(PROBLEM_LIST_TAG);
   updateTag(problemTag(problem.contestId, problem.index));
 
-  const tag = `${problem.contestId}${problem.index}`;
+  const tag = formatProblemId(problem.contestId, problem.index);
   const link = `${SITE_URL}/problem/${problem.contestId}/${problem.index}`;
   const logConfig = {
     VERIFIED: `✅ Verified **${tag}**`,
@@ -201,7 +202,7 @@ export async function regenerateProblemContent(
   updateTag(PROBLEM_LIST_TAG);
   updateTag(problemTag(problem.contestId, problem.index));
 
-  const tag = `${problem.contestId}${problem.index}`;
+  const tag = formatProblemId(problem.contestId, problem.index);
   const link = `${SITE_URL}/problem/${problem.contestId}/${problem.index}`;
   const reportSummary =
     resolvedReportCount > 0

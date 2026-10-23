@@ -172,5 +172,5 @@ export default async function ProblemPage({ params }: ProblemPageProps) {
 
   if (!problem) notFound();
 
-  return <ProblemContentBody problem={problem} />;
+  return <ProblemContentBody key={problem.id} problem={problem} />;
 }

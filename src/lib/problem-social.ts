@@ -1,8 +1,10 @@
 import type { ReviewStatus, RunState } from "@prisma/client";
 
 const MAX_DESCRIPTION_LENGTH = 160;
-const MAX_POSTGRES_INT = 2_147_483_647;
-const PROBLEM_INDEX_PATTERN = /^[A-Z][A-Z0-9]{0,9}$/;
+
+import { formatProblemId } from "./codeforces-problem";
+
+export { formatProblemId, parseProblemRouteParams } from "./codeforces-problem";
 
 export type ProblemSocialData = {
   contestId: number;
@@ -16,34 +18,6 @@ export type ProblemSocialData = {
   hasEditorial: boolean;
   hasSolution: boolean;
 };
-
-export function parseProblemRouteParams({
-  contestId,
-  index,
-}: {
-  contestId: string;
-  index: string;
-}) {
-  if (!/^\d+$/.test(contestId)) return null;
-
-  const parsedContestId = Number(contestId);
-  const normalizedIndex = index.toUpperCase();
-
-  if (
-    !Number.isSafeInteger(parsedContestId) ||
-    parsedContestId <= 0 ||
-    parsedContestId > MAX_POSTGRES_INT ||
-    !PROBLEM_INDEX_PATTERN.test(normalizedIndex)
-  ) {
-    return null;
-  }
-
-  return { contestId: parsedContestId, index: normalizedIndex };
-}
-
-export function formatProblemId(contestId: number, index: string) {
-  return `${contestId}${index}`;
-}
 
 export function problemSocialTitle(problem: ProblemSocialData) {
   return `${formatProblemId(problem.contestId, problem.index)}: ${problem.name}`;

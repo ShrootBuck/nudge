@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { fileURLToPath } from "node:url";
 
-test("OpenCode waits outlive Bun's idle timeout but still honor cancellation and deadlines", async () => {
+test("OpenCode disables transport idle timeouts but still honors cancellation and deadlines", async () => {
   const child = Bun.spawn(
     [
       process.execPath,
@@ -10,7 +10,7 @@ test("OpenCode waits outlive Bun's idle timeout but still honor cancellation and
       ),
     ],
     {
-      env: { PATH: process.env.PATH, BUN_CONFIG_HTTP_IDLE_TIMEOUT: "1" },
+      env: { PATH: process.env.PATH },
       stdout: "pipe",
       stderr: "pipe",
       timeout: 20_000,
@@ -26,7 +26,7 @@ test("OpenCode waits outlive Bun's idle timeout but still honor cancellation and
   const [control, completed, cancelled, deadline] = JSON.parse(stdout);
   expect(control).toMatchObject({
     status: "rejected",
-    message: expect.stringContaining("Transport: The operation timed out."),
+    causeName: "TimeoutError",
   });
   expect(completed).toEqual({ status: "fulfilled" });
   expect(cancelled).toMatchObject({

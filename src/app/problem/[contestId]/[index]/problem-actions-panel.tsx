@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import { useId, useRef, useState, useTransition } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { formatProblemId } from "@/lib/codeforces-problem";
 import { cfProblemUrl, cn, ratingTone } from "@/lib/utils";
 import {
   regenerateProblemContent,
@@ -46,8 +47,7 @@ export function ProblemMetaRow({
         rel="noopener noreferrer"
         className="inline-flex items-center rounded-full border border-border/70 bg-background/80 px-3 py-1.5 font-mono text-sm text-muted-foreground shadow-sm transition hover:text-foreground"
       >
-        {problem.contestId}
-        {problem.index}
+        {formatProblemId(problem.contestId, problem.index)}
       </a>
 
       <span
@@ -124,22 +124,21 @@ export function ReportSection({ problemId }: { problemId: string }) {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (isPending) return;
     setError(null);
 
-    startTransition(() => {
-      void (async () => {
-        try {
-          const result = await reportProblem(problemId, reason);
-          if (result.success) {
-            setReason("");
-            setSubmitted(true);
-          } else {
-            setError(result.error);
-          }
-        } catch {
-          setError("Failed to submit report");
+    startTransition(async () => {
+      try {
+        const result = await reportProblem(problemId, reason);
+        if (result.success) {
+          setReason("");
+          setSubmitted(true);
+        } else {
+          setError(result.error);
         }
-      })();
+      } catch {
+        setError("Failed to submit report");
+      }
     });
   }
 
@@ -275,34 +274,39 @@ export function ReviewSection({
     router.refresh();
   }
 
+  function toggleReview() {
+    if (open) resetPassword();
+    setOpen((value) => !value);
+  }
+
   function handleReview(nextStatus: ReviewAction) {
+    if (isPending) return;
     setError(null);
     setPendingAction(nextStatus);
 
-    startTransition(() => {
-      void (async () => {
-        try {
-          const result = await setProblemReviewStatus(
-            problemId,
-            passwordRef.current,
-            nextStatus,
-          );
+    startTransition(async () => {
+      try {
+        const result = await setProblemReviewStatus(
+          problemId,
+          passwordRef.current,
+          nextStatus,
+        );
 
-          if (result.success) {
-            closeAfterSuccess();
-          } else {
-            setError(result.error);
-          }
-        } catch {
-          setError("Review update failed");
-        } finally {
-          setPendingAction(null);
+        if (result.success) {
+          closeAfterSuccess();
+        } else {
+          setError(result.error);
         }
-      })();
+      } catch {
+        setError("Review update failed");
+      } finally {
+        setPendingAction(null);
+      }
     });
   }
 
   function handleRegenerate() {
+    if (isPending) return;
     if (
       !window.confirm(
         "Regenerate this problem? The current hints, editorial, solution, and transcript will be deleted.",
@@ -314,25 +318,23 @@ export function ReviewSection({
     setError(null);
     setPendingAction("REGENERATE");
 
-    startTransition(() => {
-      void (async () => {
-        try {
-          const result = await regenerateProblemContent(
-            problemId,
-            passwordRef.current,
-          );
+    startTransition(async () => {
+      try {
+        const result = await regenerateProblemContent(
+          problemId,
+          passwordRef.current,
+        );
 
-          if (result.success) {
-            closeAfterSuccess();
-          } else {
-            setError(result.error);
-          }
-        } catch {
-          setError("Regenerate failed");
-        } finally {
-          setPendingAction(null);
+        if (result.success) {
+          closeAfterSuccess();
+        } else {
+          setError(result.error);
         }
-      })();
+      } catch {
+        setError("Regenerate failed");
+      } finally {
+        setPendingAction(null);
+      }
     });
   }
 
@@ -347,7 +349,7 @@ export function ReviewSection({
     >
       <button
         type="button"
-        onClick={() => setOpen((value) => !value)}
+        onClick={toggleReview}
         aria-expanded={open}
         aria-controls={panelId}
         className="flex w-full cursor-pointer items-center justify-between gap-3 px-4 py-3.5 text-left sm:gap-4 sm:px-6 sm:py-4"
@@ -396,6 +398,8 @@ export function ReviewSection({
               <Input
                 id="review-password"
                 type="password"
+                disabled={isPending}
+                autoComplete="current-password"
                 ref={passwordInputRef}
                 defaultValue=""
                 onChange={(e) => {

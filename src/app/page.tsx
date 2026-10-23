@@ -11,9 +11,14 @@ import { cacheLife, cacheTag } from "next/cache";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { PROBLEM_LIST_TAG } from "@/lib/cache-tags";
+import { formatProblemId } from "@/lib/codeforces-problem";
 import { prisma } from "@/lib/prisma";
 import { completedContentWhere, problemWhere } from "@/lib/problem-pipeline-db";
 import { getAvailableProblemTags } from "@/lib/problem-read-cache";
+import {
+  normalizeProblemSearch,
+  problemSearchWhere,
+} from "@/lib/problem-search";
 import { cn, ratingTone } from "@/lib/utils";
 import { LuckyButton } from "./lucky-button";
 import { ProblemFilters } from "./problem-filters";
@@ -25,7 +30,6 @@ import {
 import { MAX_RATING, MIN_RATING } from "./rating-constants";
 
 const PAGE_SIZE = 10;
-const MAX_SEARCH_QUERY_LENGTH = 100;
 const MAX_TAG_FILTERS = 10;
 const MAX_TAG_LENGTH = 100;
 
@@ -158,10 +162,6 @@ function countActiveFilters({
   return count;
 }
 
-function formatProblemId(contestId: number, index: string) {
-  return `${contestId}${index}`;
-}
-
 function buildProblemFilters({
   query,
   tags,
@@ -175,25 +175,8 @@ function buildProblemFilters({
 }) {
   const where: Prisma.ProblemWhereInput = {
     ...listableWhere(),
+    ...problemSearchWhere(query),
   };
-
-  if (query) {
-    const contestMatch = query.match(/^(\d+)([A-Za-z]\d?)?$/);
-    if (contestMatch) {
-      const contestId = Number(contestMatch[1]);
-      where.contestId =
-        Number.isSafeInteger(contestId) &&
-        contestId > 0 &&
-        contestId <= 2_147_483_647
-          ? contestId
-          : 0;
-      if (where.contestId !== 0 && contestMatch[2]) {
-        where.index = contestMatch[2].toUpperCase();
-      }
-    } else {
-      where.name = { contains: query, mode: "insensitive" };
-    }
-  }
 
   if (minRating !== MIN_RATING || maxRating !== MAX_RATING) {
     where.rating = { gte: minRating, lte: maxRating };
@@ -285,9 +268,7 @@ export default async function Home({
 
   const page = parsePageParam(params.page);
   const query =
-    typeof params.q === "string"
-      ? params.q.trim().slice(0, MAX_SEARCH_QUERY_LENGTH)
-      : "";
+    typeof params.q === "string" ? normalizeProblemSearch(params.q) : "";
   const tags = parseTagsParam(params.tags ?? params.tag);
   let minRating = parseRatingBound(params.minRating, MIN_RATING);
   let maxRating = parseRatingBound(params.maxRating, MAX_RATING);

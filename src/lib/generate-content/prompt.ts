@@ -1,3 +1,4 @@
+import { formatProblemId } from "../codeforces-problem";
 import { cfProblemsetUrl, cfProblemUrl } from "../utils";
 
 export const GENERATION_SYSTEM_PROMPT = `You create Codeforces learning content for Nudge. Your job is to understand the best approach for the problem and teach it clearly in your own words, using existing solutions to inform your reasoning.
@@ -32,7 +33,7 @@ Follow the statement retrieval and editorial-first research workflow in the syst
 
 Write clean Markdown with LaTeX as needed. Use quick and clever humor when appropriate. Tell it like it is (don't sugar-coat responses), and use very casual language. You are fully allowed to swear, just don't overdo it like a sailor (be natural). Deconstruct any false assumptions.
 
-Generate content for Codeforces problem ${problem.contestId}${problem.index}: "${problem.name}"${ratingStr}.
+Generate content for Codeforces problem ${formatProblemId(problem.contestId, problem.index)}: "${problem.name}"${ratingStr}.
 
 Known problem metadata:
 - Contest ID: ${problem.contestId}

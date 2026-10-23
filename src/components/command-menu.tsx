@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useRef, useState } from "react";
 import { searchProblems } from "@/app/actions";
 import {
   Command,
@@ -12,7 +13,11 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { ratingTone } from "@/lib/utils";
+import {
+  formatProblemId,
+  MAX_PROBLEM_INPUT_LENGTH,
+} from "@/lib/codeforces-problem";
+import { cn, ratingTone } from "@/lib/utils";
 
 type SearchResult = {
   id: string;
@@ -37,7 +42,6 @@ export function CommandMenu({
   const [results, setResults] = useState<SearchResult[]>([]);
   const [status, setStatus] = useState<SearchStatus>("idle");
   const requestSequence = useRef(0);
-  const [, startTransition] = useTransition();
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -54,7 +58,8 @@ export function CommandMenu({
     const normalizedQuery = query.trim();
     const requestId = ++requestSequence.current;
 
-    if (normalizedQuery.length === 0) {
+    setResults([]);
+    if (!open || normalizedQuery.length === 0) {
       setResults([]);
       setStatus("idle");
       return;
@@ -65,10 +70,8 @@ export function CommandMenu({
       void searchProblems(normalizedQuery)
         .then((data) => {
           if (requestSequence.current !== requestId) return;
-          startTransition(() => {
-            setResults(data);
-            setStatus("success");
-          });
+          setResults(data);
+          setStatus("success");
         })
         .catch(() => {
           if (requestSequence.current !== requestId) return;
@@ -77,8 +80,11 @@ export function CommandMenu({
         });
     }, 200);
 
-    return () => clearTimeout(delayDebounceFn);
-  }, [query]);
+    return () => {
+      clearTimeout(delayDebounceFn);
+      requestSequence.current++;
+    };
+  }, [query, open]);
 
   const onSelect = (problem: SearchResult) => {
     setOpen(false);
@@ -91,22 +97,32 @@ export function CommandMenu({
       open={open}
       onOpenChange={setOpen}
       title="Search problems"
-      description="Search completed Codeforces problems by ID or name."
+      description="Search available Codeforces problems by ID, name, or problem URL."
       showCloseButton
     >
       <Command shouldFilter={false}>
         <CommandInput
-          placeholder="Search by ID (e.g. 1500A) or name..."
+          placeholder="Problem ID, name, or Codeforces URL..."
+          maxLength={MAX_PROBLEM_INPUT_LENGTH}
           value={query}
           onValueChange={setQuery}
         />
-        <CommandList>
-          <CommandEmpty
-            className={status === "error" ? "text-destructive" : ""}
-          >
+        <CommandList aria-busy={status === "loading"}>
+          <CommandEmpty aria-live="polite">
             {status === "idle" && "Start typing to search."}
             {status === "loading" && "Searching..."}
-            {status === "success" && "No problems found."}
+            {status === "success" && (
+              <div className="flex flex-col items-center gap-2">
+                <span>No completed problems found.</span>
+                <Link
+                  href="/request"
+                  onClick={() => setOpen(false)}
+                  className="underline underline-offset-4"
+                >
+                  Request a problem
+                </Link>
+              </div>
+            )}
             {status === "error" && "Search failed. Try again."}
           </CommandEmpty>
           {results.length > 0 && (
@@ -114,21 +130,21 @@ export function CommandMenu({
               {results.map((problem) => (
                 <CommandItem
                   key={problem.id}
-                  value={`${problem.contestId}${problem.index} ${problem.name}`}
-                  aria-label={`${problem.contestId}${problem.index}: ${problem.name}`}
+                  value={`${formatProblemId(problem.contestId, problem.index)} ${problem.name}`}
+                  aria-label={`${formatProblemId(problem.contestId, problem.index)}: ${problem.name}`}
                   onSelect={() => onSelect(problem)}
                 >
                   <div className="flex min-w-0 flex-1 items-center gap-2">
                     <span className="shrink-0 font-mono text-muted-foreground">
-                      {problem.contestId}
-                      {problem.index}
+                      {formatProblemId(problem.contestId, problem.index)}
                     </span>
                     <span className="min-w-0 truncate">{problem.name}</span>
                     {problem.rating !== null && (
                       <span
-                        className={`ml-auto inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 font-mono text-[10px] font-semibold ${ratingTone(
-                          problem.rating,
-                        )}`}
+                        className={cn(
+                          "ml-auto inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 font-mono text-[10px] font-semibold",
+                          ratingTone(problem.rating),
+                        )}
                       >
                         {problem.rating}
                       </span>
