@@ -1,3 +1,4 @@
+import { cacheLife } from "next/cache";
 import { ImageResponse } from "next/og";
 import { OG_COLORS, OgBrand, OgFrame } from "@/components/og-image";
 import { OG_IMAGE_SIZE } from "@/lib/site-metadata";
@@ -6,8 +7,11 @@ export const alt = "Nudge - progressive Codeforces hints without the spoilers";
 export const size = OG_IMAGE_SIZE;
 export const contentType = "image/png";
 
-export default function OpenGraphImage() {
-  return new ImageResponse(
+async function getSiteImage() {
+  "use cache: remote";
+
+  cacheLife("max");
+  const image = new ImageResponse(
     <OgFrame>
       <div
         style={{
@@ -104,4 +108,15 @@ export default function OpenGraphImage() {
     </OgFrame>,
     size,
   );
+
+  return image.arrayBuffer();
+}
+
+export default async function OpenGraphImage() {
+  return new Response(await getSiteImage(), {
+    headers: {
+      "Content-Type": contentType,
+      "Cache-Control": "public, max-age=0, must-revalidate",
+    },
+  });
 }

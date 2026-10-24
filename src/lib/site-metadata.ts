@@ -5,8 +5,8 @@ export const SITE_DESCRIPTION =
   "Progressive hints, clean editorials, and full C++ solutions for Codeforces problems.";
 
 export const OG_IMAGE_SIZE = {
-  width: 2400,
-  height: 1260,
+  width: 1200,
+  height: 630,
 } as const;
 
 type SocialImage = {

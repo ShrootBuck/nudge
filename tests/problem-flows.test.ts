@@ -4,6 +4,10 @@ import { fileURLToPath } from "node:url";
 // Separate processes keep fake DB/services out of every other test.
 for (const [fixture, description] of [
   [
+    "og-images",
+    "social images return complete PNGs and preserve freshness and missing-problem handling",
+  ],
+  [
     "request-problem",
     "requests preserve numeric IDs and respect availability, review, and retry states",
   ],

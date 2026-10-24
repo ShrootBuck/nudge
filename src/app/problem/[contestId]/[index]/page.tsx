@@ -78,7 +78,9 @@ async function getProblemView(
   contestId: number,
   index: string,
 ): Promise<ProblemView | null> {
-  "use cache";
+  // Preparing Markdown, math, and highlighted code is expensive. Share the
+  // completed view across serverless instances, not just one process's memory.
+  "use cache: remote";
 
   cacheTag(problemTag(contestId, index));
 

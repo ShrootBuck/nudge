@@ -1,6 +1,8 @@
+import { cacheLife, cacheTag } from "next/cache";
 import { notFound } from "next/navigation";
 import { ImageResponse } from "next/og";
 import { OG_COLORS, OgBrand, OgFrame, OgPill } from "@/components/og-image";
+import { problemTag } from "@/lib/cache-tags";
 import { getProblemSocialData } from "@/lib/problem-read-cache";
 import { formatProblemId, parseProblemRouteParams } from "@/lib/problem-social";
 import { OG_IMAGE_SIZE } from "@/lib/site-metadata";
@@ -48,16 +50,20 @@ function reviewBadge(problem: { runState: string; reviewStatus: string }) {
   }
 }
 
-export default async function ProblemOpenGraphImage({
-  params,
-}: {
-  params: Promise<{ contestId: string; index: string }>;
-}) {
-  const route = parseProblemRouteParams(await params);
-  if (!route) notFound();
+async function getProblemImage(contestId: number, index: string) {
+  "use cache: remote";
 
-  const problem = await getProblemSocialData(route.contestId, route.index);
-  if (!problem) notFound();
+  cacheTag(problemTag(contestId, index));
+  const problem = await getProblemSocialData(contestId, index);
+  if (!problem) {
+    cacheLife("minutes");
+    return null;
+  }
+  if (problem.runState === "SUCCEEDED") {
+    cacheLife("days");
+  } else {
+    cacheLife("seconds");
+  }
 
   const problemId = formatProblemId(problem.contestId, problem.index);
   const review = reviewBadge(problem);
@@ -67,7 +73,7 @@ export default async function ProblemOpenGraphImage({
     problem.hasSolution ? "C++ solution ready" : "Solution pending",
   ];
 
-  return new ImageResponse(
+  const image = new ImageResponse(
     <OgFrame>
       <div
         style={{
@@ -213,4 +219,29 @@ export default async function ProblemOpenGraphImage({
     </OgFrame>,
     size,
   );
+
+  // ImageResponse renders lazily. Consume it inside the cache boundary so the
+  // shared cache stores the finished PNG, not just the data used to render it.
+  return image.arrayBuffer();
+}
+
+export default async function ProblemOpenGraphImage({
+  params,
+}: {
+  params: Promise<{ contestId: string; index: string }>;
+}) {
+  const route = parseProblemRouteParams(await params);
+  if (!route) notFound();
+
+  const image = await getProblemImage(route.contestId, route.index);
+  if (!image) notFound();
+
+  return new Response(image, {
+    headers: {
+      "Content-Type": contentType,
+      // Keep freshness under the tagged runtime cache's control. An independent
+      // browser/CDN TTL would keep serving old badges after a review or retry.
+      "Cache-Control": "public, max-age=0, must-revalidate",
+    },
+  });
 }

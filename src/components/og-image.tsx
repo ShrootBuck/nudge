@@ -20,8 +20,6 @@ export function OgFrame({ children }: { children: ReactNode }) {
         display: "flex",
         position: "relative",
         overflow: "hidden",
-        transform: "scale(2)",
-        transformOrigin: "top left",
         color: OG_COLORS.foreground,
         backgroundColor: OG_COLORS.background,
       }}
