@@ -1,50 +1,26 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
-import Link from "next/link";
-import Script from "next/script";
 import { Suspense } from "react";
-import { BrandMark } from "@/components/brand-mark";
 import { CurrentModel } from "@/components/current-model";
 import { Footer } from "@/components/footer";
 import { Navbar } from "@/components/navbar";
 import { SITE_URL } from "@/lib/env";
-import { NAV_LINKS } from "@/lib/nav-links";
 import {
   createPageMetadata,
   SITE_DESCRIPTION,
   SITE_NAME,
 } from "@/lib/site-metadata";
+import { themeInitScript } from "@/lib/theme";
 import "./globals.css";
-
-const themeInitScript = `
-(() => {
-  const storageKey = "theme";
-  const root = document.documentElement;
-
-  function applyTheme(value) {
-    const resolved =
-      value === "light" || value === "dark"
-        ? value
-        : window.matchMedia("(prefers-color-scheme: dark)").matches
-          ? "dark"
-          : "light";
-
-    root.classList.toggle("dark", resolved === "dark");
-    root.style.colorScheme = resolved;
-  }
-
-  try {
-    applyTheme(window.localStorage.getItem(storageKey));
-  } catch {
-    applyTheme(null);
-  }
-})();
-`;
 
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
 });
+
+export const viewport: Viewport = {
+  colorScheme: "light dark",
+};
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
@@ -76,41 +52,6 @@ export const metadata: Metadata = {
   },
 };
 
-function NavbarFallback() {
-  return (
-    <header className="sticky top-0 z-50 w-full">
-      <div className="border-b border-border/50 bg-background/60 backdrop-blur-xl">
-        <nav className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link
-            href="/"
-            className="flex items-center gap-2 text-lg font-semibold tracking-tight transition hover:opacity-80"
-          >
-            <BrandMark className="size-7 shrink-0" />
-            Nudge
-          </Link>
-
-          <div className="hidden items-center gap-1 md:flex">
-            {NAV_LINKS.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className="rounded-full px-3.5 py-1.5 text-sm font-medium text-muted-foreground transition hover:bg-foreground/[0.05] hover:text-foreground"
-              >
-                {link.label}
-              </Link>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="size-8 rounded-full border border-border/60 bg-background/60" />
-            <div className="size-8 rounded-full border border-border/60 bg-background/60 md:hidden" />
-          </div>
-        </nav>
-      </div>
-    </header>
-  );
-}
-
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -122,6 +63,14 @@ export default function RootLayout({
       className={`${inter.variable} h-full antialiased`}
       suppressHydrationWarning
     >
+      <head>
+        {/* Apply the saved theme before first paint, without a JS bundle. */}
+        <script
+          id="theme-init"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: Static first-party theme bootstrap; no interpolated user content.
+          dangerouslySetInnerHTML={{ __html: themeInitScript }}
+        />
+      </head>
       <body className="flex min-h-dvh flex-col">
         <a
           href="#main-content"
@@ -129,18 +78,13 @@ export default function RootLayout({
         >
           Skip to main content
         </a>
-        <Script id="theme-init" strategy="beforeInteractive">
-          {themeInitScript}
-        </Script>
-        <Suspense fallback={<NavbarFallback />}>
-          <Navbar
-            currentModel={
-              <Suspense fallback={null}>
-                <CurrentModel />
-              </Suspense>
-            }
-          />
-        </Suspense>
+        <Navbar
+          currentModel={
+            <Suspense fallback={null}>
+              <CurrentModel />
+            </Suspense>
+          }
+        />
         {children}
         <Footer />
       </body>

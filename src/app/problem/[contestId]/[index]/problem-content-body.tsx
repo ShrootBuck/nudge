@@ -46,7 +46,7 @@ export function ProblemContentBody({ problem }: { problem: ProblemView }) {
   const ReviewIcon = review.icon;
 
   return (
-    <main id="main-content" tabIndex={-1} className="min-h-screen pb-20">
+    <main id="main-content" tabIndex={-1} className="pb-20">
       <div className="mx-auto max-w-5xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         <nav className="mb-5 sm:mb-6">
           <Link
@@ -82,7 +82,7 @@ export function ProblemContentBody({ problem }: { problem: ProblemView }) {
                   )}
                 </div>
 
-                <h1 className="mt-5 max-w-3xl text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+                <h1 className="mt-5 max-w-3xl break-words text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
                   {problem.name}
                 </h1>
 

@@ -101,6 +101,22 @@ export function ProblemFilters({
   const [sortPopoverOpen, setSortPopoverOpen] = useState(false);
 
   useEffect(() => {
+    const desktop = window.matchMedia("(min-width: 768px)");
+    // Portals stay visible when their trigger is hidden by a breakpoint.
+    // Close them before they can lose their anchor or trap focus offscreen.
+    const closeOverlays = () => {
+      setTagDialogOpen(false);
+      setTagPopoverOpen(false);
+      setRatingDialogOpen(false);
+      setRatingPopoverOpen(false);
+      setSortDialogOpen(false);
+      setSortPopoverOpen(false);
+    };
+    desktop.addEventListener("change", closeOverlays);
+    return () => desktop.removeEventListener("change", closeOverlays);
+  }, []);
+
+  useEffect(() => {
     setSearchValue(query);
   }, [query]);
 
@@ -409,11 +425,11 @@ export function ProblemFilters({
 
           <div
             aria-live="polite"
-            className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground"
+            className="mt-2 flex min-h-6 flex-wrap items-center gap-2 text-xs text-muted-foreground"
           >
             <span>
               <span className="tabular-nums">
-                {totalCount.toLocaleString()}
+                {totalCount.toLocaleString("en-US")}
               </span>{" "}
               {totalCount === 1 ? "match" : "matches"}
             </span>
@@ -424,10 +440,15 @@ export function ProblemFilters({
               </span>
             )}
             {isPending && <span>Updating...</span>}
+            {(activeFilterCount > 0 || sort !== DEFAULT_PROBLEM_SORT) && (
+              <Button variant="ghost" size="xs" onClick={clearFilters}>
+                Clear filters
+              </Button>
+            )}
           </div>
         </div>
 
-        <div className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:w-auto xl:grid-cols-[14rem_11rem_9rem_auto]">
+        <div className="grid min-w-0 grid-cols-2 gap-2 md:grid-cols-3 xl:shrink-0 xl:grid-cols-[13rem_9rem_7rem]">
           <div className="col-span-2 md:col-span-1">
             <div className="md:hidden">
               <Dialog open={sortDialogOpen} onOpenChange={setSortDialogOpen}>
@@ -436,7 +457,7 @@ export function ProblemFilters({
                     <Button
                       variant="outline"
                       size="lg"
-                      className="w-full justify-between border-border/60 bg-background/80 shadow-sm"
+                      className="h-11 w-full min-w-0 justify-between"
                     />
                   }
                 >
@@ -453,7 +474,7 @@ export function ProblemFilters({
                     </DialogDescription>
                   </DialogHeader>
                   {sortMenu}
-                  <DialogFooter showCloseButton />
+                  <DialogFooter className="m-0" showCloseButton />
                 </DialogContent>
               </Dialog>
             </div>
@@ -465,7 +486,7 @@ export function ProblemFilters({
                     <Button
                       variant="outline"
                       size="lg"
-                      className="w-full justify-between border-border/60 bg-background/80 shadow-sm"
+                      className="h-11 w-full min-w-0 justify-between"
                     />
                   }
                 >
@@ -489,7 +510,7 @@ export function ProblemFilters({
                     <Button
                       variant={committedRatingActive ? "secondary" : "outline"}
                       size="lg"
-                      className="w-full justify-between border-border/60 shadow-sm"
+                      className="h-11 w-full min-w-0 justify-between"
                     />
                   }
                 >
@@ -506,7 +527,7 @@ export function ProblemFilters({
                     </DialogDescription>
                   </DialogHeader>
                   {ratingPanel}
-                  <DialogFooter showCloseButton />
+                  <DialogFooter className="m-0" showCloseButton />
                 </DialogContent>
               </Dialog>
             </div>
@@ -521,7 +542,7 @@ export function ProblemFilters({
                     <Button
                       variant={committedRatingActive ? "secondary" : "outline"}
                       size="lg"
-                      className="w-full justify-between border-border/60 shadow-sm"
+                      className="h-11 w-full min-w-0 justify-between"
                     />
                   }
                 >
@@ -546,7 +567,7 @@ export function ProblemFilters({
                     <Button
                       variant={tags.length > 0 ? "secondary" : "outline"}
                       size="lg"
-                      className="w-full justify-between border-border/60 shadow-sm"
+                      className="h-11 w-full min-w-0 justify-between"
                     />
                   }
                 >
@@ -563,7 +584,7 @@ export function ProblemFilters({
                     </DialogDescription>
                   </DialogHeader>
                   {tagMenu}
-                  <DialogFooter showCloseButton />
+                  <DialogFooter className="m-0" showCloseButton />
                 </DialogContent>
               </Dialog>
             </div>
@@ -575,7 +596,7 @@ export function ProblemFilters({
                     <Button
                       variant={tags.length > 0 ? "secondary" : "outline"}
                       size="lg"
-                      className="w-full justify-between border-border/60 shadow-sm"
+                      className="h-11 w-full min-w-0 justify-between"
                     />
                   }
                 >
@@ -591,17 +612,6 @@ export function ProblemFilters({
               </Popover>
             </div>
           </div>
-
-          {activeFilterCount > 0 && (
-            <Button
-              variant="ghost"
-              size="lg"
-              className="col-span-2 w-full md:col-span-3 xl:col-span-1 xl:w-auto"
-              onClick={clearFilters}
-            >
-              Clear filters
-            </Button>
-          )}
         </div>
       </div>
 

@@ -38,7 +38,10 @@ export function ChevronIcon({ open }: { open: boolean }) {
       viewBox="0 0 16 16"
       fill="none"
       aria-hidden="true"
-      className={`text-muted-foreground/60 transition-transform duration-300 ease-out ${open ? "rotate-180" : ""}`}
+      className={cn(
+        "shrink-0 text-muted-foreground/60 transition-transform duration-300 ease-out",
+        open && "rotate-180",
+      )}
     >
       <path
         d="M4 6L8 10L12 6"
@@ -156,7 +159,7 @@ export function SectionIntro({
 }) {
   return (
     <div className="mb-4 flex min-w-0 items-start gap-3 sm:mb-5 sm:gap-4">
-      <div className="rounded-xl border border-border/60 bg-background/80 p-2.5 text-muted-foreground shadow-sm sm:rounded-2xl sm:p-3">
+      <div className="shrink-0 rounded-xl border border-border/60 bg-background/80 p-2.5 text-muted-foreground shadow-sm sm:rounded-2xl sm:p-3">
         <Icon className="size-5" />
       </div>
       <div className="min-w-0">
@@ -205,7 +208,7 @@ export function CollapsibleSection({
           className="flex w-full cursor-pointer items-center justify-between gap-3 p-4 text-left sm:gap-4 sm:p-6"
         >
           <span className="flex min-w-0 items-start gap-3 sm:gap-4">
-            <span className="rounded-xl border border-border/60 bg-background/80 p-2.5 text-muted-foreground shadow-sm sm:rounded-2xl sm:p-3">
+            <span className="shrink-0 rounded-xl border border-border/60 bg-background/80 p-2.5 text-muted-foreground shadow-sm sm:rounded-2xl sm:p-3">
               <Icon className="size-5" />
             </span>
             <span className="min-w-0">

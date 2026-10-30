@@ -21,7 +21,7 @@ function Command({
     <CommandPrimitive
       data-slot="command"
       className={cn(
-        "flex size-full flex-col overflow-hidden rounded-xl! bg-popover p-1 text-popover-foreground",
+        "flex min-h-0 w-full flex-col overflow-hidden rounded-xl! bg-popover p-1 text-popover-foreground",
         className,
       )}
       {...props}
@@ -47,14 +47,20 @@ function CommandDialog({
     <Dialog {...props}>
       <DialogContent
         className={cn(
-          "top-1/3 translate-y-0 overflow-hidden rounded-xl! p-0",
+          "top-[max(1rem,15dvh)] max-h-[calc(85dvh-1rem)] translate-y-0 gap-0 overflow-hidden rounded-xl! p-0 sm:max-w-lg",
           className,
         )}
         showCloseButton={showCloseButton}
       >
-        <DialogHeader className="sr-only">
+        <DialogHeader
+          className={
+            showCloseButton ? "shrink-0 px-4 pt-4 pb-2 pr-12" : "sr-only"
+          }
+        >
           <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
+          <DialogDescription className="sr-only">
+            {description}
+          </DialogDescription>
         </DialogHeader>
         {children}
       </DialogContent>
@@ -67,7 +73,7 @@ function CommandInput({
   ...props
 }: React.ComponentProps<typeof CommandPrimitive.Input>) {
   return (
-    <div data-slot="command-input-wrapper" className="p-1 pb-0">
+    <div data-slot="command-input-wrapper" className="shrink-0 p-1 pb-0">
       <InputGroup className="h-8! rounded-lg! border-input/30 bg-input/30 shadow-none! *:data-[slot=input-group-addon]:pl-2!">
         <CommandPrimitive.Input
           data-slot="command-input"
@@ -93,7 +99,7 @@ function CommandList({
     <CommandPrimitive.List
       data-slot="command-list"
       className={cn(
-        "no-scrollbar max-h-72 scroll-py-1 overflow-x-hidden overflow-y-auto outline-none",
+        "min-h-0 max-h-72 scroll-py-1 overflow-x-hidden overflow-y-auto overscroll-contain outline-none",
         className,
       )}
       {...props}

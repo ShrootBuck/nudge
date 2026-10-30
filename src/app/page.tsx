@@ -297,19 +297,19 @@ export default async function Home({
   });
 
   return (
-    <main id="main-content" tabIndex={-1} className="min-h-screen pb-16">
+    <main id="main-content" tabIndex={-1} className="pb-16">
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8 lg:px-8">
         <section className="relative overflow-hidden rounded-[1.5rem] border border-border/70 bg-card/80 p-5 shadow-[0_28px_70px_-40px_rgba(15,23,42,0.45)] backdrop-blur sm:rounded-[2rem] sm:p-8">
           <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.12),transparent_32%),radial-gradient(circle_at_85%_15%,rgba(245,158,11,0.16),transparent_28%)]" />
 
-          <div className="relative grid gap-6 sm:gap-8 lg:grid-cols-[minmax(0,1fr)_340px] lg:items-start">
+          <div className="relative grid gap-6 sm:gap-8 lg:grid-cols-[minmax(0,1fr)_16rem] lg:items-start">
             <div className="min-w-0">
               <span className="inline-flex items-center gap-2 rounded-full border border-border/70 bg-background/80 px-3 py-1 text-xs font-medium tracking-wide text-muted-foreground shadow-sm">
-                <Sparkles className="size-3.5" />
+                <Sparkles className="size-3.5 shrink-0" />
                 Competitive programming, faster and smarter
               </span>
 
-              <h1 className="mt-5 max-w-3xl text-3xl font-semibold tracking-tight text-balance sm:text-5xl">
+              <h1 className="mt-5 max-w-3xl text-3xl font-semibold tracking-tight text-balance sm:text-4xl xl:text-5xl">
                 Get unstuck without skipping straight to the answer.
               </h1>
 
@@ -324,12 +324,12 @@ export default async function Home({
               </div>
             </div>
 
-            <div className="grid gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-1">
+            <div className="grid grid-cols-2 gap-2 sm:gap-3 lg:grid-cols-1">
               <StatCard
                 label={
                   activeFilterCount ? "Matching problems" : "Completed problems"
                 }
-                value={totalCount.toLocaleString()}
+                value={totalCount.toLocaleString("en-US")}
                 detail={
                   activeFilterCount
                     ? `${activeFilterCount} active filter${activeFilterCount === 1 ? "" : "s"}`
@@ -340,7 +340,7 @@ export default async function Home({
                 label={
                   activeFilterCount ? "Verified matches" : "Verified writeups"
                 }
-                value={verifiedCount.toLocaleString()}
+                value={verifiedCount.toLocaleString("en-US")}
                 detail="manually checked so far"
               />
             </div>
@@ -412,8 +412,10 @@ export default async function Home({
                       </div>
 
                       <h3 className="mt-3 text-base font-semibold tracking-tight sm:text-xl">
-                        <span className="inline-flex min-w-0 items-baseline gap-2 text-balance">
-                          <span>{problem.name}</span>
+                        <span className="inline-flex max-w-full min-w-0 items-baseline gap-2 text-balance">
+                          <span className="min-w-0 break-words">
+                            {problem.name}
+                          </span>
                           <ArrowRight className="size-4 shrink-0 translate-y-[0.02em] text-muted-foreground transition-transform duration-200 group-hover:translate-x-0.5 group-hover:text-foreground" />
                         </span>
                       </h3>
@@ -565,7 +567,7 @@ function StatCard({
 }) {
   return (
     <div className="rounded-[1.15rem] border border-border/70 bg-background/78 p-3.5 shadow-sm backdrop-blur sm:rounded-[1.4rem] sm:p-4">
-      <p className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+      <p className="min-h-8 text-xs font-medium tracking-wide text-muted-foreground uppercase sm:min-h-4">
         {label}
       </p>
       <p className="mt-2 text-2xl font-semibold tracking-tight">{value}</p>

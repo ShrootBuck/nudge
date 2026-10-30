@@ -50,6 +50,7 @@
 }
 
 :root {
+  color-scheme: light;
   --background: oklch(0.985 0.006 84);
   --foreground: oklch(0.235 0.017 255);
   --card: oklch(0.992 0.004 84);
@@ -85,6 +86,7 @@
 }
 
 .dark {
+  color-scheme: dark;
   --background: oklch(0.19 0.012 255);
   --foreground: oklch(0.95 0.008 84);
   --card: oklch(0.235 0.014 255);
@@ -124,8 +126,8 @@
   }
   html,
   body {
-    max-width: 100%;
-    overflow-x: clip;
+    min-width: 320px;
+    @apply bg-background text-foreground;
   }
   body {
     @apply bg-background text-foreground;
@@ -144,9 +146,12 @@
   }
   html {
     @apply font-sans;
+    scrollbar-gutter: stable;
+    scroll-padding-top: 5rem;
   }
   main {
     min-width: 0;
+    flex: 1;
   }
   button:not(:disabled),
   [role="button"]:not(:disabled) {

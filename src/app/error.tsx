@@ -38,7 +38,12 @@ export default function ErrorPage({
             <RefreshCw data-icon="inline-start" />
             Try again
           </Button>
-          <Button variant="outline" size="lg" render={<Link href="/" />}>
+          <Button
+            variant="outline"
+            size="lg"
+            nativeButton={false}
+            render={<Link href="/" />}
+          >
             <Home data-icon="inline-start" />
             Back to home
           </Button>

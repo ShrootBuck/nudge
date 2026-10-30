@@ -19,10 +19,10 @@ export async function CurrentModel() {
   return (
     <Badge
       variant="secondary"
-      className="max-w-full"
+      className="max-w-full min-w-0"
       title={`Nudge currently uses ${state.currentModel} to generate hints, editorials, and code writeups.`}
     >
-      <span className="shrink-0">Current AI model:</span>
+      <span className="hidden shrink-0 sm:inline">Current AI model:</span>
       <span className="truncate">{state.currentModel}</span>
     </Badge>
   );
