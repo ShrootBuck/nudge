@@ -23,7 +23,16 @@ bun run dev
 
 Copy the variables documented in `.env.example` into your local environment. The app requires a PostgreSQL database whose schema matches `prisma/schema.prisma`.
 
-After schema changes, apply them with `bunx prisma db push` and regenerate the client with `bunx prisma generate`.
+Initialize a fresh development database with `bun run db:deploy`. For a schema change, point `DATABASE_URL` (and `DIRECT_URL`, if set) at a local/disposable development database, then:
+
+```bash
+bun run db:migrate --name describe_the_change --create-only
+# Review the generated prisma/migrations/<timestamp>_describe_the_change/migration.sql.
+bun run db:migrate
+bunx --bun prisma generate
+```
+
+Commit the SQL migration together with `prisma/schema.prisma`. Deployments apply pending migrations automatically. Prisma commands prefer a nonempty `DIRECT_URL` and otherwise use `DATABASE_URL`; never run development migration commands or `db push` against production, including through the SSH tunnel.
 
 The navbar displays the model and reasoning effort from the latest successfully saved generation. Its display string is stored in the singleton `SiteState` row and updated in the same transaction as the generated content. The browser fetches it from `/api/current-model`, with a 60-second HTTP cache, so the badge does not force otherwise static pages to render at request time. The indicator stays hidden until the first successful save; it does not query generation history or control model selection.
 
@@ -33,7 +42,7 @@ Successful generations prepare sanitized Markdown, KaTeX math, and highlighted c
 
 Readers reuse the saved documents across server restarts. Older rows are prepared and saved once when first read; no AI regeneration is needed. Only prepared documents and copyable solution code reach the browser, which handles reveals without downloading the parser, KaTeX renderer, or Shiki. Public problem component output is also cached in Next's process-local cache and invalidated by the existing problem tags when content or review state changes.
 
-Before deploying this schema change, apply `bunx prisma db push` to add the nullable `preparedContent` field. To prepare completed problems in advance, run these with administrative `DATABASE_URL` access (and `CACHE_REVALIDATION_URL` / `CACHE_REVALIDATION_SECRET` for the write command):
+Production intentionally prepares older problems when visitors read them; deployment does not run a bulk backfill. If an explicit administrative backfill is needed later, these commands require `DATABASE_URL` access (and `CACHE_REVALIDATION_URL` / `CACHE_REVALIDATION_SECRET` for the write command):
 
 ```bash
 bun run content:prepare --check
@@ -47,6 +56,14 @@ Run the full local quality gate before shipping:
 ```bash
 bun run check
 ```
+
+Migration/startup integration tests use a separate disposable local PostgreSQL database whose name starts with `nudge_migrations_test_`:
+
+```bash
+TEST_MIGRATION_DATABASE_URL=postgresql://postgres@127.0.0.1:5432/nudge_migrations_test_local bun test tests/migrations.test.ts
+```
+
+The test creates and removes its own schema. It checks fresh initialization, repeat startup, applying a new migration while preserving data, and refusing to start after a migration failure.
 
 ## What is this?
 
@@ -128,7 +145,13 @@ Notes:
 
 ## Coolify deployment
 
-Deploy the repository with its Dockerfile on port 3000. Set the runtime variables in `.env.example`, and mount a persistent volume at `/data/transcripts`, writable by the image's `bun` user (UID 1000). Keep PostgreSQL private on the Coolify Docker network. Generation uses the authenticated HTTPS API. `bun run db:tunnel` is only needed for optional administrative access, such as Prisma Studio or schema changes; no public database port is needed.
+Deploy the repository with its Dockerfile on port 3000 in [Coolify](https://coolify.zaydkrunz.com). Set the runtime variables in `.env.example`, and mount a persistent volume at `/data/transcripts`, writable by the image's `bun` user (UID 1000). Keep PostgreSQL private on the Coolify Docker network. Generation uses the authenticated HTTPS API. `bun run db:tunnel` is only needed for optional administrative access, such as Prisma Studio; no public database port is needed.
+
+The Docker command runs `scripts/start-production.sh`, which applies committed migrations with `bun run db:deploy` before starting Next. A migration failure exits the new container before it can serve traffic. Builds only generate Prisma Client and compile the app; database changes happen at runtime. Keep the Docker startup command in Coolify rather than overriding it with `next start`, and do not add a duplicate migration hook. `bun run db:status` shows migration history without applying changes.
+
+`prisma/migrations/0_init` captures the schema at the switch from `db push` to Prisma Migrate, including the nullable `preparedContent` field. Nudge production was verified and baselined on 2026-10-31; no further baseline step is needed there. A fresh database applies it automatically. For another existing populated database, first check it with `bunx --bun prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --exit-code`; only if it matches, register the baseline once with `bunx --bun prisma migrate resolve --applied 0_init`. This records migration history without recreating tables or changing problem content. Never put baseline resolution in the startup script.
+
+Keep migrations compatible with the previous app version during rolling deployments. Never edit applied migrations; use a new migration to make subsequent changes. Failed migrations may leave partial SQL changes, so inspect the database and deploy logs before using `prisma migrate resolve` to recover. Rolling back the app does not reverse schema changes. See [Prisma's production migration workflow](https://www.prisma.io/docs/orm/v7/prisma-migrate/workflows/development-and-production).
 
 Configure a Coolify scheduled task with command `bun run jobs:daily` and cron `0 7 * * *` (UTC), which is midnight in America/Phoenix. It runs the Codeforces sync and report digest; a PostgreSQL advisory lock prevents overlapping runs. `bun run jobs:daily -- --check` validates database connectivity and locking without running either job. Disable the previous cloud schedules before enabling this task.
 

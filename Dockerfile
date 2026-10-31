@@ -16,4 +16,4 @@ ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOSTNAME=0.0.0.0 PORT=3000
 RUN mkdir -p /data/transcripts && chown -R bun:bun /data /app/.next
 USER bun
 EXPOSE 3000
-CMD ["bun", "--bun", "run", "start"]
+CMD ["sh", "scripts/start-production.sh"]
