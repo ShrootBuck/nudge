@@ -1,70 +1,93 @@
 import { readFile } from "node:fs/promises";
-import { del, put } from "@vercel/blob";
+import {
+  MAX_TRANSCRIPT_BYTES,
+  TRANSCRIPT_ROUTE,
+  validTranscriptKey,
+} from "./transcript-storage";
 
-const TRANSCRIPT_CACHE_MAX_AGE_SECONDS = 365 * 24 * 60 * 60;
-
-type TranscriptUploader = (
-  pathname: string,
-  body: Buffer,
-  options: {
-    access: "public";
-    addRandomSuffix: false;
-    cacheControlMaxAge: number;
-    contentType: "application/json";
-    token?: string;
-  },
-) => Promise<{ url: string }>;
-
-function safePathSegment(value: string) {
-  return value.replaceAll(/[^a-zA-Z0-9_-]/g, "_");
-}
-
-function getVercelBlobReadWriteToken(
+export function hasTranscriptUploadConfiguration(
   environment: Record<string, string | undefined> = process.env,
 ) {
-  const token = environment.BLOB_READ_WRITE_TOKEN?.trim();
-  return token && token !== "[SENSITIVE]" ? token : null;
+  return Boolean(
+    environment.CACHE_REVALIDATION_URL?.trim() &&
+      environment.CACHE_REVALIDATION_SECRET?.trim(),
+  );
 }
 
-export function hasVercelBlobReadWriteToken(
-  environment: Record<string, string | undefined> = process.env,
-) {
-  return Boolean(getVercelBlobReadWriteToken(environment));
+function storageUrl(path: string) {
+  const base = process.env.CACHE_REVALIDATION_URL?.trim();
+  if (!base) throw new Error("CACHE_REVALIDATION_URL is not configured");
+  const url = new URL(path, base);
+  if (
+    url.protocol !== "https:" &&
+    !(
+      url.protocol === "http:" &&
+      ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)
+    )
+  ) {
+    throw new Error("Transcript storage requires HTTPS outside localhost");
+  }
+  return url;
+}
+
+function authorization() {
+  const secret = process.env.CACHE_REVALIDATION_SECRET?.trim();
+  if (!secret) throw new Error("CACHE_REVALIDATION_SECRET is not configured");
+  return `Bearer ${secret}`;
 }
 
 export async function publishGenerationTranscript({
-  problemId,
-  problemLabel,
-  responseId,
   transcriptPath,
-  token = getVercelBlobReadWriteToken(),
-  upload = put,
 }: {
   problemId: string;
   problemLabel: string;
   responseId: string;
   transcriptPath: string;
-  token?: string | null;
-  upload?: TranscriptUploader;
 }) {
-  const transcript = await readFile(transcriptPath);
-  const pathname = [
-    "generation-transcripts",
-    safePathSegment(problemId),
-    `${safePathSegment(problemLabel)}-${safePathSegment(responseId)}.json`,
-  ].join("/");
-  const blob = await upload(pathname, transcript, {
-    access: "public",
-    addRandomSuffix: false,
-    cacheControlMaxAge: TRANSCRIPT_CACHE_MAX_AGE_SECONDS,
-    contentType: "application/json",
-    ...(token ? { token } : {}),
+  const body = await readFile(transcriptPath);
+  if (body.byteLength > MAX_TRANSCRIPT_BYTES)
+    throw new Error("Transcript exceeds size limit");
+  const response = await fetch(storageUrl("/api/transcripts"), {
+    method: "POST",
+    headers: {
+      Authorization: authorization(),
+      "Content-Type": "application/json",
+    },
+    body,
+    redirect: "error",
+    signal: AbortSignal.timeout(120_000),
   });
-
-  return blob.url;
+  if (!response.ok)
+    throw new Error(`Transcript upload failed (${response.status})`);
+  const result = (await response.json()) as { path?: unknown };
+  if (
+    typeof result.path !== "string" ||
+    !result.path.startsWith(TRANSCRIPT_ROUTE) ||
+    !validTranscriptKey(result.path.slice(TRANSCRIPT_ROUTE.length))
+  ) {
+    throw new Error("Invalid transcript upload acknowledgement");
+  }
+  return storageUrl(result.path).href;
 }
 
 export async function deleteGenerationTranscript(url: string) {
-  const token = getVercelBlobReadWriteToken();
-  await del(url, token ? { token } : undefined);
+  const expected = storageUrl(TRANSCRIPT_ROUTE);
+  const target = new URL(url, expected);
+  if (
+    target.origin !== expected.origin ||
+    !target.pathname.startsWith(TRANSCRIPT_ROUTE) ||
+    !validTranscriptKey(target.pathname.slice(TRANSCRIPT_ROUTE.length))
+  ) {
+    throw new Error(
+      "Refusing to delete a transcript outside the configured storage service",
+    );
+  }
+  const response = await fetch(target, {
+    method: "DELETE",
+    headers: { Authorization: authorization() },
+    redirect: "error",
+    signal: AbortSignal.timeout(30_000),
+  });
+  if (!response.ok)
+    throw new Error(`Transcript deletion failed (${response.status})`);
 }

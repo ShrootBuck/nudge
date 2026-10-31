@@ -16,7 +16,9 @@
     "format": "biome format --write",
     "test": "bun test",
     "typecheck": "tsc --noEmit --incremental false",
-    "check": "bun run lint && bun run typecheck && bun run test"
+    "check": "bun run lint && bun run typecheck && bun run test",
+    "jobs:daily": "bun scripts/daily-jobs.ts",
+    "db:tunnel": "bun scripts/db-tunnel.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",
@@ -30,9 +32,6 @@
     "@shikijs/langs": "^4.4.3",
     "@shikijs/themes": "^4.4.3",
     "@tailwindcss/typography": "^0.5.19",
-    "@trigger.dev/build": "^4.4.6",
-    "@trigger.dev/sdk": "^4.4.6",
-    "@vercel/blob": "^2.6.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",

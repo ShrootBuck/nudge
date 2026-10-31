@@ -14,7 +14,7 @@ import {
   selectAndClaimNextAutomaticGenerationProblem,
   selectNextAutomaticGenerationProblem,
 } from "../src/lib/generation-queue";
-import { hasVercelBlobReadWriteToken } from "../src/lib/generation-transcript";
+import { hasTranscriptUploadConfiguration } from "../src/lib/generation-transcript";
 import { prisma } from "../src/lib/prisma";
 import {
   OPENCODE_NEXT_USAGE,
@@ -114,9 +114,9 @@ async function main() {
     throw new Error("Missing required environment variable: DATABASE_URL");
   }
   if (!parsedArguments.dryRun) {
-    if (!hasVercelBlobReadWriteToken()) {
+    if (!hasTranscriptUploadConfiguration()) {
       throw new Error(
-        "Missing usable BLOB_READ_WRITE_TOKEN for local transcript uploads",
+        "Missing CACHE_REVALIDATION_URL or CACHE_REVALIDATION_SECRET for transcript uploads",
       );
     }
   }

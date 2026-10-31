@@ -1,6 +1,10 @@
 import { mock } from "bun:test";
 import assert from "node:assert/strict";
 
+console.info = () => {};
+console.warn = () => {};
+console.error = () => {};
+
 const problems = Array.from({ length: 101 }, (_, i) => ({
   contestId: i + 1,
   index: "01",
@@ -15,10 +19,6 @@ let failRead = true;
 let failWrite = false;
 const invalidations: string[][] = [];
 
-mock.module("@trigger.dev/sdk", () => ({
-  schedules: { task: (definition: unknown) => definition },
-  logger: { info() {}, warn() {}, error() {} },
-}));
 mock.module("../../src/lib/codeforces-api", () => ({
   fetchCodeforcesProblemset: async () => ({
     problems,
@@ -65,8 +65,8 @@ mock.module("../../src/lib/prisma", () => ({
   },
 }));
 
-const { syncProblems } = await import("../../src/trigger/sync-problems");
-const task = syncProblems as unknown as { run: () => Promise<unknown> };
+const { syncProblems } = await import("../../src/jobs/sync-problems");
+const task = { run: syncProblems };
 await assert.rejects(task.run(), /Database read failed/);
 assert.equal(maxActiveWrites, 10);
 assert.equal(invalidations.length, 1);

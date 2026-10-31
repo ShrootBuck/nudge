@@ -41,14 +41,14 @@ All content is generated locally through OpenCode, then stored in Postgres and s
 
 ## Local OpenCode generation
 
-Generation is local-only, using the project-pinned OpenCode V2 CLI, client, and plugin packages (2.0.26). Trigger.dev does not run OpenCode and there is no encoded cloud credential path. The generation agent allows tools automatically, including shell commands and file edits. Questions are disabled: the tool is removed and native permission rules deny it. Generation can run on macOS or Linux. Each run uses a temporary working directory and a one-hour timeout.
+Generation is local-only, using the project-pinned OpenCode V2 CLI, client, and plugin packages (2.0.26). The server does not run OpenCode and there is no encoded cloud credential path. The generation agent allows tools automatically, including shell commands and file edits. Questions are disabled: the tool is removed and native permission rules deny it. Generation can run on macOS or Linux. Each run uses a temporary working directory and a one-hour timeout.
 
 Nudge starts its own authenticated server on a random loopback port and shuts it down when the command finishes. It does not attach to or replace your personal OpenCode background service. The local client disables Bun's five-minute socket idle timeout so a quiet session wait can last for the full one-hour generation deadline; cancellation still interrupts it. Use `bun run opencode -- <command>` for the bundled CLI; your global `opencode` installation can have a different version.
 
 1. Existing local provider credentials are reused. Check them with `bun run opencode -- auth list`. If needed, use `bun run opencode -- auth login` and select the provider/account you want to use. `bun run models` confirms which providers are available to Nudge.
-2. Make sure `DATABASE_URL` points at the Nudge database.
-3. Connect a public Vercel Blob store to the project and set `BLOB_READ_WRITE_TOKEN` locally. `bunx vercel env pull` can pull the connected store credentials.
-4. Set `CACHE_REVALIDATION_URL` to the deployed app URL. Set the same strong `CACHE_REVALIDATION_SECRET` locally, in Trigger.dev, and in the deployed Next.js app. Local generation and Trigger.dev use these values to expire deployed problem caches after database writes.
+2. Start Tailscale and run `bun run db:tunnel` in a separate terminal. Keep it running. Set `DATABASE_URL` and `DIRECT_URL` to the Nudge database credentials with host `127.0.0.1` and port `54329`.
+3. Transcripts are stored in the deployed app's persistent `/data/transcripts` volume. No separate storage provider is required.
+4. Set `CACHE_REVALIDATION_URL` to the deployed app URL. Set the same strong `CACHE_REVALIDATION_SECRET` locally and in the deployed Next.js app. Local generation uses it to upload transcripts and expire deployed caches after database writes; the scheduled jobs use it for cache invalidation.
 5. Configure the model, reasoning variant, and public display label in `nudge.config.json` (see [Switching models or providers](#switching-models-or-providers)).
 
    ```json
@@ -90,7 +90,7 @@ Each real run claims one eligible problem and creates an isolated OpenCode sessi
 
 The agent receives problem metadata and both Codeforces problem URLs, then retrieves the complete statement and researches solutions with its own tools. This includes PDF statements and relevant diagrams; Nudge does not scrape HTML or prefetch statement images/editorial pages before starting the session. Retrieval failures and fallback attempts appear in the generation transcript. A PDF or missing editorial alone is not an unsolvable result; the agent must identify a concrete statement/resource blocker after trying alternatives.
 
-Nudge persists the generated hints/editorial/solution, records whole-session token usage (including tool turns and cached tokens), mirrors the exact `opencode session export` bytes into `.opencode-runs`, uploads that file to the public Blob store, and prints both transcript locations. A session is deleted only after its transcript has been mirrored; export failures leave it available in OpenCode and report a warning. Ctrl-C, SIGTERM, and the one-hour timeout interrupt the V2 session before cleanup. OpenCode reads provider credentials from its normal local credential store; Nudge never copies them into project configuration.
+Nudge persists the generated hints/editorial/solution, records whole-session token usage (including tool turns and cached tokens), mirrors the exact `opencode session export` bytes into `.opencode-runs`, uploads that file to the Coolify app's transcript endpoint, and prints both transcript locations. A session is deleted only after its transcript has been mirrored; export failures leave it available in OpenCode and report a warning. Ctrl-C, SIGTERM, and the one-hour timeout interrupt the V2 session before cleanup. OpenCode reads provider credentials from its normal local credential store; Nudge never copies them into project configuration.
 
 ## Switching models or providers
 
@@ -108,3 +108,11 @@ Notes:
 - `variant` is optional and must be one of the variant keys from step 4.
 - `display.model` is the public label — free text, so fix naming there, not in `model`. `display.reasoning` is optional and falls back to `variant` when omitted. The label renders as `display.model (reasoning)`, or just `display.model` when neither is set, so the checked-in configuration renders `GPT-6 Astra (low)`.
 - `display.*` is cosmetic and safe to edit anytime, but the label is stored on each problem at generation time — existing content keeps the label it was generated with, and the new label applies to future generations.
+
+## Coolify deployment
+
+Deploy the repository with its Dockerfile on port 3000. Set the runtime variables in `.env.example`, and mount a persistent volume at `/data/transcripts`, writable by the image's `bun` user (UID 1000). Keep PostgreSQL private on the Coolify Docker network. Local tools reach it through `bun run db:tunnel`, using the existing SSH/Tailscale connection; no public database port is needed.
+
+Configure a Coolify scheduled task with command `bun run jobs:daily` and cron `0 7 * * *` (UTC), which is midnight in America/Phoenix. It runs the Codeforces sync and report digest; a PostgreSQL advisory lock prevents overlapping runs. `bun run jobs:daily -- --check` validates database connectivity and locking without running either job. Disable the previous cloud schedules before enabling this task.
+
+The health check is `/api/health`. Verify public problem pages, transcript downloads, and authenticated cache invalidation after deploys. Back up both PostgreSQL and the transcript volume; they must be restored together. Do not delete the migration source until data counts and transcript checksums match.

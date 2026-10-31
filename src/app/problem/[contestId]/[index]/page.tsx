@@ -1,4 +1,3 @@
-import { getDownloadUrl } from "@vercel/blob";
 import type { MarkdownDocument } from "comark";
 import { parseMarkdown } from "comark";
 import type { Metadata } from "next";
@@ -135,9 +134,7 @@ async function getProblemView(
     reviewStatus: problem.reviewStatus,
     runState: problem.runState,
     modelDisplayName,
-    transcriptDownloadUrl: problem.generationTranscriptUrl
-      ? getDownloadUrl(problem.generationTranscriptUrl)
-      : null,
+    transcriptDownloadUrl: problem.generationTranscriptUrl,
     lastGenerationError:
       problem.lastGenerationError && problem.reviewStatus === "UNSOLVABLE"
         ? problem.lastGenerationError.slice(0, 500)
