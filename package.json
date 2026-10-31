@@ -19,7 +19,8 @@
     "typecheck": "tsc --noEmit --incremental false",
     "check": "bun run lint && bun run typecheck && bun run test",
     "jobs:daily": "bun scripts/daily-jobs.ts",
-    "db:tunnel": "bun scripts/db-tunnel.ts"
+    "db:tunnel": "bun scripts/db-tunnel.ts",
+    "content:prepare": "bun scripts/prepare-content.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.4.1",

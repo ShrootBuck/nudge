@@ -2,7 +2,7 @@ import { type MarkdownDocument, type Node, parseMarkdown } from "comark";
 import { renderMath } from "comark/plugins/math";
 import { markdownOptions, markdownPlugins } from "./markdown";
 
-// Run inside the cached server data loader, before the reader opens a panel.
+// Run on the server when saving content (or preparing a legacy row once).
 export async function prepareMarkdown(
   content: string,
 ): Promise<MarkdownDocument> {

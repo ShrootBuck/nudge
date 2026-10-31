@@ -244,7 +244,6 @@ export function ProblemContentBody({ problem }: { problem: ProblemView }) {
                 icon={BookOpenText}
               >
                 <ProblemMarkdown
-                  content={problem.editorial.content}
                   parsedDocument={problem.editorial.parsedDocument}
                 />
               </CollapsibleSection>

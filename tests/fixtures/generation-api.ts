@@ -4,7 +4,9 @@ import { randomUUID } from "node:crypto";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { Prisma } from "@prisma/client";
 import type { GenerationCompletion } from "../../src/lib/generation-contract";
+import { readPreparedContent } from "../../src/lib/prepared-content";
 
 // This fixture deliberately exercises real transactions in a disposable DB only.
 assert.match(
@@ -23,6 +25,9 @@ mock.module("../../src/lib/cache-revalidate", () => ({
 mock.module("../../src/lib/discord-log", () => ({ discordLog: notify }));
 const { GET, POST } = await import("../../src/app/api/generation/route");
 const { prisma } = await import("../../src/lib/prisma");
+const { getPreparedProblemContent } = await import(
+  "../../src/lib/problem-content"
+);
 const { resetStaleRunningGenerations } = await import(
   "../../src/lib/generation-queue"
 );
@@ -190,6 +195,11 @@ try {
   assert.equal(await prisma.aiGenerationUsage.count(), 0);
   assert.equal(
     (await prisma.problem.findUniqueOrThrow({ where: { id: initial.id } }))
+      .preparedContent,
+    null,
+  );
+  assert.equal(
+    (await prisma.problem.findUniqueOrThrow({ where: { id: initial.id } }))
       .runState,
     "RUNNING",
   );
@@ -224,6 +234,57 @@ try {
     `https://nudge.example/api/transcripts/${submission.transcriptKey}`,
   );
   assert.equal(saved.generationTotalTokens, 321);
+  assert.ok(readPreparedContent(saved.preparedContent, content));
+
+  // Legacy preparation persists once without changing the catalog's sort timestamp.
+  await prisma.problem.update({
+    where: { id: initial.id },
+    data: { preparedContent: Prisma.DbNull },
+    select: { id: true },
+  });
+  const legacy = await prisma.problem.findUniqueOrThrow({
+    where: { id: initial.id },
+    include: { hints: true, editorial: true, solution: true },
+  });
+  const restored = await getPreparedProblemContent(legacy);
+  const persisted = await prisma.problem.findUniqueOrThrow({
+    where: { id: initial.id },
+    include: { hints: true, editorial: true, solution: true },
+  });
+  assert.equal(persisted.updatedAt.getTime(), legacy.updatedAt.getTime());
+  assert.deepEqual(persisted.preparedContent, restored);
+  assert.deepEqual(await getPreparedProblemContent(persisted), restored);
+
+  // An old reader must not overwrite a newer generation's prepared documents.
+  const newerContent = {
+    ...content,
+    editorial: "A newer editorial with $x^2$.",
+  };
+  const { prepareProblemContent, preparedContentJson } = await import(
+    "../../src/lib/prepared-content"
+  );
+  const newerPrepared = preparedContentJson(
+    await prepareProblemContent(newerContent),
+  );
+  await prisma.$transaction(async (tx) => {
+    await tx.editorial.update({
+      where: { problemId: initial.id },
+      data: { content: newerContent.editorial },
+    });
+    await tx.problem.update({
+      where: { id: initial.id },
+      data: {
+        updatedAt: new Date(legacy.updatedAt.getTime() + 1000),
+        preparedContent: newerPrepared,
+      },
+    });
+  });
+  await getPreparedProblemContent(legacy);
+  assert.deepEqual(
+    (await prisma.problem.findUniqueOrThrow({ where: { id: initial.id } }))
+      .preparedContent,
+    newerPrepared,
+  );
 
   const second = await createProblem(90002);
   const secondClaim = await claimNextGeneration();

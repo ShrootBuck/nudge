@@ -100,10 +100,7 @@ export function HintCard({
           id={panelId}
           className="min-w-0 border-t border-border/60 px-4 pb-4 pt-4 sm:px-6 sm:pb-5"
         >
-          <ProblemMarkdown
-            content={hint.content}
-            parsedDocument={hint.parsedDocument}
-          />
+          <ProblemMarkdown parsedDocument={hint.parsedDocument} />
         </div>
       )}
     </div>
@@ -117,12 +114,12 @@ export function SolutionCode({
 }: {
   code: string;
   downloadFileName: string;
-  parsedDocument?: MarkdownDocument | null;
+  parsedDocument: MarkdownDocument;
 }) {
   const parsedSolution = parseSolutionContent(code);
 
   if (parsedSolution.kind === "markdown") {
-    return <ProblemMarkdown content={parsedSolution.content} />;
+    return <ProblemMarkdown parsedDocument={parsedDocument} />;
   }
 
   return (
@@ -132,16 +129,10 @@ export function SolutionCode({
       showActions
       downloadFileName={downloadFileName}
     >
-      {parsedDocument ? (
-        <MarkdownDocumentRenderer
-          value={parsedDocument}
-          components={{ pre: StyledPre }}
-        />
-      ) : (
-        <StyledPre>
-          <code>{parsedSolution.code}</code>
-        </StyledPre>
-      )}
+      <MarkdownDocumentRenderer
+        value={parsedDocument}
+        components={{ pre: StyledPre }}
+      />
     </CodeBlock>
   );
 }

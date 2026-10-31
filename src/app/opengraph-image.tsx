@@ -8,7 +8,7 @@ export const size = OG_IMAGE_SIZE;
 export const contentType = "image/png";
 
 async function getSiteImage() {
-  "use cache: remote";
+  "use cache";
 
   cacheLife("max");
   const image = new ImageResponse(

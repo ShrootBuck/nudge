@@ -57,6 +57,9 @@ model Problem {
   generationTotalTokens        Int?
   generationTranscriptUrl      String?
 
+  // Derived, versioned Markdown/math/code documents; source text remains canonical.
+  preparedContent Json?
+
   hints                  Hint[]
   editorial              Editorial?
   solution               Solution?

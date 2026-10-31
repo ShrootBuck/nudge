@@ -26,18 +26,16 @@ export type ProblemView = {
   hints: {
     id: string;
     order: number;
-    content: string;
     parsedDocument: MarkdownDocument;
   }[];
   editorial: {
     id: string;
-    content: string;
-    parsedDocument?: MarkdownDocument | null;
+    parsedDocument: MarkdownDocument;
   } | null;
   solution: {
     id: string;
     content: string;
-    parsedDocument?: MarkdownDocument | null;
+    parsedDocument: MarkdownDocument;
   } | null;
 };
 

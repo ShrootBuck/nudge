@@ -25,7 +25,22 @@ Copy the variables documented in `.env.example` into your local environment. The
 
 After schema changes, apply them with `bunx prisma db push` and regenerate the client with `bunx prisma generate`.
 
-The navbar displays the model and reasoning effort from the latest successfully saved generation. Its display string is stored in the singleton `SiteState` row and updated in the same transaction as the generated content. The indicator stays hidden until the first successful save; it does not query generation history or control model selection.
+The navbar displays the model and reasoning effort from the latest successfully saved generation. Its display string is stored in the singleton `SiteState` row and updated in the same transaction as the generated content. The browser fetches it from `/api/current-model`, with a 60-second HTTP cache, so the badge does not force otherwise static pages to render at request time. The indicator stays hidden until the first successful save; it does not query generation history or control model selection.
+
+### Prepared problem content
+
+Successful generations prepare sanitized Markdown, KaTeX math, and highlighted code before acquiring the database transaction lock. The prepared documents and their source text commit together in `Problem.preparedContent`. A source-content hash and `PREPARED_CONTENT_VERSION` prevent reuse after a content or renderer change. Bump that version when changing parser, sanitization, math, or highlighting behavior, including dependency upgrades that affect output.
+
+Readers reuse the saved documents across server restarts. Older rows are prepared and saved once when first read; no AI regeneration is needed. Only prepared documents and copyable solution code reach the browser, which handles reveals without downloading the parser, KaTeX renderer, or Shiki. Public problem component output is also cached in Next's process-local cache and invalidated by the existing problem tags when content or review state changes.
+
+Before deploying this schema change, apply `bunx prisma db push` to add the nullable `preparedContent` field. To prepare completed problems in advance, run these with administrative `DATABASE_URL` access (and `CACHE_REVALIDATION_URL` / `CACHE_REVALIDATION_SECRET` for the write command):
+
+```bash
+bun run content:prepare --check
+bun run content:prepare
+```
+
+`--check` does not write and exits with status 1 if any completed problems need preparation. The write command processes bounded batches, preserves catalog ordering, and refreshes completed problem page caches. Re-running it skips matching documents and retries cache invalidation.
 
 Run the full local quality gate before shipping:
 

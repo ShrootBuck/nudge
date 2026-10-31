@@ -47,7 +47,7 @@ export async function getProblemSocialData(
   contestId: number,
   index: string,
 ): Promise<ProblemSocialData | null> {
-  "use cache: remote";
+  "use cache";
 
   cacheTag(problemTag(contestId, index));
 

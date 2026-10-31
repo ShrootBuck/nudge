@@ -1,12 +1,9 @@
-import type { MarkdownDocument } from "comark";
-import { parseMarkdown } from "comark";
 import type { Metadata } from "next";
 import { cacheLife, cacheTag } from "next/cache";
 import { notFound } from "next/navigation";
 import { problemTag } from "@/lib/cache-tags";
-import { markdownOptions, markdownPlugins } from "@/lib/markdown";
-import { prepareMarkdown } from "@/lib/prepare-markdown";
 import { prisma } from "@/lib/prisma";
+import { getPreparedProblemContent } from "@/lib/problem-content";
 import { getProblemSocialData } from "@/lib/problem-read-cache";
 import {
   formatProblemId,
@@ -15,7 +12,6 @@ import {
   problemSocialDescription,
   problemSocialTitle,
 } from "@/lib/problem-social";
-import { parseSolutionContent } from "@/lib/problem-solution";
 import { createPageMetadata, OG_IMAGE_SIZE } from "@/lib/site-metadata";
 import { ProblemContentBody } from "./problem-content-body";
 import type { ProblemView } from "./problem-view-types";
@@ -73,13 +69,10 @@ export async function generateMetadata({
   };
 }
 
-async function getProblemView(
-  contestId: number,
-  index: string,
-): Promise<ProblemView | null> {
-  // Preparing Markdown, math, and highlighted code is expensive. Share the
-  // completed view across serverless instances, not just one process's memory.
-  "use cache: remote";
+async function getProblemContent(contestId: number, index: string) {
+  // Cache the public component output. Prepared documents themselves live in
+  // Postgres, so a process restart no longer repeats math/code preparation.
+  "use cache";
 
   cacheTag(problemTag(contestId, index));
 
@@ -105,26 +98,8 @@ async function getProblemView(
     cacheLife("seconds");
   }
 
-  const modelDisplayName = problem.generatedByDisplayName ?? null;
-
-  let parsedSolutionDocument: MarkdownDocument | null = null;
-
-  if (problem.solution) {
-    const parsedSolution = parseSolutionContent(problem.solution.content);
-
-    if (parsedSolution.kind === "code") {
-      try {
-        parsedSolutionDocument = await parseMarkdown(
-          `\`\`\`${parsedSolution.language}\n${parsedSolution.code}\n\`\`\``,
-          { ...markdownOptions, plugins: markdownPlugins },
-        );
-      } catch {
-        parsedSolutionDocument = null;
-      }
-    }
-  }
-
-  return {
+  const prepared = await getPreparedProblemContent(problem);
+  const view: ProblemView = {
     id: problem.id,
     contestId: problem.contestId,
     index: problem.index,
@@ -133,7 +108,7 @@ async function getProblemView(
     tags: problem.tags,
     reviewStatus: problem.reviewStatus,
     runState: problem.runState,
-    modelDisplayName,
+    modelDisplayName: problem.generatedByDisplayName ?? null,
     transcriptDownloadUrl: problem.generationTranscriptUrl,
     lastGenerationError:
       problem.lastGenerationError && problem.reviewStatus === "UNSOLVABLE"
@@ -141,35 +116,38 @@ async function getProblemView(
         : problem.lastGenerationError
           ? "The last generation attempt failed. A retry is needed."
           : null,
-    hints: await Promise.all(
-      problem.hints.map(async (hint) => ({
-        ...hint,
-        parsedDocument: await prepareMarkdown(hint.content),
-      })),
-    ),
-    editorial: problem.editorial
-      ? {
-          ...problem.editorial,
-          parsedDocument: await prepareMarkdown(problem.editorial.content),
-        }
-      : null,
-    solution: problem.solution
-      ? {
-          id: problem.solution.id,
-          content: problem.solution.content,
-          parsedDocument: parsedSolutionDocument,
-        }
-      : null,
+    // Both the DB query and prepared documents are ordered by hint order.
+    hints: prepared.hints.map((hint, position) => ({
+      id: problem.hints[position].id,
+      order: hint.order,
+      parsedDocument: hint.document,
+    })),
+    editorial:
+      problem.editorial && prepared.editorial
+        ? {
+            id: problem.editorial.id,
+            parsedDocument: prepared.editorial,
+          }
+        : null,
+    solution:
+      problem.solution && prepared.solution
+        ? {
+            id: problem.solution.id,
+            content: problem.solution.content,
+            parsedDocument: prepared.solution,
+          }
+        : null,
   };
+  return <ProblemContentBody key={problem.id} problem={view} />;
 }
 
 export default async function ProblemPage({ params }: ProblemPageProps) {
   const route = parseProblemRouteParams(await params);
   if (!route) notFound();
 
-  const problem = await getProblemView(route.contestId, route.index);
+  const content = await getProblemContent(route.contestId, route.index);
 
-  if (!problem) notFound();
+  if (!content) notFound();
 
-  return <ProblemContentBody key={problem.id} problem={problem} />;
+  return content;
 }

@@ -51,7 +51,7 @@ function reviewBadge(problem: { runState: string; reviewStatus: string }) {
 }
 
 async function getProblemImage(contestId: number, index: string) {
-  "use cache: remote";
+  "use cache";
 
   cacheTag(problemTag(contestId, index));
   const problem = await getProblemSocialData(contestId, index);

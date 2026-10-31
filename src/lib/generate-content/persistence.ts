@@ -1,4 +1,8 @@
 import type { Prisma } from "@prisma/client";
+import {
+  type PreparedProblemContent,
+  preparedContentJson,
+} from "../prepared-content";
 import { pipelineStateData, problemUpdateData } from "../problem-pipeline-db";
 import type { ParsedContent } from "./content-schema";
 
@@ -18,6 +22,7 @@ export async function saveProblemContent(
   problemId: string,
   parsed: ParsedContent,
   generation: GenerationAuditInfo,
+  prepared: PreparedProblemContent,
   tx: Prisma.TransactionClient,
 ) {
   await tx.hint.deleteMany({ where: { problemId } });
@@ -46,6 +51,7 @@ export async function saveProblemContent(
     where: { id: problemId },
     data: problemUpdateData({
       ...pipelineStateData("SUCCEEDED"),
+      preparedContent: preparedContentJson(prepared),
       generatedByDisplayName: generation.displayName,
       generatedByModel: generation.resolvedModel,
       generationResponseId: generation.responseId,

@@ -11,13 +11,16 @@ import type {
   GenerationRequest,
   GenerationResult,
 } from "./generation-contract";
+import { prepareProblemContent } from "./prepared-content";
 import { prisma } from "./prisma";
 import { readTranscript, TRANSCRIPT_ROUTE } from "./transcript-storage";
 
 export class GenerationConflict extends Error {}
 export class GenerationInputError extends Error {}
 
-function savedResult(problem: Problem): GenerationResult {
+function savedResult(
+  problem: Omit<Problem, "preparedContent">,
+): GenerationResult {
   if (
     problem.runState === "SUCCEEDED" ||
     problem.reviewStatus === "UNSOLVABLE"
@@ -39,6 +42,21 @@ function savedResult(problem: Problem): GenerationResult {
 export async function finishGeneration(
   submission: Exclude<GenerationRequest, { action: "claim" }>,
 ) {
+  const parsed = (() => {
+    if (submission.action !== "complete") return null;
+    try {
+      return problemResultSchema.parse(
+        JSON.parse(submission.response.outputText),
+      );
+    } catch {
+      return null;
+    }
+  })();
+  // Do CPU work before acquiring the generation row lock. The prepared documents
+  // still commit atomically with their source text and the completed claim.
+  const prepared =
+    parsed?.status === "success" ? await prepareProblemContent(parsed) : null;
+
   const finished = await prisma.$transaction(
     async (tx) => {
       // Hold the claim's row lock until all writes commit. A stale worker cannot
@@ -46,6 +64,7 @@ export async function finishGeneration(
       await tx.$queryRaw`SELECT "id" FROM "Problem" WHERE "generationClaimId" = ${submission.claimId} FOR UPDATE`;
       const problem = await tx.problem.findUnique({
         where: { generationClaimId: submission.claimId },
+        omit: { preparedContent: true },
       });
       if (!problem || problem.runState === "IDLE")
         throw new GenerationConflict("Generation claim is no longer active");
@@ -85,16 +104,8 @@ export async function finishGeneration(
           client: tx,
         });
 
-        const parsed = (() => {
-          try {
-            return problemResultSchema.parse(JSON.parse(response.outputText));
-          } catch {
-            error = "Generated output failed content validation";
-            return null;
-          }
-        })();
-        if (parsed?.status === "success") {
-          await saveProblemContent(problem.id, parsed, audit, tx);
+        if (parsed?.status === "success" && prepared) {
+          await saveProblemContent(problem.id, parsed, audit, prepared, tx);
         } else {
           error ??=
             parsed?.reason ?? "Generated output failed content validation";
@@ -129,6 +140,7 @@ export async function finishGeneration(
       }
       const updated = await tx.problem.findUniqueOrThrow({
         where: { id: problem.id },
+        omit: { preparedContent: true },
       });
       return { problem: updated, result: savedResult(updated), changed: true };
     },

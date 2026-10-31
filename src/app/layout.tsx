@@ -1,6 +1,5 @@
 import type { Metadata, Viewport } from "next";
 import { Inter } from "next/font/google";
-import { Suspense } from "react";
 import { CurrentModel } from "@/components/current-model";
 import { Footer } from "@/components/footer";
 import { Navbar } from "@/components/navbar";
@@ -78,13 +77,7 @@ export default function RootLayout({
         >
           Skip to main content
         </a>
-        <Navbar
-          currentModel={
-            <Suspense fallback={null}>
-              <CurrentModel />
-            </Suspense>
-          }
-        />
+        <Navbar currentModel={<CurrentModel />} />
         {children}
         <Footer />
       </body>
