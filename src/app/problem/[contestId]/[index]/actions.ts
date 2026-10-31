@@ -150,6 +150,7 @@ export async function regenerateProblemContent(
           reviewStatus: "UNREVIEWED",
           requestedCount: { increment: 1 },
           generationStartedAt: null,
+          generationClaimId: null,
           lastGenerationError: null,
           generatedByDisplayName: null,
           generatedByModel: null,

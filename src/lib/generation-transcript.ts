@@ -1,4 +1,5 @@
 import { readFile } from "node:fs/promises";
+import { siteApiAuthorization, siteApiUrl } from "./site-api";
 import {
   MAX_TRANSCRIPT_BYTES,
   TRANSCRIPT_ROUTE,
@@ -14,28 +15,6 @@ export function hasTranscriptUploadConfiguration(
   );
 }
 
-function storageUrl(path: string) {
-  const base = process.env.CACHE_REVALIDATION_URL?.trim();
-  if (!base) throw new Error("CACHE_REVALIDATION_URL is not configured");
-  const url = new URL(path, base);
-  if (
-    url.protocol !== "https:" &&
-    !(
-      url.protocol === "http:" &&
-      ["localhost", "127.0.0.1", "[::1]"].includes(url.hostname)
-    )
-  ) {
-    throw new Error("Transcript storage requires HTTPS outside localhost");
-  }
-  return url;
-}
-
-function authorization() {
-  const secret = process.env.CACHE_REVALIDATION_SECRET?.trim();
-  if (!secret) throw new Error("CACHE_REVALIDATION_SECRET is not configured");
-  return `Bearer ${secret}`;
-}
-
 export async function publishGenerationTranscript({
   transcriptPath,
 }: {
@@ -47,10 +26,10 @@ export async function publishGenerationTranscript({
   const body = await readFile(transcriptPath);
   if (body.byteLength > MAX_TRANSCRIPT_BYTES)
     throw new Error("Transcript exceeds size limit");
-  const response = await fetch(storageUrl("/api/transcripts"), {
+  const response = await fetch(siteApiUrl("/api/transcripts"), {
     method: "POST",
     headers: {
-      Authorization: authorization(),
+      Authorization: siteApiAuthorization(),
       "Content-Type": "application/json",
     },
     body,
@@ -67,11 +46,11 @@ export async function publishGenerationTranscript({
   ) {
     throw new Error("Invalid transcript upload acknowledgement");
   }
-  return storageUrl(result.path).href;
+  return siteApiUrl(result.path).href;
 }
 
 export async function deleteGenerationTranscript(url: string) {
-  const expected = storageUrl(TRANSCRIPT_ROUTE);
+  const expected = siteApiUrl(TRANSCRIPT_ROUTE);
   const target = new URL(url, expected);
   if (
     target.origin !== expected.origin ||
@@ -84,7 +63,7 @@ export async function deleteGenerationTranscript(url: string) {
   }
   const response = await fetch(target, {
     method: "DELETE",
-    headers: { Authorization: authorization() },
+    headers: { Authorization: siteApiAuthorization() },
     redirect: "error",
     signal: AbortSignal.timeout(30_000),
   });

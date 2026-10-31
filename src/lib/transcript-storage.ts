@@ -1,6 +1,8 @@
-import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { link, mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
+
+export { authorizedServiceRequest as authorizedTranscriptRequest } from "./service-auth";
 
 export const MAX_TRANSCRIPT_BYTES = 64 * 1024 * 1024;
 export const TRANSCRIPT_ROUTE = "/api/transcripts/";
@@ -18,16 +20,6 @@ function storagePath(key: string) {
   const directory = process.env.TRANSCRIPT_STORAGE_DIR?.trim();
   if (!directory) throw new Error("TRANSCRIPT_STORAGE_DIR is not configured");
   return join(resolve(directory), key);
-}
-
-export function authorizedTranscriptRequest(request: Request) {
-  const secret = process.env.CACHE_REVALIDATION_SECRET?.trim();
-  if (!secret) return false;
-  const supplied = Buffer.from(request.headers.get("authorization") ?? "");
-  const expected = Buffer.from(`Bearer ${secret}`);
-  return (
-    supplied.length === expected.length && timingSafeEqual(supplied, expected)
-  );
 }
 
 export async function storeTranscript(body: Uint8Array) {

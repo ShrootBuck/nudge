@@ -1,6 +1,4 @@
-import { safeRevalidateTags } from "../cache-revalidate";
-import { CURRENT_MODEL_TAG, PROBLEM_LIST_TAG, problemTag } from "../cache-tags";
-import { prisma } from "../prisma";
+import type { Prisma } from "@prisma/client";
 import { pipelineStateData, problemUpdateData } from "../problem-pipeline-db";
 import type { ParsedContent } from "./content-schema";
 
@@ -15,84 +13,59 @@ export type GenerationAuditInfo = {
   transcriptUrl: string | null;
 };
 
-const CONTENT_SAVE_TRANSACTION_TIMEOUT_MS = 30_000;
-const CONTENT_SAVE_TRANSACTION_MAX_WAIT_MS = 15_000;
-
+// The caller owns the transaction so content, usage, and claim completion commit together.
 export async function saveProblemContent(
   problemId: string,
   parsed: ParsedContent,
   generation: GenerationAuditInfo,
+  tx: Prisma.TransactionClient,
 ) {
-  const updatedProblem = await prisma.$transaction(
-    async (tx) => {
-      await tx.hint.deleteMany({ where: { problemId } });
-      await tx.editorial.deleteMany({ where: { problemId } });
-      await tx.solution.deleteMany({ where: { problemId } });
+  await tx.hint.deleteMany({ where: { problemId } });
+  await tx.editorial.deleteMany({ where: { problemId } });
+  await tx.solution.deleteMany({ where: { problemId } });
 
-      if (parsed.hints.length > 0) {
-        await tx.hint.createMany({
-          data: parsed.hints.map((hint) => ({
-            problemId,
-            order: hint.order,
-            content: hint.content,
-          })),
-        });
-      }
-
-      await tx.editorial.create({
-        data: { problemId, content: parsed.editorial },
-      });
-
-      await tx.solution.create({
-        data: { problemId, content: parsed.solution },
-      });
-
-      const problem = await tx.problem.update({
-        where: { id: problemId },
-        data: problemUpdateData({
-          ...pipelineStateData("SUCCEEDED"),
-          generatedByDisplayName: generation.displayName,
-          generatedByModel: generation.resolvedModel,
-          generationResponseId: generation.responseId,
-          generationFinishReason: generation.finishReason,
-          generationNativeFinishReason: generation.nativeFinishReason,
-          generationProviderName: generation.providerName,
-          generationTotalTokens: generation.totalTokens,
-          generationTranscriptUrl: generation.transcriptUrl,
-          generationStartedAt: null,
-          lastGenerationError: null,
-        }),
-        select: {
-          contestId: true,
-          index: true,
-        },
-      });
-
-      await tx.siteState.upsert({
-        where: { id: "global" },
-        create: { id: "global", currentModel: generation.displayName },
-        update: { currentModel: generation.displayName },
-      });
-
-      return problem;
-    },
-    {
-      maxWait: CONTENT_SAVE_TRANSACTION_MAX_WAIT_MS,
-      timeout: CONTENT_SAVE_TRANSACTION_TIMEOUT_MS,
-    },
-  );
-
-  const cacheUpdated = await safeRevalidateTags(
-    [
-      PROBLEM_LIST_TAG,
-      CURRENT_MODEL_TAG,
-      problemTag(updatedProblem.contestId, updatedProblem.index),
-    ],
-    "expire",
-  );
-  if (!cacheUpdated) {
-    console.warn(
-      `Saved ${updatedProblem.contestId}${updatedProblem.index}, but cache invalidation failed`,
-    );
+  if (parsed.hints.length > 0) {
+    await tx.hint.createMany({
+      data: parsed.hints.map((hint) => ({
+        problemId,
+        order: hint.order,
+        content: hint.content,
+      })),
+    });
   }
+
+  await tx.editorial.create({
+    data: { problemId, content: parsed.editorial },
+  });
+
+  await tx.solution.create({
+    data: { problemId, content: parsed.solution },
+  });
+
+  await tx.problem.update({
+    where: { id: problemId },
+    data: problemUpdateData({
+      ...pipelineStateData("SUCCEEDED"),
+      generatedByDisplayName: generation.displayName,
+      generatedByModel: generation.resolvedModel,
+      generationResponseId: generation.responseId,
+      generationFinishReason: generation.finishReason,
+      generationNativeFinishReason: generation.nativeFinishReason,
+      generationProviderName: generation.providerName,
+      generationTotalTokens: generation.totalTokens,
+      generationTranscriptUrl: generation.transcriptUrl,
+      generationStartedAt: null,
+      lastGenerationError: null,
+    }),
+    select: {
+      contestId: true,
+      index: true,
+    },
+  });
+
+  await tx.siteState.upsert({
+    where: { id: "global" },
+    create: { id: "global", currentModel: generation.displayName },
+    update: { currentModel: generation.displayName },
+  });
 }

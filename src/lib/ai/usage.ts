@@ -26,12 +26,14 @@ export async function recordGenerationUsage({
   problemId,
   response,
   date = new Date(),
+  client = prisma,
 }: {
   problemId: string;
   response: StructuredResponse;
   date?: Date;
+  client?: Prisma.TransactionClient;
 }) {
-  await prisma.aiGenerationUsage.upsert({
+  await client.aiGenerationUsage.upsert({
     where: { responseId: response.responseId },
     create: {
       problemId,
@@ -49,3 +51,5 @@ export async function recordGenerationUsage({
     },
   });
 }
+
+import type { Prisma } from "@prisma/client";

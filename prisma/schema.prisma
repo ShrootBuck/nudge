@@ -44,6 +44,7 @@ model Problem {
   reviewStatus        ReviewStatus @default(UNREVIEWED)
   requestedCount      Int          @default(0)
   generationStartedAt DateTime?
+  generationClaimId   String?      @unique
   lastGenerationError String?      @db.Text
 
   generatedByDisplayName String?

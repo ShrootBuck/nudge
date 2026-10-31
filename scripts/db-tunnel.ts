@@ -1,6 +1,7 @@
 export {};
 
-// Keep this running while using local generation or Prisma Studio.
+// Optional administrative access for Prisma Studio or schema changes.
+// Local generation uses Nudge's authenticated HTTPS API and needs no tunnel.
 const host = process.env.NUDGE_SSH_HOST || "zayd@pickleballs";
 const container =
   process.env.NUDGE_DATABASE_CONTAINER || "apiijmbdlkucfbp3nw7mybuv";

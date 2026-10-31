@@ -96,6 +96,7 @@ export async function resetStaleRunningGenerations(now = new Date()) {
           ? { generationAttempts: { decrement: 1 } }
           : {}),
         generationStartedAt: null,
+        generationClaimId: null,
         lastGenerationError:
           "Generation was reset after running for more than 24 hours.",
       }),
@@ -147,10 +148,12 @@ export async function claimProblemForGeneration({
   problemId,
   requireAutomaticEligibility,
   client = prisma,
+  claimId,
 }: {
   problemId: string;
   requireAutomaticEligibility: boolean;
   client?: Prisma.TransactionClient;
+  claimId: string;
 }) {
   const updated = await client.problem.updateMany({
     where: requireAutomaticEligibility
@@ -161,6 +164,7 @@ export async function claimProblemForGeneration({
       generationAttempts: { increment: 1 },
       reviewStatus: "UNREVIEWED",
       generationStartedAt: new Date(),
+      generationClaimId: claimId,
       lastGenerationError: null,
     }),
   });
@@ -168,10 +172,30 @@ export async function claimProblemForGeneration({
   return updated.count === 1;
 }
 
-export async function selectAndClaimNextAutomaticGenerationProblem() {
+export async function selectAndClaimNextAutomaticGenerationProblem(
+  claimId: string,
+) {
   for (let attempt = 0; attempt < 10; attempt++) {
     const result = await prisma.$transaction(
       async (tx) => {
+        // Serialize retries of this request, including a lost HTTP response.
+        await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${claimId}, 0))`;
+        const existing = await tx.problem.findUnique({
+          where: { generationClaimId: claimId },
+          select: automaticGenerationProblemSelect,
+        });
+        if (existing) {
+          return {
+            status: "claimed" as const,
+            selection: {
+              problem: existing,
+              selectionReason:
+                existing.requestedCount > 0
+                  ? ("requested" as const)
+                  : ("backfill" as const),
+            },
+          };
+        }
         const selection = await selectNextAutomaticGenerationProblem(tx);
 
         if (!selection) {
@@ -182,11 +206,18 @@ export async function selectAndClaimNextAutomaticGenerationProblem() {
           problemId: selection.problem.id,
           requireAutomaticEligibility: true,
           client: tx,
+          claimId,
         });
 
-        return claimed
-          ? { status: "claimed" as const, selection }
-          : { status: "retry" as const };
+        if (!claimed) return { status: "retry" as const };
+        const problem = await tx.problem.findUniqueOrThrow({
+          where: { id: selection.problem.id },
+          select: automaticGenerationProblemSelect,
+        });
+        return {
+          status: "claimed" as const,
+          selection: { ...selection, problem },
+        };
       },
       {
         maxWait: CLAIM_TRANSACTION_MAX_WAIT_MS,

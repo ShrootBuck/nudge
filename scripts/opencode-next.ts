@@ -2,20 +2,17 @@ import {
   createLocalOpenCodeRuntime,
   type OpenCodeRuntime,
 } from "../src/lib/ai/opencode";
-import { discordLog } from "../src/lib/discord-log";
-import { SITE_URL } from "../src/lib/env";
 import {
   executeProblemGeneration,
   type GenerationLogger,
-  markClaimedProblemFailed,
   toProblemLabel,
 } from "../src/lib/generate-content/execution";
 import {
-  selectAndClaimNextAutomaticGenerationProblem,
-  selectNextAutomaticGenerationProblem,
-} from "../src/lib/generation-queue";
-import { hasTranscriptUploadConfiguration } from "../src/lib/generation-transcript";
-import { prisma } from "../src/lib/prisma";
+  claimNextGeneration,
+  failGeneration,
+  previewNextGeneration,
+  validateGenerationApiConfiguration,
+} from "../src/lib/generation-api";
 import {
   OPENCODE_NEXT_USAGE,
   parseOpenCodeNextArguments,
@@ -71,9 +68,7 @@ async function preflight(runtime: OpenCodeRuntime) {
 }
 
 function candidateSummary(
-  selection: NonNullable<
-    Awaited<ReturnType<typeof selectNextAutomaticGenerationProblem>>
-  >,
+  selection: NonNullable<Awaited<ReturnType<typeof previewNextGeneration>>>,
 ) {
   const { problem, selectionReason } = selection;
   return `${bold(toProblemLabel(problem))} — ${problem.name} ${dim(
@@ -110,16 +105,7 @@ async function main() {
     throw new Error(`${message}\n${OPENCODE_NEXT_USAGE}`);
   }
 
-  if (!process.env.DATABASE_URL?.trim()) {
-    throw new Error("Missing required environment variable: DATABASE_URL");
-  }
-  if (!parsedArguments.dryRun) {
-    if (!hasTranscriptUploadConfiguration()) {
-      throw new Error(
-        "Missing CACHE_REVALIDATION_URL or CACHE_REVALIDATION_SECRET for transcript uploads",
-      );
-    }
-  }
+  validateGenerationApiConfiguration();
 
   const runtime = await createLocalOpenCodeRuntime();
 
@@ -127,7 +113,7 @@ async function main() {
     const runtimeDetails = await preflight(runtime);
 
     if (parsedArguments.dryRun) {
-      const selection = await selectNextAutomaticGenerationProblem();
+      const selection = await previewNextGeneration();
       if (!selection) {
         console.log(
           `${tag("EMPTY", "yellow")} No eligible generation candidates.`,
@@ -143,14 +129,6 @@ async function main() {
 
     const abortController = new AbortController();
     let interruptedBy: SignalName | null = null;
-    let claimedProblem:
-      | NonNullable<
-          Awaited<
-            ReturnType<typeof selectAndClaimNextAutomaticGenerationProblem>
-          >
-        >["problem"]
-      | null = null;
-
     const interrupt = (signal: SignalName) => {
       if (interruptedBy) {
         return;
@@ -184,7 +162,8 @@ async function main() {
           );
         }
 
-        const selection = await selectAndClaimNextAutomaticGenerationProblem();
+        if (abortController.signal.aborted) throw abortController.signal.reason;
+        const selection = await claimNextGeneration();
         if (!selection) {
           console.log(
             `${tag("EMPTY", "yellow")} No eligible generation candidates.`,
@@ -192,15 +171,19 @@ async function main() {
           return;
         }
 
-        claimedProblem = selection.problem;
         console.log(`${tag("CLAIM", "cyan")} ${candidateSummary(selection)}`);
 
         if (abortController.signal.aborted) {
+          await failGeneration(
+            selection.claimId,
+            `Generation interrupted by ${interruptedBy}`,
+          );
           throw abortController.signal.reason;
         }
 
         const result = await executeProblemGeneration({
           problem: selection.problem,
+          claimId: selection.claimId,
           generate: runtime.generate,
           log: generationLogger,
           abortSignal: abortController.signal,
@@ -212,30 +195,19 @@ async function main() {
         }
 
         if (result.outcome === "failed") {
-          console.error(`${tag("FAIL", "red")} Run failed.`);
+          console.error(`${tag("FAIL", "red")} ${result.error}`);
           process.exitCode = 1;
           return;
         }
 
-        await discordLog({
-          content: `⚡ Generated **${toProblemLabel(selection.problem)}** using ${runtimeDetails.displayName}\n${SITE_URL}/problem/${selection.problem.contestId}/${selection.problem.index}`,
-        });
-
-        const savedProblem = await prisma.problem.findUnique({
-          where: { id: selection.problem.id },
-          select: {
-            generationTotalTokens: true,
-            generatedByDisplayName: true,
-          },
-        });
         const tokenSummary =
-          savedProblem?.generationTotalTokens != null
-            ? `, ${savedProblem.generationTotalTokens.toLocaleString()} tokens`
+          result.totalTokens != null
+            ? `, ${result.totalTokens.toLocaleString()} tokens`
             : "";
 
         console.log(
           `${tag("DONE", "green")} ${bold(toProblemLabel(selection.problem))} with ${
-            savedProblem?.generatedByDisplayName ?? runtimeDetails.displayName
+            result.displayName ?? runtimeDetails.displayName
           } (${outcomeText(result.outcome)}${tokenSummary}).`,
         );
         console.log(
@@ -253,16 +225,6 @@ async function main() {
           `${tag("DONE", "green")} Finished ${completedRuns}/${parsedArguments.runCount} requested generations.`,
         );
       }
-    } catch (error) {
-      const reason = `Local OpenCode generation failed: ${
-        error instanceof Error ? error.message : String(error)
-      }`;
-
-      if (claimedProblem) {
-        await markClaimedProblemFailed({ problem: claimedProblem, reason });
-      }
-
-      throw error;
     } finally {
       process.off("SIGINT", onSigint);
       process.off("SIGTERM", onSigterm);
@@ -279,6 +241,4 @@ try {
     `${tag("FAIL", "red")} ${error instanceof Error ? error.message : String(error)}`,
   );
   process.exitCode = 1;
-} finally {
-  await prisma.$disconnect();
 }

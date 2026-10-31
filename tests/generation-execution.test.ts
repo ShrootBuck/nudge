@@ -1,7 +1,7 @@
 import { expect, test } from "bun:test";
 import { fileURLToPath } from "node:url";
 
-test("generation delegates statement retrieval to the agent and preserves result validation", async () => {
+test("generation delegates retrieval to the agent, submits over HTTPS, and preserves interrupted uploads", async () => {
   // Isolate module mocks so no other test can inherit fake persistence.
   const child = Bun.spawn(
     [

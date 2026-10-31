@@ -1,35 +1,29 @@
-import type { Prisma } from "@prisma/client";
+import { mkdir, unlink, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
 import type { GenerateOptions, StructuredResponse } from "../ai";
-import { recordGenerationUsage } from "../ai/usage";
-import { safeRevalidateTags } from "../cache-revalidate";
-import { PROBLEM_LIST_TAG, problemTag } from "../cache-tags";
 import { formatProblemId } from "../codeforces-problem";
-import { discordLog } from "../discord-log";
-import { SITE_URL } from "../env";
+import { completeGeneration, failGeneration } from "../generation-api";
+import type {
+  GenerationCompletion,
+  GenerationResult,
+} from "../generation-contract";
 import type { AutomaticGenerationProblem } from "../generation-queue";
 import {
   deleteGenerationTranscript,
   publishGenerationTranscript,
 } from "../generation-transcript";
-import { prisma } from "../prisma";
-import { pipelineStateData, problemUpdateData } from "../problem-pipeline-db";
-import { problemOutputSchema, problemResultSchema } from "./content-schema";
-import { type GenerationAuditInfo, saveProblemContent } from "./persistence";
+import { siteApiUrl } from "../site-api";
+import { problemOutputSchema } from "./content-schema";
 import { buildPrompt, GENERATION_SYSTEM_PROMPT } from "./prompt";
 
 export type StructuredResponseGenerator = (
   options: GenerateOptions,
 ) => Promise<StructuredResponse>;
-
 export type GenerationLogger = {
   info(message: string, properties?: Record<string, unknown>): void;
   warn(message: string, properties?: Record<string, unknown>): void;
   error(message: string, properties?: Record<string, unknown>): void;
 };
-
-export type GenerationResult =
-  | { processed: 1; outcome: "succeeded" | "unsolvable" }
-  | { processed: 0; outcome: "failed"; error: string };
 
 function toErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : String(error);
@@ -41,221 +35,116 @@ export function toProblemLabel(
   return formatProblemId(problem.contestId, problem.index);
 }
 
-function toGenerationAuditInfo(
-  response: StructuredResponse,
-  transcriptUrl: string | null,
-): GenerationAuditInfo {
-  return {
-    displayName: response.displayName,
-    responseId: response.responseId,
-    resolvedModel: response.resolvedModel,
-    finishReason: response.finishReason,
-    nativeFinishReason: response.nativeFinishReason,
-    providerName: response.providerName,
-    totalTokens: response.totalTokens,
-    transcriptUrl,
-  };
-}
-
-function generationAuditData(
-  response: StructuredResponse,
-  transcriptUrl: string | null,
-): Pick<
-  Prisma.ProblemUpdateInput,
-  | "generatedByDisplayName"
-  | "generatedByModel"
-  | "generationResponseId"
-  | "generationFinishReason"
-  | "generationNativeFinishReason"
-  | "generationProviderName"
-  | "generationTotalTokens"
-  | "generationTranscriptUrl"
-> {
-  const audit = toGenerationAuditInfo(response, transcriptUrl);
-
-  return {
-    generatedByDisplayName: audit.displayName,
-    generatedByModel: audit.resolvedModel,
-    generationResponseId: audit.responseId,
-    generationFinishReason: audit.finishReason,
-    generationNativeFinishReason: audit.nativeFinishReason,
-    generationProviderName: audit.providerName,
-    generationTotalTokens: audit.totalTokens,
-    generationTranscriptUrl: audit.transcriptUrl,
-  };
-}
-
-async function revalidateProblem(
-  problem: Pick<AutomaticGenerationProblem, "contestId" | "index">,
-) {
-  const cacheUpdated = await safeRevalidateTags(
-    [PROBLEM_LIST_TAG, problemTag(problem.contestId, problem.index)],
-    "expire",
-  );
-  if (!cacheUpdated) {
-    console.warn(
-      `Updated ${toProblemLabel(problem)}, but cache invalidation failed`,
-    );
-  }
-}
-
-export async function markClaimedProblemFailed({
-  problem,
-  reason,
-  response,
-  transcriptUrl = null,
-}: {
-  problem: Pick<
-    AutomaticGenerationProblem,
-    "id" | "contestId" | "index" | "generationTranscriptUrl"
-  >;
-  reason: string;
-  response?: StructuredResponse | null;
-  transcriptUrl?: string | null;
-}) {
-  const updated = await prisma.problem.updateMany({
-    where: { id: problem.id, runState: "RUNNING" },
-    data: problemUpdateData({
-      ...pipelineStateData("FAILED"),
-      generationStartedAt: null,
-      lastGenerationError: reason,
-      ...(response
-        ? generationAuditData(response, transcriptUrl)
-        : { generationTranscriptUrl: null }),
-    }),
-  });
-
-  if (updated.count > 0) {
-    await revalidateProblem(problem);
-  }
-}
-
 export async function executeProblemGeneration({
   problem,
+  claimId,
   generate,
   log,
   abortSignal,
 }: {
   problem: AutomaticGenerationProblem;
+  claimId: string;
   generate: StructuredResponseGenerator;
   log: GenerationLogger;
   abortSignal?: AbortSignal;
 }): Promise<GenerationResult> {
   const label = toProblemLabel(problem);
-  let response: StructuredResponse | null = null;
-  let transcriptUrl: string | null = null;
-
-  try {
-    log.info(`Running generation for ${label}`);
-
-    const generationStartedAt = Date.now();
-    const heartbeat = setInterval(() => {
-      const elapsedSeconds = Math.round(
-        (Date.now() - generationStartedAt) / 1000,
-      );
-      const elapsedMinutes = Math.floor(elapsedSeconds / 60);
-      const elapsed =
-        elapsedMinutes > 0
-          ? `${elapsedMinutes}m ${elapsedSeconds % 60}s`
-          : `${elapsedSeconds}s`;
-      log.info(`${label} still running (${elapsed} elapsed)`);
-    }, 30_000);
-    heartbeat.unref?.();
-
-    try {
-      response = await generate({
-        systemPrompt: GENERATION_SYSTEM_PROMPT,
-        userPrompt: buildPrompt(problem),
-        outputSchema: problemOutputSchema,
-        abortSignal,
-      });
-    } finally {
-      clearInterval(heartbeat);
-    }
-    if (response.transcriptPath) {
-      log.info(
-        `Saved full generation transcript to ${response.transcriptPath}`,
-      );
-      try {
-        transcriptUrl = await publishGenerationTranscript({
-          problemId: problem.id,
-          problemLabel: label,
-          responseId: response.responseId,
-          transcriptPath: response.transcriptPath,
-        });
-        log.info(`Published full generation transcript to ${transcriptUrl}`);
-        if (
-          problem.generationTranscriptUrl &&
-          problem.generationTranscriptUrl !== transcriptUrl
-        ) {
-          await deleteGenerationTranscript(
-            problem.generationTranscriptUrl,
-          ).catch((error) => {
-            log.warn(
-              `Could not delete previous transcript: ${toErrorMessage(error)}`,
-            );
-          });
-        }
-      } catch (error) {
-        log.warn(
-          `Could not publish generation transcript: ${toErrorMessage(error)}`,
-        );
-      }
-    } else if (response.transcriptWarning) {
-      log.warn(response.transcriptWarning);
-    }
-    await recordGenerationUsage({ problemId: problem.id, response });
-
-    if (!response.outputText.trim()) {
-      throw new Error("Provider response missing output text");
-    }
-
-    const parsed = JSON.parse(response.outputText);
-    const outputData = problemResultSchema.parse(parsed);
-
-    if (outputData.status === "unsolvable") {
-      const reason = outputData.reason;
-      log.warn(`Problem ${label} reported as unsolvable: ${reason}`);
-
-      await prisma.problem.update({
-        where: { id: problem.id },
-        data: problemUpdateData({
-          ...pipelineStateData("FAILED"),
-          reviewStatus: "UNSOLVABLE",
-          generationStartedAt: null,
-          lastGenerationError: reason,
-          ...generationAuditData(response, transcriptUrl),
-        }),
-      });
-
-      await revalidateProblem(problem);
-
-      // Keep the whole message under Discord's 2000-char content limit.
-      await discordLog({
-        content: `🚫 **${label}** reported unsolvable: ${reason.slice(0, 1500)}\n${SITE_URL}/problem/${problem.contestId}/${problem.index}`,
-      });
-
-      return { processed: 1, outcome: "unsolvable" };
-    }
-
-    await saveProblemContent(
-      problem.id,
-      outputData,
-      toGenerationAuditInfo(response, transcriptUrl),
+  log.info(`Running generation for ${label}`);
+  const generationStartedAt = Date.now();
+  const heartbeat = setInterval(() => {
+    const seconds = Math.round((Date.now() - generationStartedAt) / 1000);
+    log.info(
+      `${label} still running (${Math.floor(seconds / 60)}m ${seconds % 60}s elapsed)`,
     );
+  }, 30_000);
+  heartbeat.unref?.();
 
-    return { processed: 1, outcome: "succeeded" };
+  let response: StructuredResponse;
+  try {
+    response = await generate({
+      systemPrompt: GENERATION_SYSTEM_PROMPT,
+      userPrompt: buildPrompt(problem),
+      outputSchema: problemOutputSchema,
+      abortSignal,
+    });
   } catch (error) {
     const reason = `Generation failed for ${label}: ${toErrorMessage(error)}`;
     log.error(reason);
-
-    await markClaimedProblemFailed({
-      problem,
-      reason,
-      response,
-      transcriptUrl,
-    });
-
-    return { processed: 0, outcome: "failed", error: reason };
+    return await failGeneration(claimId, reason);
+  } finally {
+    clearInterval(heartbeat);
   }
+
+  let transcriptUrl: string | null = null;
+  if (response.transcriptPath) {
+    log.info(`Saved full generation transcript to ${response.transcriptPath}`);
+    try {
+      transcriptUrl = await publishGenerationTranscript({
+        problemId: problem.id,
+        problemLabel: label,
+        responseId: response.responseId,
+        transcriptPath: response.transcriptPath,
+      });
+      log.info(`Published full generation transcript to ${transcriptUrl}`);
+    } catch (error) {
+      log.warn(
+        `Could not publish generation transcript: ${toErrorMessage(error)}`,
+      );
+    }
+  } else if (response.transcriptWarning) {
+    log.warn(response.transcriptWarning);
+  }
+
+  const submission: GenerationCompletion = {
+    action: "complete",
+    claimId,
+    response: {
+      outputText: response.outputText,
+      responseId: response.responseId,
+      displayName: response.displayName,
+      resolvedModel: response.resolvedModel,
+      finishReason: response.finishReason,
+      nativeFinishReason: response.nativeFinishReason,
+      providerName: response.providerName,
+      totalTokens: response.totalTokens,
+    },
+    transcriptKey: transcriptUrl
+      ? (new URL(transcriptUrl).pathname.split("/").at(-1) ?? null)
+      : null,
+  };
+  // Keep the generated result if the network goes away after an expensive run.
+  // No credentials are stored here. A retry uses the same claim and is idempotent.
+  const pendingPath = resolve(".opencode-runs", `${claimId}.pending.json`);
+  await mkdir(resolve(pendingPath, ".."), { recursive: true });
+  await writeFile(
+    pendingPath,
+    JSON.stringify({ origin: siteApiUrl("/").origin, submission }),
+    { mode: 0o600 },
+  );
+  let result: GenerationResult;
+  try {
+    result = await completeGeneration(submission);
+  } catch (error) {
+    throw new Error(
+      `${toErrorMessage(error)}. Result saved locally; retry without regenerating: bun run opencode:resume -- ${pendingPath}`,
+      { cause: error },
+    );
+  }
+  await unlink(pendingPath).catch((error) =>
+    log.warn(`Could not remove saved submission: ${toErrorMessage(error)}`),
+  );
+  // The old transcript is deletable only after the database references the new one.
+  if (
+    transcriptUrl &&
+    problem.generationTranscriptUrl &&
+    problem.generationTranscriptUrl !== transcriptUrl
+  ) {
+    await deleteGenerationTranscript(problem.generationTranscriptUrl).catch(
+      (error) =>
+        log.warn(
+          `Could not delete previous transcript: ${toErrorMessage(error)}`,
+        ),
+    );
+  }
+  return result;
 }
