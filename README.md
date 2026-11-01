@@ -118,6 +118,14 @@ For a no-write preview of the next candidate:
 bun run opencode:next -- --dry-run
 ```
 
+In an interactive terminal, batch runs support these keys (no Enter needed):
+
+- **p**: pause after the current claimed generation finishes, saves, and exports its transcript. Press **p** again to resume the remaining batch.
+- **q**: finish the current claimed generation, then exit successfully without claiming another. When already paused, exits immediately. A chained command such as `&& x` will run after this clean exit.
+- **Ctrl+C**: abort the current generation and exit with an interruption status.
+
+Controls apply to this runner only, and are disabled when input or output is redirected. A claim already in flight when you press a key is allowed to finish. Pausing on the final job still lets the completed batch exit. The final batch summary includes completed count, elapsed time, and reported tokens. Existing running processes must be restarted to pick up CLI changes.
+
 Each real run claims one eligible problem and creates an isolated OpenCode session. A local V2 plugin exposes `nudge_submit_result`, which validates the result against Nudge's JSON schema. Plain JSON text is not accepted as a submission; if the model finishes without submitting, Nudge sends at most two reminders before failing. The existing content validation still runs before persistence.
 
 Claims and result submissions are safe to retry after a dropped response. If submission still fails after retries, the command saves a credential-free `.opencode-runs/<claim-id>.pending.json` and prints `bun run opencode:resume -- <path>` to retry the upload without running generation again. Stale or replaced claims are rejected.

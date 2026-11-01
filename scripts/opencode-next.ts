@@ -13,6 +13,7 @@ import {
   previewNextGeneration,
   validateGenerationApiConfiguration,
 } from "../src/lib/generation-api";
+import { attachBatchKeyboard, BatchGate } from "./batch-controls";
 import {
   OPENCODE_NEXT_USAGE,
   parseOpenCodeNextArguments,
@@ -145,11 +146,25 @@ async function main() {
 
     process.once("SIGINT", onSigint);
     process.once("SIGTERM", onSigterm);
+    const gate = new BatchGate();
+    const detachKeyboard = attachBatchKeyboard(
+      gate,
+      (message) => console.log(`${tag("CTRL", "cyan")} ${message}`),
+      onSigint,
+    );
 
     try {
       let completedRuns = 0;
+      const startedAt = Date.now();
+      let totalTokens = 0;
 
       for (let runIndex = 1; runIndex <= parsedArguments.runCount; runIndex++) {
+        if (gate.paused && !gate.stopped) {
+          console.log(
+            `${tag("PAUSE", "yellow")} No new work will be claimed. Press p to resume or q to exit.`,
+          );
+        }
+        if (!(await gate.waitForNext(abortController.signal))) break;
         if (parsedArguments.runCount > 1) {
           if (runIndex > 1) {
             console.log("");
@@ -168,7 +183,7 @@ async function main() {
           console.log(
             `${tag("EMPTY", "yellow")} No eligible generation candidates.`,
           );
-          return;
+          break;
         }
 
         console.log(`${tag("CLAIM", "cyan")} ${candidateSummary(selection)}`);
@@ -218,14 +233,19 @@ async function main() {
         );
 
         completedRuns++;
+        totalTokens += result.totalTokens ?? 0;
       }
 
       if (parsedArguments.runCount > 1) {
         console.log(
-          `${tag("DONE", "green")} Finished ${completedRuns}/${parsedArguments.runCount} requested generations.`,
+          `${tag("DONE", "green")} ${gate.stopped ? "Stopped cleanly after" : "Finished"} ${completedRuns}/${parsedArguments.runCount} requested generations (${Math.round((Date.now() - startedAt) / 1000)}s, ${totalTokens.toLocaleString()} reported tokens).`,
         );
       }
+    } catch (error) {
+      if (!interruptedBy) throw error;
+      process.exitCode = interruptedBy === "SIGINT" ? 130 : 143;
     } finally {
+      detachKeyboard();
       process.off("SIGINT", onSigint);
       process.off("SIGTERM", onSigterm);
     }
