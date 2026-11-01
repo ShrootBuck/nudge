@@ -6,6 +6,62 @@ import {
   validTranscriptKey,
 } from "./transcript-storage";
 
+class TranscriptRequestError extends Error {
+  constructor(
+    message: string,
+    readonly retryable: boolean,
+  ) {
+    super(message);
+  }
+}
+
+async function requestTranscript<T>({
+  url,
+  method,
+  body,
+  readResponse,
+}: {
+  url: URL;
+  method: "POST" | "DELETE";
+  body?: Buffer<ArrayBuffer>;
+  readResponse: (response: Response) => Promise<T>;
+}) {
+  const authorization = siteApiAuthorization();
+  // Uploads are content-addressed and deletion is idempotent, so a lost response
+  // can safely be retried with the same bytes. Keep TLS verification enabled.
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const response = await fetch(url, {
+        method,
+        headers: {
+          Authorization: authorization,
+          ...(body ? { "Content-Type": "application/json" } : {}),
+        },
+        body,
+        redirect: "error",
+        signal: AbortSignal.timeout(method === "POST" ? 120_000 : 30_000),
+      });
+      if (!response.ok) {
+        await response.body?.cancel();
+        throw new TranscriptRequestError(
+          `Transcript ${method === "POST" ? "upload" : "deletion"} failed (${response.status})`,
+          response.status === 408 ||
+            response.status === 429 ||
+            response.status >= 500,
+        );
+      }
+      return await readResponse(response);
+    } catch (error) {
+      if (
+        attempt >= 2 ||
+        (error instanceof TranscriptRequestError && !error.retryable)
+      )
+        throw error;
+      await Bun.sleep(500 * 2 ** attempt);
+    }
+  }
+}
+
 export function hasTranscriptUploadConfiguration(
   environment: Record<string, string | undefined> = process.env,
 ) {
@@ -26,27 +82,25 @@ export async function publishGenerationTranscript({
   const body = await readFile(transcriptPath);
   if (body.byteLength > MAX_TRANSCRIPT_BYTES)
     throw new Error("Transcript exceeds size limit");
-  const response = await fetch(siteApiUrl("/api/transcripts"), {
+  return requestTranscript({
+    url: siteApiUrl("/api/transcripts"),
     method: "POST",
-    headers: {
-      Authorization: siteApiAuthorization(),
-      "Content-Type": "application/json",
-    },
     body,
-    redirect: "error",
-    signal: AbortSignal.timeout(120_000),
+    readResponse: async (response) => {
+      const result = (await response.json()) as { path?: unknown } | null;
+      if (
+        typeof result?.path !== "string" ||
+        !result.path.startsWith(TRANSCRIPT_ROUTE) ||
+        !validTranscriptKey(result.path.slice(TRANSCRIPT_ROUTE.length))
+      ) {
+        throw new TranscriptRequestError(
+          "Invalid transcript upload acknowledgement",
+          false,
+        );
+      }
+      return siteApiUrl(result.path).href;
+    },
   });
-  if (!response.ok)
-    throw new Error(`Transcript upload failed (${response.status})`);
-  const result = (await response.json()) as { path?: unknown };
-  if (
-    typeof result.path !== "string" ||
-    !result.path.startsWith(TRANSCRIPT_ROUTE) ||
-    !validTranscriptKey(result.path.slice(TRANSCRIPT_ROUTE.length))
-  ) {
-    throw new Error("Invalid transcript upload acknowledgement");
-  }
-  return siteApiUrl(result.path).href;
 }
 
 export async function deleteGenerationTranscript(url: string) {
@@ -61,12 +115,11 @@ export async function deleteGenerationTranscript(url: string) {
       "Refusing to delete a transcript outside the configured storage service",
     );
   }
-  const response = await fetch(target, {
+  await requestTranscript({
+    url: target,
     method: "DELETE",
-    headers: { Authorization: siteApiAuthorization() },
-    redirect: "error",
-    signal: AbortSignal.timeout(30_000),
+    readResponse: async (response) => {
+      await response.body?.cancel();
+    },
   });
-  if (!response.ok)
-    throw new Error(`Transcript deletion failed (${response.status})`);
 }
