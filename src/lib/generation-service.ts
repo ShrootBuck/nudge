@@ -42,13 +42,20 @@ function savedResult(
 export async function finishGeneration(
   submission: Exclude<GenerationRequest, { action: "claim" }>,
 ) {
+  let validationError: string | null = null;
   const parsed = (() => {
     if (submission.action !== "complete") return null;
     try {
-      return problemResultSchema.parse(
+      const result = problemResultSchema.safeParse(
         JSON.parse(submission.response.outputText),
       );
+      if (result.success) return result.data;
+      validationError = result.error.issues
+        .map((issue) => `${issue.path.join(".") || "result"}: ${issue.message}`)
+        .join("; ");
+      return null;
     } catch {
+      validationError = "Result is not valid JSON";
       return null;
     }
   })();
@@ -108,7 +115,8 @@ export async function finishGeneration(
           await saveProblemContent(problem.id, parsed, audit, prepared, tx);
         } else {
           error ??=
-            parsed?.reason ?? "Generated output failed content validation";
+            parsed?.reason ??
+            `Generated output failed content validation: ${validationError}`;
           await tx.problem.update({
             where: { id: problem.id },
             data: {

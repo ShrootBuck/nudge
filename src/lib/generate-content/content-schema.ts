@@ -15,41 +15,25 @@ const generatedTextSchema = z.string().refine((text) => !text.includes("\0"), {
 });
 
 const hintSchema = z.object({
-  order: z.number().int().min(1).max(5),
+  order: z.number().int().min(1),
   content: generatedTextSchema.trim().min(1).max(MAX_HINT_LENGTH),
 });
 
-export const contentSchema = z
-  .object({
-    status: z.literal("success"),
-    reason: z.null(),
-    hints: z.preprocess(
-      // OpenCode can accept string hints despite the requested object schema.
-      // Only recover an unambiguous ordered string list; validate it normally.
-      (value) =>
-        Array.isArray(value) && value.every((hint) => typeof hint === "string")
-          ? value.map((content, index) => ({ order: index + 1, content }))
-          : value,
-      z.array(hintSchema).length(5),
-    ),
-    editorial: generatedTextSchema.trim().min(1).max(MAX_EDITORIAL_LENGTH),
-    solution: generatedTextSchema.trim().min(1).max(MAX_SOLUTION_LENGTH),
-  })
-  .superRefine(({ hints }, ctx) => {
-    const orders = [...hints.map((hint) => hint.order)].sort((a, b) => a - b);
-
-    for (const [index, order] of [1, 2, 3, 4, 5].entries()) {
-      if (orders[index] !== order) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message:
-            "Hints must contain exactly one entry for each order from 1 to 5",
-          path: ["hints"],
-        });
-        break;
-      }
-    }
-  });
+export const contentSchema = z.object({
+  status: z.literal("success"),
+  reason: z.null(),
+  hints: z.preprocess(
+    // OpenCode can accept string hints despite the requested object schema.
+    // Only recover an unambiguous ordered string list; validate it normally.
+    (value) =>
+      Array.isArray(value) && value.every((hint) => typeof hint === "string")
+        ? value.map((content, index) => ({ order: index + 1, content }))
+        : value,
+    z.array(hintSchema).min(1),
+  ),
+  editorial: generatedTextSchema.trim().min(1).max(MAX_EDITORIAL_LENGTH),
+  solution: generatedTextSchema.trim().min(1).max(MAX_SOLUTION_LENGTH),
+});
 
 const unsolvableContentSchema = z.object({
   status: z.literal("unsolvable"),
@@ -72,10 +56,66 @@ const unsolvableContentSchema = z.object({
   solution: z.null(),
 });
 
-export const problemResultSchema = z.discriminatedUnion("status", [
-  contentSchema,
-  unsolvableContentSchema,
-]);
+// Repair presentation/metadata only; never invent missing learning content.
+function normalizeResult(value: unknown): unknown {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return value;
+  const result = { ...value } as Record<string, unknown>;
+  if (typeof result.status === "string")
+    result.status = result.status.trim().toLowerCase();
+  const hasContent =
+    Array.isArray(result.hints) &&
+    result.hints.length > 0 &&
+    typeof result.editorial === "string" &&
+    result.editorial.trim() &&
+    typeof result.solution === "string" &&
+    result.solution.trim();
+  if (hasContent) result.status = "success";
+  if (result.status === "success") {
+    result.reason = null;
+    if (Array.isArray(result.hints)) {
+      const hints = result.hints.map((hint) =>
+        typeof hint === "string" ? { content: hint } : hint,
+      );
+      // Preserve explicit ordering when it is unambiguous, otherwise use array order.
+      const order = (hint: unknown): number =>
+        hint && typeof hint === "object" && "order" in hint
+          ? Number(hint.order)
+          : Number.NaN;
+      if (
+        hints.every(
+          (hint) => Number.isInteger(order(hint)) && order(hint) > 0,
+        ) &&
+        new Set(hints.map(order)).size === hints.length
+      )
+        hints.sort((a, b) => order(a) - order(b));
+      result.hints = hints.map((hint, index) =>
+        hint && typeof hint === "object" && !Array.isArray(hint)
+          ? { ...hint, order: index + 1 }
+          : hint,
+      );
+    }
+    if (typeof result.solution === "string") {
+      const fenced = result.solution
+        .trim()
+        .match(/^```(?:cpp|c\+\+|cxx|cc|C\+\+|C\+\+26)?\s*\n([\s\S]*?)\n```$/);
+      if (fenced) result.solution = fenced[1];
+    }
+  } else if (result.status === "unsolvable") {
+    for (const field of ["hints", "editorial", "solution"])
+      if (
+        result[field] == null ||
+        result[field] === "null" ||
+        result[field] === ""
+      )
+        result[field] = null;
+  }
+  return result;
+}
+
+export const problemResultSchema = z.preprocess(
+  normalizeResult,
+  z.discriminatedUnion("status", [contentSchema, unsolvableContentSchema]),
+);
 
 export type ParsedContent = z.infer<typeof contentSchema>;
 export type ParsedProblemResult = z.infer<typeof problemResultSchema>;

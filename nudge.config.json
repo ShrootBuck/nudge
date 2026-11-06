@@ -1,8 +1,8 @@
 {
-  "model": "openai/gpt-6-astra",
-  "variant": "low",
+  "model": "opencode/crouton-alpha-free",
+  "variant": "max",
   "display": {
-    "model": "GPT-6 Astra",
-    "reasoning": "low"
+    "model": "Crouton Alpha Free",
+    "reasoning": "max"
   }
 }

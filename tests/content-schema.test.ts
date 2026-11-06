@@ -54,21 +54,47 @@ describe("generated text storage validation", () => {
     ).toEqual(problemResultSchema.parse(validContent));
   });
 
-  test("still rejects invalid recovered hints and ambiguous mixed lists", () => {
+  test("still rejects missing or unusable actual content", () => {
     const strings = validContent.hints.map((hint) => hint.content);
     for (const hints of [
-      strings.slice(1),
-      [...strings, "extra"],
+      [],
       ["   ", ...strings.slice(1)],
       ["bad\0text", ...strings.slice(1)],
       ["x".repeat(10_001), ...strings.slice(1)],
-      [validContent.hints[0], ...strings.slice(1)],
-      validContent.hints.map((hint) => ({ ...hint, order: 1 })),
     ]) {
       expect(
         problemResultSchema.safeParse({ ...validContent, hints }).success,
       ).toBe(false);
     }
+  });
+
+  test("recovers harmless metadata and formatting differences", () => {
+    const result = problemResultSchema.parse({
+      ...validContent,
+      status: " SUCCESS ",
+      reason: "null",
+      hints: ["first", { order: "1", content: "second" }, { content: "third" }],
+      solution: `\`\`\`cpp\n${validContent.solution}\`\`\``,
+      extra: "ignored",
+    });
+    expect(result).toEqual({
+      ...validContent,
+      hints: ["first", "second", "third"].map((content, index) => ({
+        order: index + 1,
+        content,
+      })),
+      solution: validContent.solution.trim(),
+    });
+  });
+
+  test("infers success from complete content and preserves explicit hint order", () => {
+    const content = { ...validContent, status: undefined, reason: undefined };
+    expect(
+      problemResultSchema.parse({
+        ...content,
+        hints: [...content.hints].reverse(),
+      }),
+    ).toEqual(problemResultSchema.parse(validContent));
   });
 
   test("preserves Unicode, math, newlines, and C++ escaped null literals", () => {
