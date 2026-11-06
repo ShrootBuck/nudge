@@ -17,21 +17,36 @@ export default Plugin.define({
       .object({
         status: z.string().optional().describe("success or unsolvable"),
         reason: z
-          .unknown()
+          .string()
+          .nullable()
           .optional()
           .describe("null on success; concrete blocker otherwise"),
         hints: z
-          .unknown()
+          .union([
+            z.array(
+              z.union([
+                z.string(),
+                z.object({
+                  order: z.union([z.number(), z.string()]).optional(),
+                  content: z.string(),
+                }),
+              ]),
+            ),
+            z.string(),
+            z.null(),
+          ])
           .optional()
           .describe(
             "Five progressive hints: [{order: 1, content: 'Markdown'}, ...]",
           ),
         editorial: z
-          .unknown()
+          .string()
+          .nullable()
           .optional()
           .describe("Self-contained Markdown editorial on success"),
         solution: z
-          .unknown()
+          .string()
+          .nullable()
           .optional()
           .describe("Complete raw C++ solution on success"),
       })

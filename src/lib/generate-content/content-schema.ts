@@ -60,6 +60,15 @@ const unsolvableContentSchema = z.object({
 function normalizeResult(value: unknown): unknown {
   if (!value || typeof value !== "object" || Array.isArray(value)) return value;
   const result = { ...value } as Record<string, unknown>;
+  // Some tool adapters serialize nested arguments a second time.
+  if (typeof result.hints === "string") {
+    try {
+      const hints: unknown = JSON.parse(result.hints);
+      if (Array.isArray(hints) || hints === null) result.hints = hints;
+    } catch {
+      // Leave malformed JSON for the normal field validation error.
+    }
+  }
   if (typeof result.status === "string")
     result.status = result.status.trim().toLowerCase();
   const hasContent =

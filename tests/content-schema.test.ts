@@ -45,6 +45,20 @@ const validContent = {
 };
 
 describe("generated text storage validation", () => {
+  test("decodes JSON-serialized hint arguments without altering their content", () => {
+    expect(
+      problemResultSchema.parse({
+        ...validContent,
+        reason: "null",
+        hints: JSON.stringify(validContent.hints),
+      }),
+    ).toEqual(problemResultSchema.parse(validContent));
+    for (const hints of ["[{broken", '{"content":"not an array"}', "[]"]) {
+      expect(
+        problemResultSchema.safeParse({ ...validContent, hints }).success,
+      ).toBe(false);
+    }
+  });
   test("recovers string hints in array order without changing the content", () => {
     expect(
       problemResultSchema.parse({
