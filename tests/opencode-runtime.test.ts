@@ -138,7 +138,7 @@ describe("bundled OpenCode V2 runtime", () => {
         String(provider.url),
       );
       runtime = new LocalOpenCodeRuntime(instance);
-      expect((await runtime.preflight()).version).toBe("2.0.26");
+      expect((await runtime.preflight()).version).toBe("2.2.5");
       const result = await runtime.generate({
         systemPrompt: "Nudge test instruction: submit valid learning content.",
         userPrompt: "Return sample learning content.",
