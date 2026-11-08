@@ -7,6 +7,7 @@ This version has breaking changes — APIs, conventions, and file structure may 
 <!-- END:nextjs-agent-rules -->
 
 - Use Bun only (`bun`, `bunx`). Do not use npm.
+- When I ask to change the model or reasoning level in this project, assume I mean Nudge's AI configuration in `nudge.config.json`, unless I explicitly say this chat or Codex lol.
 
 ## Database changes and deployment
 

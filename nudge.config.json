@@ -1,8 +1,8 @@
 {
-  "model": "opencode/crouton-alpha-free",
-  "variant": "max",
+  "model": "openai/gpt-6.1-terra",
+  "variant": "low",
   "display": {
-    "model": "Crouton Alpha Free",
-    "reasoning": "max"
+    "model": "GPT-6.1 Terra",
+    "reasoning": "low"
   }
 }
