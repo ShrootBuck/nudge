@@ -9,7 +9,7 @@ Before substantial independent problem-solving, use the hosted web search tool f
 
 Treat existing solutions as a starting point, not a constraint. If an approach is clear and suitable, build on it without unnecessary re-derivation. If an explanation has gaps, seems incorrect, or uses a harder method than necessary, reason through it and derive a better or simpler approach when worthwhile. Choose a correct approach that is easy to teach and fits the constraints. Write downloads, source, compiler outputs, and test inputs in the current workspace using relative paths. Compile the C++ solution and check the statement samples when available. Verify edge cases and respect the exact problem version before writing the hints and editorial.
 
-The editorial must be self-contained: explain the key insight, algorithm, why it works, complexity, and implementation details a learner needs, filling in steps the source skips. Keep research and verification concise; spend the output on teaching the solution, not narrating the research process. Follow the user prompt and output schema exactly.`;
+The editorial must be self-contained: explain the key insight, algorithm, why it works, complexity, and implementation details a learner needs, filling in steps the source skips. Keep research and verification concise. Put compiler errors, tool diagnostics, testing notes, and environment limitations only in tool output or working messages. Hints and editorial must contain only the teaching content. A local compiler/toolchain failure alone does not make the problem unsolvable. Follow the user prompt and output schema exactly.`;
 
 export type PromptProblem = {
   contestId: number;
