@@ -136,6 +136,15 @@ The agent receives problem metadata and both Codeforces problem URLs, then retri
 
 Nudge persists the generated hints/editorial/solution, records whole-session token usage (including tool turns and cached tokens), mirrors the exact `opencode session export` bytes into `.opencode-runs`, uploads that file to the Coolify app's transcript endpoint, and prints both transcript locations. A session is deleted only after its transcript has been mirrored; export failures leave it available in OpenCode and report a warning. Ctrl-C, SIGTERM, and the one-hour timeout interrupt the V2 session before cleanup. OpenCode reads provider credentials from its normal local credential store; Nudge never copies them into project configuration.
 
+To load a saved transcript back into OpenCode, import its local path or published URL, then open the session ID printed by the import command:
+
+```bash
+bun run opencode -- session import .opencode-runs/<session-id>.json
+bun run opencode -- --session <session-id>
+```
+
+You can use the transcript URL in place of the local path in the import command.
+
 ## Switching models or providers
 
 Never hand-type a model ID from memory; copy it verbatim from the CLI. `bun run models` queries the same bundled OpenCode runtime that generation spawns and validates against, drilling down in three steps:

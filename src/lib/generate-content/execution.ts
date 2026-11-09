@@ -49,7 +49,6 @@ export async function executeProblemGeneration({
   abortSignal?: AbortSignal;
 }): Promise<GenerationResult> {
   const label = toProblemLabel(problem);
-  log.info(`Running generation for ${label}`);
   const generationStartedAt = Date.now();
   const heartbeat = setInterval(() => {
     const seconds = Math.round((Date.now() - generationStartedAt) / 1000);
@@ -77,7 +76,7 @@ export async function executeProblemGeneration({
 
   let transcriptUrl: string | null = null;
   if (response.transcriptPath) {
-    log.info(`Saved full generation transcript to ${response.transcriptPath}`);
+    log.info(`Transcript: ${response.transcriptPath}`);
     try {
       transcriptUrl = await publishGenerationTranscript({
         problemId: problem.id,
@@ -85,7 +84,7 @@ export async function executeProblemGeneration({
         responseId: response.responseId,
         transcriptPath: response.transcriptPath,
       });
-      log.info(`Published full generation transcript to ${transcriptUrl}`);
+      log.info(`Transcript URL: ${transcriptUrl}`);
     } catch (error) {
       log.warn(
         `Could not publish generation transcript: ${toErrorMessage(error)}`,

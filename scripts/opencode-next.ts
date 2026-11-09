@@ -13,6 +13,8 @@ import {
   previewNextGeneration,
   validateGenerationApiConfiguration,
 } from "../src/lib/generation-api";
+import { siteApiUrl } from "../src/lib/site-api";
+import { cfProblemsetUrl } from "../src/lib/utils";
 import { attachBatchKeyboard, BatchGate } from "./batch-controls";
 import {
   OPENCODE_NEXT_USAGE,
@@ -60,9 +62,7 @@ async function preflight(runtime: OpenCodeRuntime) {
 
   console.log(
     `${tag("OK", "green")} Preflight passed ${dim(
-      `OpenCode ${details.version} (${details.executablePath}), ${details.modelReference}${
-        details.variant ? `/${details.variant}` : ""
-      }, displayed as ${details.displayName}`,
+      `OpenCode ${details.version} · ${details.displayName}`,
     )}`,
   );
   return details;
@@ -124,6 +124,9 @@ async function main() {
 
       console.log(
         `${tag("DRY", "cyan")} Next candidate: ${candidateSummary(selection)}`,
+      );
+      console.log(
+        `      ${cfProblemsetUrl(selection.problem.contestId, selection.problem.index)}`,
       );
       return;
     }
@@ -187,6 +190,10 @@ async function main() {
         }
 
         console.log(`${tag("CLAIM", "cyan")} ${candidateSummary(selection)}`);
+        console.log(
+          `      ${cfProblemsetUrl(selection.problem.contestId, selection.problem.index)}`,
+        );
+        const generationStartedAt = Date.now();
 
         if (abortController.signal.aborted) {
           await failGeneration(
@@ -223,12 +230,14 @@ async function main() {
         console.log(
           `${tag("DONE", "green")} ${bold(toProblemLabel(selection.problem))} with ${
             result.displayName ?? runtimeDetails.displayName
-          } (${outcomeText(result.outcome)}${tokenSummary}).`,
+          } (${outcomeText(result.outcome)}${tokenSummary}, ${Math.round((Date.now() - generationStartedAt) / 1000)}s).`,
         );
         console.log(
           `${dim("Open")} ${color(
             "cyan",
-            `/problem/${selection.problem.contestId}/${selection.problem.index}`,
+            siteApiUrl(
+              `/problem/${selection.problem.contestId}/${selection.problem.index}`,
+            ).href,
           )}`,
         );
 
