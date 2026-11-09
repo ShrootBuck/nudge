@@ -51,11 +51,9 @@ export async function executeProblemGeneration({
   const label = toProblemLabel(problem);
   const generationStartedAt = Date.now();
   const heartbeat = setInterval(() => {
-    const seconds = Math.round((Date.now() - generationStartedAt) / 1000);
-    log.info(
-      `${label} still running (${Math.floor(seconds / 60)}m ${seconds % 60}s elapsed)`,
-    );
-  }, 30_000);
+    const minutes = Math.floor((Date.now() - generationStartedAt) / 60_000);
+    log.info(`${label} still running (${minutes}m elapsed)`);
+  }, 60_000);
   heartbeat.unref?.();
 
   let response: StructuredResponse;
