@@ -2,8 +2,7 @@ node_modules
 .next
 .git
 .env*
-.opencode-runs
-.claude-runs
+.*-runs
 .migration-data
 .agents
 .codex

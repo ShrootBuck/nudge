@@ -169,7 +169,8 @@ try {
   assert.equal((await post(submission)).status, 400);
   assert.equal(await prisma.aiGenerationUsage.count(), 0);
   submission.transcriptKey = await storeTranscript(
-    Buffer.from('{"test":true}'),
+    Buffer.from('{"type":"turn.completed"}\n'),
+    "jsonl",
   );
 
   // Force a failure late in the transaction, after the content and usage writes.

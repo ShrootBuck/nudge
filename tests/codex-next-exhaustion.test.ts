@@ -7,7 +7,7 @@ for (const available of [0, 2]) {
       [
         process.execPath,
         fileURLToPath(
-          new URL("./fixtures/opencode-next-exhaustion.ts", import.meta.url),
+          new URL("./fixtures/codex-next-exhaustion.ts", import.meta.url),
         ),
       ],
       {

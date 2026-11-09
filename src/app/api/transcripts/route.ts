@@ -1,5 +1,6 @@
 import {
   authorizedTranscriptRequest,
+  JSONL_CONTENT_TYPE,
   MAX_TRANSCRIPT_BYTES,
   storeTranscript,
   TRANSCRIPT_ROUTE,
@@ -27,11 +28,25 @@ export async function POST(request: Request) {
     reader.releaseLock();
   }
   const body = Buffer.concat(chunks);
+  const isJsonl =
+    request.headers.get("content-type")?.split(";")[0].trim() ===
+    JSONL_CONTENT_TYPE;
   try {
-    JSON.parse(body.toString("utf8"));
+    const text = body.toString("utf8");
+    if (isJsonl) {
+      for (const line of text.trimEnd().split("\n")) {
+        const event = JSON.parse(line);
+        if (typeof event?.type !== "string")
+          throw new Error("Missing Codex event type");
+      }
+    } else {
+      JSON.parse(text);
+    }
   } catch {
-    return new Response("Invalid JSON", { status: 400 });
+    return new Response(isJsonl ? "Invalid JSONL" : "Invalid JSON", {
+      status: 400,
+    });
   }
-  const key = await storeTranscript(body);
+  const key = await storeTranscript(body, isJsonl ? "jsonl" : "json");
   return Response.json({ path: `${TRANSCRIPT_ROUTE}${key}` });
 }

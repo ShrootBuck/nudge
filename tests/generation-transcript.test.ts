@@ -121,3 +121,32 @@ describe("self-hosted generation transcripts", () => {
     }
   });
 });
+
+test("raw Codex JSONL round-trips byte-for-byte and malformed event logs are rejected", async () => {
+  const body = Buffer.from(
+    '{"type":"thread.started","thread_id":"abc"}\r\n{"type":"turn.completed","usage":{}}\n',
+  );
+  const upload = (data: Buffer) =>
+    POST(
+      new Request("http://localhost/api/transcripts", {
+        method: "POST",
+        headers: {
+          Authorization: "Bearer test-transcript-secret",
+          "Content-Type": "application/x-ndjson",
+        },
+        body: new Uint8Array(data),
+      }),
+    );
+  const key = transcriptKey(body, "jsonl");
+  expect(await (await upload(body)).json()).toEqual({
+    path: `/api/transcripts/${key}`,
+  });
+  const download = await GET(new Request("http://localhost"), {
+    params: Promise.resolve({ key }),
+  });
+  expect(download.headers.get("content-type")).toBe("application/x-ndjson");
+  expect(download.headers.get("content-disposition")).toContain(".jsonl");
+  expect(Buffer.from(await download.arrayBuffer())).toEqual(body);
+  for (const invalid of ["", '{"type":"ok"}\nbad\n', '{"missing":"type"}\n'])
+    expect((await upload(Buffer.from(invalid))).status).toBe(400);
+});

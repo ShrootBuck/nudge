@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { validTranscriptKey } from "./transcript-storage";
 
 // JSON can contain NUL; PostgreSQL text cannot.
 const text = z.string().refine((value) => !value.includes("\0"));
@@ -24,7 +25,7 @@ export const generationRequestSchema = z.discriminatedUnion("action", [
     response: generationResponseSchema,
     transcriptKey: z
       .string()
-      .regex(/^[a-f0-9]{64}\.json$/)
+      .refine(validTranscriptKey, "Invalid transcript key")
       .nullable(),
   }),
   z.strictObject({

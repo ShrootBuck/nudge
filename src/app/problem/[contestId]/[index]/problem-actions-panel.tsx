@@ -74,7 +74,7 @@ export function ProblemMetaRow({
         <a
           href={problem.transcriptDownloadUrl}
           className="inline-flex items-center gap-1 rounded-full border border-border/60 bg-background/70 px-3 py-1.5 text-xs text-muted-foreground transition hover:text-foreground"
-          title="Download the raw OpenCode transcript"
+          title="Download the raw generation transcript"
         >
           <FileJson className="size-3" />
           Transcript

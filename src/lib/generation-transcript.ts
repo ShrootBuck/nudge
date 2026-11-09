@@ -1,8 +1,10 @@
 import { readFile } from "node:fs/promises";
 import { siteApiAuthorization, siteApiUrl } from "./site-api";
 import {
+  JSONL_CONTENT_TYPE,
   MAX_TRANSCRIPT_BYTES,
   TRANSCRIPT_ROUTE,
+  transcriptKey,
   validTranscriptKey,
 } from "./transcript-storage";
 
@@ -19,11 +21,13 @@ async function requestTranscript<T>({
   url,
   method,
   body,
+  contentType,
   readResponse,
 }: {
   url: URL;
   method: "POST" | "DELETE";
   body?: Buffer<ArrayBuffer>;
+  contentType?: string;
   readResponse: (response: Response) => Promise<T>;
 }) {
   const authorization = siteApiAuthorization();
@@ -35,7 +39,7 @@ async function requestTranscript<T>({
         method,
         headers: {
           Authorization: authorization,
-          ...(body ? { "Content-Type": "application/json" } : {}),
+          ...(contentType ? { "Content-Type": contentType } : {}),
         },
         body,
         redirect: "error",
@@ -74,31 +78,27 @@ export function hasTranscriptUploadConfiguration(
 export async function publishGenerationTranscript({
   transcriptPath,
 }: {
-  problemId: string;
-  problemLabel: string;
-  responseId: string;
   transcriptPath: string;
 }) {
   const body = await readFile(transcriptPath);
   if (body.byteLength > MAX_TRANSCRIPT_BYTES)
     throw new Error("Transcript exceeds size limit");
+  const format = transcriptPath.endsWith(".jsonl") ? "jsonl" : "json";
+  const expectedPath = TRANSCRIPT_ROUTE + transcriptKey(body, format);
   return requestTranscript({
     url: siteApiUrl("/api/transcripts"),
     method: "POST",
+    contentType: format === "jsonl" ? JSONL_CONTENT_TYPE : "application/json",
     body,
     readResponse: async (response) => {
       const result = (await response.json()) as { path?: unknown } | null;
-      if (
-        typeof result?.path !== "string" ||
-        !result.path.startsWith(TRANSCRIPT_ROUTE) ||
-        !validTranscriptKey(result.path.slice(TRANSCRIPT_ROUTE.length))
-      ) {
+      if (result?.path !== expectedPath) {
         throw new TranscriptRequestError(
           "Invalid transcript upload acknowledgement",
           false,
         );
       }
-      return siteApiUrl(result.path).href;
+      return siteApiUrl(expectedPath).href;
     },
   });
 }

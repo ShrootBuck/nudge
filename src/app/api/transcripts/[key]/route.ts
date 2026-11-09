@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import {
   authorizedTranscriptRequest,
+  JSONL_CONTENT_TYPE,
   readTranscript,
   removeTranscript,
   validTranscriptKey,
@@ -16,7 +17,9 @@ export async function GET(_request: Request, { params }: Context) {
     const body = await readTranscript(key);
     return new Response(new Uint8Array(body), {
       headers: {
-        "Content-Type": "application/json",
+        "Content-Type": key.endsWith(".jsonl")
+          ? JSONL_CONTENT_TYPE
+          : "application/json",
         "Content-Disposition": `attachment; filename="${key}"`,
         "Content-Length": String(body.byteLength),
         "Cache-Control": "public, max-age=31536000, immutable",

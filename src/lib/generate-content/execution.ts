@@ -1,19 +1,13 @@
-import { mkdir, unlink, writeFile } from "node:fs/promises";
-import { resolve } from "node:path";
 import type { GenerateOptions, StructuredResponse } from "../ai";
 import { formatProblemId } from "../codeforces-problem";
-import { completeGeneration, failGeneration } from "../generation-api";
+import { failGeneration } from "../generation-api";
 import type {
   GenerationCompletion,
   GenerationResult,
 } from "../generation-contract";
 import type { AutomaticGenerationProblem } from "../generation-queue";
-import {
-  deleteGenerationTranscript,
-  publishGenerationTranscript,
-} from "../generation-transcript";
-import { siteApiUrl } from "../site-api";
 import { problemOutputSchema } from "./content-schema";
+import { savePendingGeneration, submitPendingGeneration } from "./pending";
 import { buildPrompt, GENERATION_SYSTEM_PROMPT } from "./prompt";
 
 export type StructuredResponseGenerator = (
@@ -75,25 +69,9 @@ export async function executeProblemGeneration({
     clearInterval(heartbeat);
   }
 
-  let transcriptUrl: string | null = null;
-  if (response.transcriptPath) {
-    log.info(`Saved full generation transcript to ${response.transcriptPath}`);
-    try {
-      transcriptUrl = await publishGenerationTranscript({
-        problemId: problem.id,
-        problemLabel: label,
-        responseId: response.responseId,
-        transcriptPath: response.transcriptPath,
-      });
-      log.info(`Published full generation transcript to ${transcriptUrl}`);
-    } catch (error) {
-      log.warn(
-        `Could not publish generation transcript: ${toErrorMessage(error)}`,
-      );
-    }
-  } else if (response.transcriptWarning) {
-    log.warn(response.transcriptWarning);
-  }
+  if (response.transcriptPath)
+    log.info(`Saved generation transcript to ${response.transcriptPath}`);
+  else if (response.transcriptWarning) log.warn(response.transcriptWarning);
 
   const submission: GenerationCompletion = {
     action: "complete",
@@ -108,43 +86,19 @@ export async function executeProblemGeneration({
       providerName: response.providerName,
       totalTokens: response.totalTokens,
     },
-    transcriptKey: transcriptUrl
-      ? (new URL(transcriptUrl).pathname.split("/").at(-1) ?? null)
-      : null,
+    transcriptKey: null,
   };
-  // Keep the generated result if the network goes away after an expensive run.
-  // No credentials are stored here. A retry uses the same claim and is idempotent.
-  const pendingPath = resolve(".opencode-runs", `${claimId}.pending.json`);
-  await mkdir(resolve(pendingPath, ".."), { recursive: true });
-  await writeFile(
-    pendingPath,
-    JSON.stringify({ origin: siteApiUrl("/").origin, submission }),
-    { mode: 0o600 },
+  const pendingPath = await savePendingGeneration(
+    submission,
+    response.transcriptPath,
+    problem.generationTranscriptUrl,
   );
-  let result: GenerationResult;
   try {
-    result = await completeGeneration(submission);
+    return await submitPendingGeneration(pendingPath, log);
   } catch (error) {
     throw new Error(
-      `${toErrorMessage(error)}. Result saved locally; retry without regenerating: bun run opencode:resume -- ${pendingPath}`,
+      `${toErrorMessage(error)}. Result saved locally; retry without regenerating: bun run codex:resume -- ${pendingPath}`,
       { cause: error },
     );
   }
-  await unlink(pendingPath).catch((error) =>
-    log.warn(`Could not remove saved submission: ${toErrorMessage(error)}`),
-  );
-  // The old transcript is deletable only after the database references the new one.
-  if (
-    transcriptUrl &&
-    problem.generationTranscriptUrl &&
-    problem.generationTranscriptUrl !== transcriptUrl
-  ) {
-    await deleteGenerationTranscript(problem.generationTranscriptUrl).catch(
-      (error) =>
-        log.warn(
-          `Could not delete previous transcript: ${toErrorMessage(error)}`,
-        ),
-    );
-  }
-  return result;
 }

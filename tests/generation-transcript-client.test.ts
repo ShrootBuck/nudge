@@ -49,9 +49,6 @@ afterAll(async () => {
 
 function publish() {
   return publishGenerationTranscript({
-    problemId: "problem",
-    problemLabel: "1733D1",
-    responseId: "response",
     transcriptPath,
   });
 }

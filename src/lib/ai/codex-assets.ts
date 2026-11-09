@@ -1,7 +1,5 @@
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
-import type { SessionPromptInput } from "@opencode/client";
 import {
   downloadCodeforcesImage,
   extensionForImage,
@@ -9,12 +7,12 @@ import {
 } from "./codeforces-images";
 import type { UserPromptInput } from "./types";
 
-type PromptInput = Pick<SessionPromptInput, "text" | "files">;
+type PromptInput = { text: string; images: string[] };
 
 const MAX_PROMPT_IMAGES = 12;
 const MAX_PROMPT_IMAGE_BYTES = 50 * 1024 * 1024;
 
-export async function buildOpenCodePromptInput({
+export async function buildCodexPromptInput({
   input,
   workingDirectory,
   abortSignal,
@@ -26,7 +24,7 @@ export async function buildOpenCodePromptInput({
   fetchImplementation?: FetchImplementation;
 }): Promise<PromptInput> {
   if (typeof input === "string") {
-    return { text: input, files: [] };
+    return { text: input, images: [] };
   }
 
   const assetDirectory = join(workingDirectory, "assets");
@@ -38,7 +36,7 @@ export async function buildOpenCodePromptInput({
   }
 
   const text: string[] = [];
-  const files: NonNullable<SessionPromptInput["files"]>[number][] = [];
+  const images: string[] = [];
   for (const item of input) {
     if (item.type === "text") {
       text.push(item.text ?? "");
@@ -70,11 +68,14 @@ export async function buildOpenCodePromptInput({
     const filePath = join(assetDirectory, filename);
     await writeFile(filePath, data);
     text.push(`[Attached image: ${filename}]`);
-    files.push({
-      name: filename,
-      uri: pathToFileURL(filePath).href,
-    });
+    if (mediaType === "image/svg+xml") {
+      text.push(
+        `Read the vector diagram from assets/${filename} in the workspace.`,
+      );
+    } else {
+      images.push(filePath);
+    }
   }
 
-  return { text: text.join("\n\n"), files };
+  return { text: text.join("\n\n"), images };
 }

@@ -6,13 +6,18 @@ export { authorizedServiceRequest as authorizedTranscriptRequest } from "./servi
 
 export const MAX_TRANSCRIPT_BYTES = 64 * 1024 * 1024;
 export const TRANSCRIPT_ROUTE = "/api/transcripts/";
+export const JSONL_CONTENT_TYPE = "application/x-ndjson";
+export type TranscriptFormat = "json" | "jsonl";
 
 export function validTranscriptKey(key: string) {
-  return /^[a-f0-9]{64}\.json$/.test(key);
+  return /^[a-f0-9]{64}\.jsonl?$/.test(key);
 }
 
-export function transcriptKey(body: Uint8Array) {
-  return `${createHash("sha256").update(body).digest("hex")}.json`;
+export function transcriptKey(
+  body: Uint8Array,
+  format: TranscriptFormat = "json",
+) {
+  return `${createHash("sha256").update(body).digest("hex")}.${format}`;
 }
 
 function storagePath(key: string) {
@@ -22,10 +27,13 @@ function storagePath(key: string) {
   return join(resolve(directory), key);
 }
 
-export async function storeTranscript(body: Uint8Array) {
+export async function storeTranscript(
+  body: Uint8Array,
+  format: TranscriptFormat = "json",
+) {
   if (body.byteLength > MAX_TRANSCRIPT_BYTES)
     throw new Error("Transcript exceeds size limit");
-  const key = transcriptKey(body);
+  const key = transcriptKey(body, format);
   const path = storagePath(key);
   await mkdir(resolve(path, ".."), { recursive: true });
   // Publish atomically so an interrupted write can never leave a partial download.
@@ -34,7 +42,7 @@ export async function storeTranscript(body: Uint8Array) {
     await writeFile(temporary, body, { flag: "wx", mode: 0o640 });
     await link(temporary, path).catch(async (error: NodeJS.ErrnoException) => {
       if (error.code !== "EEXIST") throw error;
-      if (transcriptKey(await readFile(path)) !== key)
+      if (transcriptKey(await readFile(path), format) !== key)
         throw new Error("Stored transcript checksum mismatch");
     });
   } finally {

@@ -1,6 +1,6 @@
 import { mock } from "bun:test";
 import assert from "node:assert/strict";
-import { mkdtemp, readdir, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { GenerateOptions, StructuredResponse } from "../../src/lib/ai";
@@ -30,10 +30,13 @@ mock.module("../../src/lib/generation-api", () => ({
   completeGeneration: complete,
   failGeneration: fail,
 }));
-mock.module("../../src/lib/generation-transcript", () => ({
-  publishGenerationTranscript: async () => {
+const publish = mock(
+  async (_options: { transcriptPath: string }): Promise<string> => {
     throw new Error("Unexpected upload");
   },
+);
+mock.module("../../src/lib/generation-transcript", () => ({
+  publishGenerationTranscript: publish,
   deleteGenerationTranscript: async () => {},
 }));
 
@@ -97,22 +100,62 @@ try {
     "unparsed output for server validation",
   );
   assert.equal(fail.mock.calls.length, 0);
-  assert.deepEqual(await readdir(join(directory, ".opencode-runs")), []);
+  assert.deepEqual(await readdir(join(directory, ".codex-runs")), []);
 
   complete.mockImplementationOnce(async () => {
     throw new Error("network disconnected");
   });
-  await assert.rejects(run(), /opencode:resume/);
+  await assert.rejects(run(), /codex:resume/);
   assert.equal(fail.mock.calls.length, 0); // Don't invalidate a potentially committed result.
   const saved = JSON.parse(
     await readFile(
-      join(directory, ".opencode-runs", `${claimId}.pending.json`),
+      join(directory, ".codex-runs", `${claimId}.pending.json`),
       "utf8",
     ),
   );
   assert.equal(saved.origin, "https://nudge.example");
   assert.equal(saved.submission.claimId, claimId);
   assert.equal(saved.submission.response.responseId, "test-response");
+
+  const { submitPendingGeneration } = await import(
+    "../../src/lib/generate-content/pending"
+  );
+  const pendingPath = join(directory, ".codex-runs", `${claimId}.pending.json`);
+  const log = { info() {}, warn() {} };
+  // Old saved submissions with no transcriptFile can still be retried by path.
+  await writeFile(
+    pendingPath,
+    JSON.stringify({ origin: saved.origin, submission: saved.submission }),
+  );
+  assert.equal(
+    (await submitPendingGeneration(pendingPath, log)).outcome,
+    "succeeded",
+  );
+
+  const transcriptPath = join(
+    directory,
+    ".codex-runs",
+    "d0359c3e-14f7-4a19-b712-1dfe3ef3573d.jsonl",
+  );
+  await writeFile(transcriptPath, '{"type":"turn.completed"}\n');
+  generate.mockImplementationOnce(async () => ({
+    ...saved.submission.response,
+    transcriptPath,
+  }));
+  const beforeUpload = complete.mock.calls.length;
+  publish.mockRejectedValueOnce(new Error("Upload offline"));
+  await assert.rejects(run(), /Upload offline.*codex:resume/);
+  assert.equal(complete.mock.calls.length, beforeUpload);
+  const key = `${"a".repeat(64)}.jsonl`;
+  publish.mockResolvedValueOnce(`https://nudge.example/api/transcripts/${key}`);
+  const beforeResume = generate.mock.calls.length;
+  assert.equal(
+    (await submitPendingGeneration(pendingPath, log)).outcome,
+    "succeeded",
+  );
+  assert.equal(generate.mock.calls.length, beforeResume);
+  assert.equal(publish.mock.calls.at(-1)?.[0].transcriptPath, transcriptPath);
+  assert.equal(complete.mock.calls.at(-1)?.[0].transcriptKey, key);
 
   generate.mockImplementationOnce(async () => {
     throw new Error("cancelled");
