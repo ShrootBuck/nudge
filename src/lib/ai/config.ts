@@ -1,21 +1,41 @@
 import { z } from "zod";
 import rawConfig from "../../../nudge.config.json";
 
-const config = z
-  .strictObject({
+const configSchema = z
+  .object({
     model: z
       .string()
-      .regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/, "Expected a Codex model ID"),
-    reasoningEffort: z.string().trim().min(1),
-    display: z.strictObject({
-      model: z.string().trim().min(1),
-      reasoning: z.string().trim().min(1).optional(),
-    }),
+      .trim()
+      .refine(
+        (value) => {
+          const separator = value.indexOf("/");
+          return separator > 0 && separator < value.length - 1;
+        },
+        { message: "model must use the provider/model format" },
+      ),
+    variant: z.string().trim().min(1).optional(),
+    display: z
+      .object({
+        model: z.string().trim().min(1),
+        reasoning: z.string().trim().min(1).optional(),
+      })
+      .strict(),
   })
-  .parse(rawConfig);
+  .strict();
 
-export const generationConfig = {
-  model: config.model,
-  reasoningEffort: config.reasoningEffort,
-  displayName: `${config.display.model} (${config.display.reasoning ?? config.reasoningEffort})`,
-};
+const parsedConfig = configSchema.parse(rawConfig);
+const modelSeparator = parsedConfig.model.indexOf("/");
+const reasoningDisplayName =
+  parsedConfig.display.reasoning ?? parsedConfig.variant ?? null;
+
+export const OPEN_CODE_GENERATION_CONFIG = {
+  model: parsedConfig.model,
+  providerId: parsedConfig.model.slice(0, modelSeparator),
+  modelId: parsedConfig.model.slice(modelSeparator + 1),
+  variant: parsedConfig.variant ?? null,
+  modelDisplayName: parsedConfig.display.model,
+  reasoningDisplayName,
+  displayName: reasoningDisplayName
+    ? `${parsedConfig.display.model} (${reasoningDisplayName})`
+    : parsedConfig.display.model,
+} as const;

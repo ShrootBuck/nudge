@@ -2,9 +2,12 @@ node_modules
 .next
 .git
 .env*
-.*-runs
+.opencode-runs
+.claude-runs
 .migration-data
 .agents
 .codex
 coverage
 *.tsbuildinfo
+
+.codex-runs

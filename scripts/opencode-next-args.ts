@@ -1,10 +1,10 @@
-export type CodexNextArguments = {
+export type OpenCodeNextArguments = {
   dryRun: boolean;
   runCount: number;
 };
 
-export const CODEX_NEXT_USAGE =
-  "Usage: bun run codex:next -- [count | --count count | -n count | --dry-run]";
+export const OPENCODE_NEXT_USAGE =
+  "Usage: bun run opencode:next -- [count | --count count | -n count | --dry-run]";
 
 function parseRunCount(value: string, source: string) {
   if (!/^[1-9]\d*$/.test(value)) {
@@ -31,9 +31,9 @@ function setRunCount(
   return parseRunCount(value, source);
 }
 
-export function parseCodexNextArguments(
+export function parseOpenCodeNextArguments(
   arguments_: string[],
-): CodexNextArguments {
+): OpenCodeNextArguments {
   let dryRun = false;
   let runCount: number | null = null;
 

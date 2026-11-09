@@ -1,4 +1,5 @@
 import { describe, expect, test } from "bun:test";
+import { buildStructuredOutputSchema } from "../src/lib/ai/request";
 import {
   problemOutputSchema,
   problemResultSchema,
@@ -148,7 +149,12 @@ describe("generated text storage validation", () => {
   }
 });
 
-test("Codex receives NUL restrictions for every generated text field", () => {
+test("OpenCode receives NUL restrictions for every generated text field", () => {
+  const schema = buildStructuredOutputSchema({
+    systemPrompt: "system",
+    userPrompt: "prompt",
+    outputSchema: problemOutputSchema,
+  });
   const patterns: string[] = [];
   function visit(value: unknown) {
     if (!value || typeof value !== "object") return;
@@ -159,7 +165,7 @@ test("Codex receives NUL restrictions for every generated text field", () => {
     }
     for (const child of Object.values(node)) visit(child);
   }
-  visit(problemOutputSchema.schema);
+  visit(schema);
   expect(patterns).toHaveLength(4);
   for (const pattern of patterns) {
     const regex = new RegExp(pattern);

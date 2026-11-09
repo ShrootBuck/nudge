@@ -2,17 +2,18 @@ import { describe, expect, test } from "bun:test";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { buildCodexPromptInput } from "../src/lib/ai/codex-assets";
+import { fileURLToPath } from "node:url";
+import { buildOpenCodePromptInput } from "../src/lib/ai/opencode-assets";
 
-describe("Codex prompt assets", () => {
-  test("downloads Codeforces images as local CLI image inputs", async () => {
+describe("OpenCode prompt assets", () => {
+  test("downloads Codeforces images into V2 file attachments", async () => {
     const workingDirectory = await mkdtemp(
-      join(tmpdir(), "nudge-codex-assets-test-"),
+      join(tmpdir(), "nudge-opencode-assets-test-"),
     );
     const calls: string[] = [];
 
     try {
-      const prompt = await buildCodexPromptInput({
+      const prompt = await buildOpenCodePromptInput({
         input: [
           { type: "text", text: "Inspect this diagram" },
           {
@@ -41,12 +42,13 @@ describe("Codex prompt assets", () => {
       expect(prompt.text).toBe(
         "Inspect this diagram\n\n[Attached image: image-1.png]",
       );
-      expect(prompt.images).toEqual([
-        join(workingDirectory, "assets", "image-1.png"),
-      ]);
-      expect([...(await readFile(prompt.images[0]))]).toEqual([
-        137, 80, 78, 71,
-      ]);
+      expect(prompt.files).toHaveLength(1);
+      expect(prompt.files?.[0]?.name).toBe("image-1.png");
+      const file = prompt.files?.[0];
+      if (!file) throw new Error("Expected an OpenCode file attachment");
+      expect([
+        ...new Uint8Array(await readFile(fileURLToPath(file.uri))),
+      ]).toEqual([137, 80, 78, 71]);
     } finally {
       await rm(workingDirectory, { recursive: true, force: true });
     }
@@ -54,12 +56,12 @@ describe("Codex prompt assets", () => {
 
   test("refuses to download images from unrelated hosts", async () => {
     const workingDirectory = await mkdtemp(
-      join(tmpdir(), "nudge-codex-assets-test-"),
+      join(tmpdir(), "nudge-opencode-assets-test-"),
     );
 
     try {
       await expect(
-        buildCodexPromptInput({
+        buildOpenCodePromptInput({
           input: [
             {
               type: "image_url",
@@ -79,13 +81,13 @@ describe("Codex prompt assets", () => {
 
   test("does not follow image redirects", async () => {
     const workingDirectory = await mkdtemp(
-      join(tmpdir(), "nudge-codex-assets-test-"),
+      join(tmpdir(), "nudge-opencode-assets-test-"),
     );
     let calls = 0;
 
     try {
       await expect(
-        buildCodexPromptInput({
+        buildOpenCodePromptInput({
           input: [
             {
               type: "image_url",

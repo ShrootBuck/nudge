@@ -4,7 +4,7 @@
 
 **Get unstuck without skipping straight to the answer.**
 
-Progressive hints, clean editorials, and full C++ solutions for Codeforces problems. Generated with Codex CLI, served at your own pace.
+Progressive hints, clean editorials, and full C++ solutions for Codeforces problems. Generated through OpenCode, served at your own pace.
 
 [Live Site](https://nudge.zaydkrunz.com)
 
@@ -14,7 +14,7 @@ Progressive hints, clean editorials, and full C++ solutions for Codeforces probl
 
 ## Development
 
-Install dependencies and start the app with Bun 1.4.0 or newer:
+Install dependencies and start the app with Bun 1.4.0 or newer (the lockfile uses a scoped override to keep Prisma on Effect 3 while OpenCode uses Effect 4):
 
 ```bash
 bun install
@@ -69,41 +69,89 @@ The test creates and removes its own schema. It checks fresh initialization, rep
 
 Most editorial sites give you the whole answer or nothing. Nudge sits in between: every problem has **progressive hints** that go from a gentle nudge toward the right area all the way to the key insight, plus a prose editorial and the full C++ solution when you're ready.
 
-All content is generated locally with Codex CLI, then stored in Postgres and served through a Next.js frontend. Problems are synced from the Codeforces API automatically.
+All content is generated locally through OpenCode, then stored in Postgres and served through a Next.js frontend. Problems are synced from the Codeforces API automatically.
 
-## Local Codex generation
+## Local OpenCode generation
 
-Install the locked dependencies with `bun install --frozen-lockfile`. Nudge uses its pinned `@openai/codex` CLI (0.167.0) on macOS or Linux. Each claim runs one unattended `codex exec` in a fresh workspace. Generation uses your existing **ChatGPT Codex usage**. To sign in on the worker, run `bun run codex -- login` and choose **Sign in with ChatGPT**. Check the account mode with `bun run codex -- login status`.
+Generation is local-only, using the project-pinned OpenCode V2 CLI, client, and plugin packages (2.2.5). The server does not run OpenCode and there is no encoded cloud credential path. The generation agent allows tools automatically, including shell commands and file edits. Questions are disabled: the tool is removed and native permission rules deny it. Generation can run on macOS or Linux. Each run uses a temporary working directory and a one-hour timeout.
 
-Set `CACHE_REVALIDATION_URL` and `CACHE_REVALIDATION_SECRET` on the worker for Nudge’s HTTPS API. The parent process handles claims and uploads. The Codex child receives a limited environment and uses its own saved login. The web server stores the results and transcripts.
+Nudge starts its own authenticated server on a random loopback port and shuts it down when the command finishes. It does not attach to or replace your personal OpenCode background service. The local client disables Bun's five-minute socket idle timeout so a quiet session wait can last for the full one-hour generation deadline; cancellation still interrupts it. Use `bun run opencode -- <command>` for the bundled CLI; your global `opencode` installation can have a different version.
 
-```sh
-bun run codex:next -- --dry-run   # validate CLI, login, model and reasoning; preview the queue
-bun run codex:next               # generate and publish one problem
-bun run codex:next -- 3          # generate up to three, sequentially
+For a fresh Linux worker, install Bun and run `bun install --frozen-lockfile`. Put a GNU C++ compiler, Python 3, curl, and Poppler (`pdftotext` and `pdftoppm`) on PATH so the agent can compile solutions and extract or render PDF statements. Give the worker writable temporary, OpenCode state, and `.opencode-runs` directories. Allow loopback connections and outbound HTTPS to Nudge, Codeforces, the model provider, and the search service. Use a dedicated sandbox account with only the worker's credentials: shell tools run with that account's filesystem and network access.
+
+1. Existing local provider credentials are reused. Check them with `bun run opencode -- auth list`. If needed, use `bun run opencode -- auth login` and select the provider/account you want to use. `bun run models` confirms which providers are available to Nudge.
+2. Set `CACHE_REVALIDATION_URL=https://nudge.zaydkrunz.com` and the same strong `CACHE_REVALIDATION_SECRET` used by the deployed app. These authenticate the generator's HTTPS requests; keep the secret in your untracked environment, never in client code or Git.
+3. Transcripts are stored in the deployed app's persistent `/data/transcripts` volume. No separate storage provider is required.
+4. Generation claims work and submits results through `/api/generation`. The server validates content, records usage, writes Postgres, and invalidates caches. No database credentials, SSH tunnel, Tailscale, or separate terminal are required for generation.
+5. Configure the model, reasoning variant, and public display label in `nudge.config.json` (see [Switching models or providers](#switching-models-or-providers)).
+
+   ```json
+   {
+     "model": "openai/gpt-6-astra",
+     "variant": "low",
+     "display": {
+       "model": "GPT-6 Astra",
+       "reasoning": "low"
+     }
+   }
+   ```
+
+6. Run one queued generation:
+
+   ```bash
+   bun run opencode:next
+   ```
+
+   To run several queued generations sequentially:
+
+   ```bash
+   bun run opencode:next -- 3
+   ```
+
+   The explicit form also works:
+
+   ```bash
+   bun run opencode:next -- --count 3
+   ```
+
+For a no-write preview of the next candidate:
+
+```bash
+bun run opencode:next -- --dry-run
 ```
 
-In an interactive batch, press **p** to pause after the active claim, **p** again to resume, or **q** to finish the current problem and exit cleanly. **Ctrl+C** and SIGTERM cancel the active run. A run times out after one hour.
+In an interactive terminal, batch runs support these keys (no Enter needed):
 
-The agent gets the problem metadata and both Codeforces URLs. It retrieves the complete statement, uses OpenAI-hosted live web search for editorials, and can download PDFs or diagrams with a sandboxed shell. Install a C++ compiler with the Codeforces headers and Poppler (`pdftotext` and `pdftoppm`) on the worker. Give the worker writable temporary and `.codex-runs` directories and access to the public web. The agent can mark a problem unsolvable with a concrete reason when it cannot obtain the required information or solve the problem after a substantive attempt.
+- **p**: pause after the current claimed generation finishes, saves, and exports its transcript. Press **p** again to resume the remaining batch.
+- **q**: finish the current claimed generation, then exit successfully without claiming another. When already paused, exits immediately. A chained command such as `&& x` will run after this clean exit.
+- **Ctrl+C**: abort the current generation and exit with an interruption status.
 
-Codex returns the hints, editorial, and C++ through `--output-schema`. The server validates the content before saving it. Each problem’s transcript is the exact JSONL emitted by `codex exec --json`, including the search and command events, messages, and reported usage. The worker saves it in `.codex-runs/` and uploads it to the web server’s persistent transcript volume. Previous JSON downloads still work.
+Controls apply to this runner only, and are disabled when input or output is redirected. A claim already in flight when you press a key is allowed to finish. Pausing on the final job still lets the completed batch exit. The final batch summary includes completed count, elapsed time, and reported tokens. Existing running processes must be restarted to pick up CLI changes.
 
-The worker saves a pending result before upload. If the network drops, run the printed `bun run codex:resume -- <pending.json>` command to retry the same transcript and claim. Resume also accepts existing pending files by path. Stale claims are rejected.
+Each real run claims one eligible problem and creates an isolated OpenCode session. A local V2 plugin exposes `nudge_submit_result`, which validates the result against Nudge's JSON schema. Plain JSON text is not accepted as a submission; if the model finishes without submitting, Nudge sends at most two reminders before failing. The existing content validation still runs before persistence.
 
-## Switching models
+Claims and result submissions are safe to retry after a dropped response. If submission still fails after retries, the command saves a credential-free `.opencode-runs/<claim-id>.pending.json` and prints `bun run opencode:resume -- <path>` to retry the upload without running generation again. Stale or replaced claims are rejected.
 
-Run `bun run models` to see the pinned CLI’s catalog and `bun run models <model-id>` to inspect a model’s reasoning levels and image support. Set the model ID and reasoning effort in `nudge.config.json`, then run the dry run before claiming work.
+The agent receives problem metadata and both Codeforces problem URLs, then retrieves the complete statement and researches solutions with its own tools. This includes PDF statements and relevant diagrams; Nudge does not scrape HTML or prefetch statement images/editorial pages before starting the session. Retrieval failures and fallback attempts appear in the generation transcript. A PDF or missing editorial alone is not an unsolvable result; the agent must identify a concrete statement/resource blocker after trying alternatives.
 
-```json
-{
-  "model": "gpt-6-luna",
-  "reasoningEffort": "low",
-  "display": { "model": "GPT-6 Luna" }
-}
-```
+Nudge persists the generated hints/editorial/solution, records whole-session token usage (including tool turns and cached tokens), mirrors the exact `opencode session export` bytes into `.opencode-runs`, uploads that file to the Coolify app's transcript endpoint, and prints both transcript locations. A session is deleted only after its transcript has been mirrored; export failures leave it available in OpenCode and report a warning. Ctrl-C, SIGTERM, and the one-hour timeout interrupt the V2 session before cleanup. OpenCode reads provider credentials from its normal local credential store; Nudge never copies them into project configuration.
 
-The public label uses the display name and reasoning effort, e.g. `GPT-6 Luna (low)`. An optional `display.reasoning` overrides the label. Each problem retains the label recorded at generation time.
+## Switching models or providers
+
+Never hand-type a model ID from memory; copy it verbatim from the CLI. `bun run models` queries the same bundled OpenCode runtime that generation spawns and validates against, drilling down in three steps:
+
+1. **Connect the provider** (skip if already authed): run `bun run opencode -- auth login`, then confirm with `bun run opencode -- auth list`.
+2. **Pick a provider**: `bun run models` lists connected providers.
+3. **Pick a model**: `bun run models <provider>` lists its models, marking with ✓ the ones that support tools and image input. Copy the full `provider/model-id` string, slashes and dashes included.
+4. **Pick a variant**: `bun run models <provider>/<model>` shows the valid `variant` values, the model's display name, and a ready-to-paste `nudge.config.json` block.
+5. **Verify without generating anything**: `bun run opencode:next -- --dry-run` runs preflight, which validates the model ID, variant, and required capabilities against live provider metadata and prints the exact display name. A typo'd variant fails fast with `does not expose the <variant> variant` instead of wasting a generation.
+
+Notes:
+
+- The config is strict-parsed on startup: unknown keys or a `model` missing the `provider/` prefix are rejected immediately.
+- `variant` is optional and must be one of the variant keys from step 4.
+- `display.model` is the public label — free text, so fix naming there, not in `model`. `display.reasoning` is optional and falls back to `variant` when omitted. The label renders as `display.model (reasoning)`, or just `display.model` when neither is set, so the checked-in configuration renders `GPT-6 Astra (low)`.
+- `display.*` is cosmetic and safe to edit anytime, but the label is stored on each problem at generation time — existing content keeps the label it was generated with, and the new label applies to future generations.
 
 ## Coolify deployment
 

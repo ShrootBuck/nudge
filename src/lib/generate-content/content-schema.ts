@@ -23,7 +23,7 @@ export const contentSchema = z.object({
   status: z.literal("success"),
   reason: z.null(),
   hints: z.preprocess(
-    // Older saved responses can contain string hints.
+    // OpenCode can accept string hints despite the requested object schema.
     // Only recover an unambiguous ordered string list; validate it normally.
     (value) =>
       Array.isArray(value) && value.every((hint) => typeof hint === "string")
@@ -48,7 +48,7 @@ const unsolvableContentSchema = z.object({
         !/\bwithin this run\b/i.test(reason),
       {
         message:
-          "Explain the concrete obstacle encountered while retrieving or solving the problem.",
+          "Unsolvable reason must name a concrete statement or source-access blocker, not lack of confidence.",
       },
     ),
   hints: z.null(),
@@ -140,7 +140,7 @@ export const problemOutputSchema: OutputSchema = {
         type: "string",
         enum: ["success", "unsolvable"],
         description:
-          "Use 'success' for a verified solution. Use 'unsolvable' if the statement or a required resource is inaccessible or inconsistent, or if after research and a serious attempt you still cannot solve the problem correctly.",
+          "Set to 'success' when the retrieved statement defines a solvable programming problem. Set to 'unsolvable' only if the statement is fundamentally incomplete, contradictory, remains inaccessible after retrieval attempts, or depends on an inaccessible required resource. PDF format or a missing editorial alone is not a blocker.",
       },
       reason: {
         anyOf: [
@@ -153,7 +153,7 @@ export const problemOutputSchema: OutputSchema = {
           { type: "null" },
         ],
         description:
-          "If status is 'unsolvable', provide a detailed failure message to show users. Describe the concrete retrieval or algorithmic obstacle, what you tried, and where it failed. Otherwise null.",
+          "If status is 'unsolvable', provide a detailed failure message to show users. Name the concrete statement/resource blocker and any relevant source lookup/access status, such as missing official tutorial, 403/Cloudflare challenge, 404, or unavailable accepted submissions. Otherwise null.",
       },
       hints: {
         anyOf: [

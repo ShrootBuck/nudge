@@ -1,7 +1,8 @@
 {
-  "model": "gpt-6-luna",
-  "reasoningEffort": "low",
+  "model": "openai/gpt-6-luna",
+  "variant": "low",
   "display": {
-    "model": "GPT-6 Luna"
+    "model": "GPT-6 Luna",
+    "reasoning": "low"
   }
 }
