@@ -141,7 +141,8 @@
         circle at 100% 0%,
         oklch(0.84 0.1 92 / 0.18),
         transparent 26%
-      ), linear-gradient(180deg, oklch(1 0 0 / 0.02), transparent 24%);
+      ),
+      linear-gradient(180deg, oklch(1 0 0 / 0.02), transparent 24%);
     background-attachment: fixed;
   }
   html {

@@ -1,5 +1,5 @@
 import { type MarkdownDocument, type Node, parseMarkdown } from "comark";
-import { renderMath } from "comark/plugins/math";
+import katex from "katex";
 import { markdownOptions, markdownPlugins } from "./markdown";
 
 // Run on the server when saving content (or preparing a legacy row once).
@@ -15,9 +15,13 @@ export async function prepareMarkdown(
     if (typeof node === "string") return;
     if (node[0] === "math") {
       // Only inject HTML produced by KaTeX after the Markdown security pass.
-      node[1].renderedHtml = renderMath(
+      node[1].renderedHtml = katex.renderToString(
         String(node[1].content ?? ""),
-        !String(node[1].class ?? "").includes("inline"),
+        {
+          displayMode: !String(node[1].class ?? "").includes("inline"),
+          throwOnError: false,
+          trust: false,
+        },
       );
     }
     for (const child of node.slice(2)) {

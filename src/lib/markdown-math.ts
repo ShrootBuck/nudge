@@ -1,4 +1,4 @@
-import type { ComarkPlugin } from "comark";
+import type { ComarkPlugin, MarkdownItPlugin } from "comark";
 
 type InlineState = {
   src: string;
@@ -29,7 +29,7 @@ type BlockState = {
 export const mathParserFixes: ComarkPlugin = {
   name: "math-parser-fixes",
   markdownItPlugins: [
-    (md) => {
+    (md: Parameters<MarkdownItPlugin>[0]) => {
       // Comark 0.6.2 (also 0.7.0) drops both delimiter lines in multiline
       // blocks, even when they contain LaTeX. Preserve those fragments too.
       // https://github.com/comarkdown/comark/blob/main/packages/comark/src/plugins/math.ts

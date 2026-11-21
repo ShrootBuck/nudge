@@ -104,13 +104,13 @@ test.skipIf(!process.env.TEST_MIGRATION_DATABASE_URL)(
       const upgraded = await start();
       expect(upgraded.code, upgraded.stderr).toBe(0);
       expect(upgraded.stdout).toContain("APP_STARTED");
-      expect(
-        await sql.unsafe<
+      expect([
+        ...(await sql.unsafe<
           { currentModel: string; migrationProbe: string | null }[]
         >(
           `SELECT "currentModel", "migrationProbe" FROM "${schema}"."SiteState" WHERE id = 'existing'`,
-        ),
-      ).toEqual([{ currentModel: "keep this", migrationProbe: null }]);
+        )),
+      ]).toEqual([{ currentModel: "keep this", migrationProbe: null }]);
 
       await addMigration("99990102000000_test_failure", "SELECT 1 / 0;");
       const failed = await start();

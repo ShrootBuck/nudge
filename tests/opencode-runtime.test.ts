@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { SessionTransferData } from "@opencode/client";
+import manifest from "../package.json";
 import { OPEN_CODE_GENERATION_CONFIG } from "../src/lib/ai/config";
 import {
   buildOpenCodeRuntimeConfig,
@@ -14,7 +15,7 @@ import { problemOutputSchema } from "../src/lib/generate-content/content-schema"
 
 type ModelRequest = {
   messages: { role: string; content: unknown }[];
-  tools?: { function: { name: string; parameters: unknown } }[];
+  tools?: { function?: { name: string; parameters: unknown } }[];
 };
 
 function modelResponse(call: number, result: Record<string, unknown> | null) {
@@ -138,7 +139,9 @@ describe("bundled OpenCode V2 runtime", () => {
         String(provider.url),
       );
       runtime = new LocalOpenCodeRuntime(instance);
-      expect((await runtime.preflight()).version).toBe("2.2.5");
+      expect((await runtime.preflight()).version).toBe(
+        manifest.dependencies["@opencode/cli"],
+      );
       const result = await runtime.generate({
         systemPrompt: "Nudge test instruction: submit valid learning content.",
         userPrompt: "Return sample learning content.",
@@ -169,13 +172,13 @@ describe("bundled OpenCode V2 runtime", () => {
       );
       expect(
         requests[0].tools?.some(
-          (tool) => tool.function.name === STRUCTURED_OUTPUT_TOOL,
+          (tool) => tool.function?.name === STRUCTURED_OUTPUT_TOOL,
         ),
       ).toBe(true);
       expect(
-        requests[0].tools?.some((tool) => tool.function.name === "question"),
+        requests[0].tools?.some((tool) => tool.function?.name === "question"),
       ).toBe(false);
-      expect(requests[0].tools?.map((tool) => tool.function.name)).toEqual(
+      expect(requests[0].tools?.map((tool) => tool.function?.name)).toEqual(
         expect.arrayContaining(["webfetch", "websearch", "shell", "read"]),
       );
       await expect(

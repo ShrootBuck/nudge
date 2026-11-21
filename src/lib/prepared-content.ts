@@ -5,7 +5,7 @@ import { prepareMarkdown } from "./prepare-markdown";
 import { parseSolutionContent } from "./problem-solution";
 
 // Bump whenever the parser, sanitizer, math renderer, or highlighting output changes.
-export const PREPARED_CONTENT_VERSION = 1;
+export const PREPARED_CONTENT_VERSION = 2;
 
 export type ProblemContentSource = {
   hints: { order: number; content: string }[];

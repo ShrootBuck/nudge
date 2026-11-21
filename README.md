@@ -14,7 +14,7 @@ Progressive hints, clean editorials, and full C++ solutions for Codeforces probl
 
 ## Development
 
-Install dependencies and start the app with Bun 1.4.0 or newer (the lockfile uses a scoped override to keep Prisma on Effect 3 while OpenCode uses Effect 4):
+Install dependencies and start the app with Bun 1.4.5:
 
 ```bash
 bun install
@@ -73,7 +73,7 @@ All content is generated locally through OpenCode, then stored in Postgres and s
 
 ## Local OpenCode generation
 
-Generation is local-only, using the project-pinned OpenCode V2 CLI, client, and plugin packages (2.2.5). The server does not run OpenCode and there is no encoded cloud credential path. The generation agent allows tools automatically, including shell commands and file edits. Questions are disabled: the tool is removed and native permission rules deny it. Generation can run on macOS or Linux. Each run uses a temporary working directory and a one-hour timeout.
+Generation is local-only, using the project-pinned OpenCode V2 CLI, client, and plugin packages. The server does not run OpenCode and there is no encoded cloud credential path. The generation agent allows tools automatically, including shell commands and file edits. Questions are disabled: the tool is removed and native permission rules deny it. Generation can run on macOS or Linux. Each run uses a temporary working directory and a one-hour timeout.
 
 Nudge starts its own authenticated server on a random loopback port and shuts it down when the command finishes. It does not attach to or replace your personal OpenCode background service. The local client disables Bun's five-minute socket idle timeout so a quiet session wait can last for the full one-hour generation deadline; cancellation still interrupts it. Use `bun run opencode -- <command>` for the bundled CLI; your global `opencode` installation can have a different version.
 
