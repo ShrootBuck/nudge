@@ -42,7 +42,9 @@ export async function storeTranscript(
     await writeFile(temporary, body, { flag: "wx", mode: 0o640 });
     await link(temporary, path).catch(async (error: NodeJS.ErrnoException) => {
       if (error.code !== "EEXIST") throw error;
-      if (transcriptKey(await readFile(path), format) !== key)
+      // Transcripts live in the runtime storage directory outside the build.
+      const existing = await readFile(/* turbopackIgnore: true */ path);
+      if (transcriptKey(existing, format) !== key)
         throw new Error("Stored transcript checksum mismatch");
     });
   } finally {

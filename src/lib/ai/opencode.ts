@@ -61,7 +61,7 @@ export function buildOpenCodeRuntimeConfig(): OpenCodeConfig {
         max_base64_bytes: MAX_CODEFORCES_IMAGE_BYTES,
       },
     },
-    websearch: { provider: "exa" },
+    websearch: { provider: "random" },
     default_agent: GENERATION_AGENT,
     agents: {
       [GENERATION_AGENT]: {
