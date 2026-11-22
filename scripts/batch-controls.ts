@@ -56,19 +56,19 @@ export function attachBatchKeyboard(
       gate.togglePause();
       log(
         gate.paused
-          ? "Pause requested. Any claimed generation will finish and save; press p to resume or q to finish and exit."
+          ? "Pause requested. Claimed generations will finish and save; press p to resume or q to finish and exit."
           : "Resumed. New generations may start.",
       );
     } else if (!key.ctrl && !key.meta && key.name === "q" && !gate.stopped) {
       gate.stop();
-      log("Stopping after any claimed generation finishes and saves.");
+      log("Stopping after all claimed generations finish and save.");
     }
   };
   input.on("keypress", onKey);
   input.setRawMode(true);
   input.resume();
   log(
-    "Keys: p pause/resume after current generation · q finish and exit · Ctrl+C abort",
+    "Keys: p pause/resume new claims · q finish active jobs and exit · Ctrl+C abort",
   );
   return () => {
     input.off("keypress", onKey);

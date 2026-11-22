@@ -142,6 +142,32 @@ describe("bundled OpenCode V2 runtime", () => {
       expect((await runtime.preflight()).version).toBe(
         manifest.dependencies["@opencode/cli"],
       );
+      // Run the CLI against the same completed session before the worker removes it.
+      let cliBytes: string | undefined;
+      const remove = instance.client.session.remove;
+      instance.client.session.remove = async (input, options) => {
+        const cli = Bun.spawn(
+          [
+            instance.executablePath,
+            "session",
+            "export",
+            input.sessionID,
+            "--server",
+            instance.server.url,
+          ],
+          {
+            env: instance.environment,
+            stdout: "pipe",
+            stderr: "inherit",
+          },
+        );
+        const [output, code] = await Promise.all([
+          new Response(cli.stdout).text(),
+          cli.exited,
+        ]);
+        if (code === 0) cliBytes = output;
+        return remove(input, options);
+      };
       const result = await runtime.generate({
         systemPrompt: "Nudge test instruction: submit valid learning content.",
         userPrompt: "Return sample learning content.",
@@ -184,6 +210,7 @@ describe("bundled OpenCode V2 runtime", () => {
       await expect(
         instance.client.session.get({ sessionID: transcript.info.id }),
       ).rejects.toThrow("not found");
+      expect(cliBytes).toBe(bytes);
     } finally {
       await runtime?.close();
       provider.stop(true);
@@ -191,6 +218,76 @@ describe("bundled OpenCode V2 runtime", () => {
       await rm(directory, { recursive: true, force: true });
     }
   }, 40_000);
+
+  test("one V2 server runs overlapping sessions and returns each problem's own result", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "nudge-v2-parallel-test-"));
+    const markers = Array.from(
+      { length: 25 },
+      (_, index) => `parallel-job-${index}.`,
+    );
+    const seen = new Set<string>();
+    const ready = Promise.withResolvers<void>();
+    const provider = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      async fetch(request) {
+        const body = (await request.json()) as ModelRequest;
+        const messages = JSON.stringify(body.messages);
+        const marker = markers.find((value) => messages.includes(value));
+        if (!marker) return new Response("Missing job marker", { status: 400 });
+        if (seen.has(marker)) return modelResponse(2, null);
+        seen.add(marker);
+        if (seen.size === markers.length) ready.resolve();
+        // Neither session receives its first token until all prompts reach the provider.
+        await ready.promise;
+        return modelResponse(1, {
+          status: "unsolvable",
+          reason: marker,
+          hints: null,
+          editorial: null,
+          solution: null,
+        });
+      },
+    });
+    let runtime: LocalOpenCodeRuntime | undefined;
+    const transcripts: string[] = [];
+    try {
+      const instance = await createTestInstance(
+        directory,
+        String(provider.url),
+      );
+      runtime = new LocalOpenCodeRuntime(instance);
+      await runtime.preflight();
+      const initialLocations = await instance.client.debug.location.list();
+      const generate = runtime.generate;
+      const results = await Promise.allSettled(
+        markers.map(async (marker) => {
+          const result = await generate({
+            systemPrompt: "Submit the result.",
+            userPrompt: marker,
+            outputSchema: problemOutputSchema,
+            abortSignal: AbortSignal.timeout(25_000),
+          });
+          if (!result.transcriptPath) throw new Error("Missing job transcript");
+          transcripts.push(result.transcriptPath);
+          expect(JSON.parse(result.outputText).reason).toBe(marker);
+        }),
+      );
+      for (const result of results)
+        if (result.status === "rejected") throw result.reason;
+      expect(new Set(transcripts).size).toBe(markers.length);
+      expect(await instance.client.debug.location.list()).toEqual(
+        initialLocations,
+      );
+      expect(await instance.client.session.active()).toEqual({});
+    } finally {
+      ready.resolve();
+      await runtime?.close();
+      provider.stop(true);
+      await Promise.all(transcripts.map((path) => rm(path, { force: true })));
+      await rm(directory, { recursive: true, force: true });
+    }
+  }, 60_000);
 
   test("interrupts durable work on cancellation and mirrors it before deleting the session", async () => {
     const directory = await mkdtemp(join(tmpdir(), "nudge-v2-abort-test-"));

@@ -74,7 +74,7 @@ export async function executeProblemGeneration({
 
   let transcriptUrl: string | null = null;
   if (response.transcriptPath) {
-    log.info(`Transcript: ${response.transcriptPath}`);
+    log.info(`${label} transcript: ${response.transcriptPath}`);
     try {
       transcriptUrl = await publishGenerationTranscript({
         problemId: problem.id,
@@ -82,14 +82,14 @@ export async function executeProblemGeneration({
         responseId: response.responseId,
         transcriptPath: response.transcriptPath,
       });
-      log.info(`Transcript URL: ${transcriptUrl}`);
+      log.info(`${label} transcript URL: ${transcriptUrl}`);
     } catch (error) {
       log.warn(
-        `Could not publish generation transcript: ${toErrorMessage(error)}`,
+        `${label}: Could not publish generation transcript: ${toErrorMessage(error)}`,
       );
     }
   } else if (response.transcriptWarning) {
-    log.warn(response.transcriptWarning);
+    log.warn(`${label}: ${response.transcriptWarning}`);
   }
 
   const submission: GenerationCompletion = {
@@ -128,7 +128,9 @@ export async function executeProblemGeneration({
     );
   }
   await unlink(pendingPath).catch((error) =>
-    log.warn(`Could not remove saved submission: ${toErrorMessage(error)}`),
+    log.warn(
+      `${label}: Could not remove saved submission: ${toErrorMessage(error)}`,
+    ),
   );
   // The old transcript is deletable only after the database references the new one.
   if (
@@ -139,7 +141,7 @@ export async function executeProblemGeneration({
     await deleteGenerationTranscript(problem.generationTranscriptUrl).catch(
       (error) =>
         log.warn(
-          `Could not delete previous transcript: ${toErrorMessage(error)}`,
+          `${label}: Could not delete previous transcript: ${toErrorMessage(error)}`,
         ),
     );
   }

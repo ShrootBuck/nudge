@@ -11,7 +11,7 @@ export async function mirrorOpenCodeTranscript({
   destinationDirectory = join(process.cwd(), ".opencode-runs"),
 }: {
   sessionId: string;
-  transcript: Uint8Array;
+  transcript: string | Uint8Array;
   destinationDirectory?: string;
 }) {
   await mkdir(destinationDirectory, { recursive: true });

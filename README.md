@@ -115,6 +115,14 @@ For a fresh Linux worker, install Bun and run `bun install --frozen-lockfile`. P
    bun run opencode:next -- --count 3
    ```
 
+From one terminal, run 250 problems with up to 25 active generations on a single private OpenCode server:
+
+```bash
+bun run opencode:next -- 250 --parallel 25
+```
+
+The count is the total for the batch. Each session has its own problem, working directory, timeout, and transcript. When a job finishes and saves, its slot takes the next problem. `--parallel 25` alone runs one batch of 25. Concurrency defaults to 1. Starting another runner starts another server.
+
 For a no-write preview of the next candidate:
 
 ```bash
@@ -123,19 +131,19 @@ bun run opencode:next -- --dry-run
 
 In an interactive terminal, batch runs support these keys (no Enter needed):
 
-- **p**: pause after the current claimed generation finishes, saves, and exports its transcript. Press **p** again to resume the remaining batch.
-- **q**: finish the current claimed generation, then exit successfully without claiming another. When already paused, exits immediately. A chained command such as `&& x` will run after this clean exit.
-- **Ctrl+C**: abort the current generation and exit with an interruption status.
+- **p** pauses new claims. Active generations finish and save. Press **p** again to resume.
+- **q** stops new claims and exits once all active generations finish and save. A chained command such as `&& x` runs after a clean exit.
+- **Ctrl+C** interrupts all active sessions and exits with an interruption status.
 
-Controls apply to this runner only, and are disabled when input or output is redirected. A claim already in flight when you press a key is allowed to finish. Pausing on the final job still lets the completed batch exit. The final batch summary includes completed count, elapsed time, and reported tokens. Existing running processes must be restarted to pick up CLI changes.
+Controls apply to this runner only and require an interactive terminal. A claim already in flight when you press a key is allowed to finish. An empty queue ends the batch after active jobs drain. In parallel mode, a recorded problem failure counts toward the requested total and other jobs continue. An API or persistence exception stops new claims while already claimed jobs finish. Any failure gives the command a nonzero exit status. The batch summary includes completed count, elapsed time, and reported tokens.
 
-Each real run claims one eligible problem and creates an isolated OpenCode session. A local V2 plugin exposes `nudge_submit_result`, which validates the result against Nudge's JSON schema. Plain JSON text is not accepted as a submission; if the model finishes without submitting, Nudge sends at most two reminders before failing. The existing content validation still runs before persistence.
+Each generation claims one eligible problem and creates an isolated OpenCode session. A local V2 plugin exposes `nudge_submit_result`, which validates the result against Nudge's JSON schema. Plain JSON text is not accepted as a submission; if the model finishes without submitting, Nudge sends at most two reminders before failing. The existing content validation still runs before persistence.
 
 Claims and result submissions are safe to retry after a dropped response. If submission still fails after retries, the command saves a credential-free `.opencode-runs/<claim-id>.pending.json` and prints `bun run opencode:resume -- <path>` to retry the upload without running generation again. Stale or replaced claims are rejected.
 
 The agent receives problem metadata and both Codeforces problem URLs, then retrieves the complete statement and researches solutions with its own tools. This includes PDF statements and relevant diagrams; Nudge does not scrape HTML or prefetch statement images/editorial pages before starting the session. Retrieval failures and fallback attempts appear in the generation transcript. A PDF or missing editorial alone is not an unsolvable result; the agent must identify a concrete statement/resource blocker after trying alternatives.
 
-Nudge persists the generated hints/editorial/solution, records whole-session token usage (including tool turns and cached tokens), mirrors the exact `opencode session export` bytes into `.opencode-runs`, uploads that file to the Coolify app's transcript endpoint, and prints both transcript locations. A session is deleted only after its transcript has been mirrored; export failures leave it available in OpenCode and report a warning. Ctrl-C, SIGTERM, and the one-hour timeout interrupt the V2 session before cleanup. OpenCode reads provider credentials from its normal local credential store; Nudge never copies them into project configuration.
+Nudge persists the generated hints/editorial/solution, records whole-session token usage (including tool turns and cached tokens), mirrors the exact `opencode session export` bytes into `.opencode-runs`, uploads that file to the Coolify app's transcript endpoint, and prints both transcript locations. The worker reuses the session export already in memory and releases the temporary directory’s cached OpenCode services after every job. A session is deleted only after its transcript has been mirrored; export failures leave it available in OpenCode and report a warning. Ctrl-C, SIGTERM, and the one-hour timeout interrupt the V2 session before cleanup. OpenCode reads provider credentials from its normal local credential store; Nudge never copies them into project configuration.
 
 To load a saved transcript back into OpenCode, import its local path or published URL, then open the session ID printed by the import command:
 

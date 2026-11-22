@@ -13,6 +13,7 @@ import {
   previewNextGeneration,
   validateGenerationApiConfiguration,
 } from "../src/lib/generation-api";
+import type { GenerationClaim } from "../src/lib/generation-contract";
 import { siteApiUrl } from "../src/lib/site-api";
 import { cfProblemsetUrl } from "../src/lib/utils";
 import { attachBatchKeyboard, BatchGate } from "./batch-controls";
@@ -140,7 +141,7 @@ async function main() {
 
       interruptedBy = signal;
       console.error(
-        `\n${tag("STOP", "yellow")} Received ${signal}; aborting the active generation...`,
+        `\n${tag("STOP", "yellow")} Received ${signal}; aborting active generations...`,
       );
       abortController.abort(new Error(`Generation interrupted by ${signal}`));
     };
@@ -161,38 +162,16 @@ async function main() {
       const startedAt = Date.now();
       let totalTokens = 0;
 
-      for (let runIndex = 1; runIndex <= parsedArguments.runCount; runIndex++) {
-        if (gate.paused && !gate.stopped) {
-          console.log(
-            `${tag("PAUSE", "yellow")} No new work will be claimed. Press p to resume or q to exit.`,
-          );
-        }
-        if (!(await gate.waitForNext(abortController.signal))) break;
-        if (parsedArguments.runCount > 1) {
-          if (runIndex > 1) {
-            console.log("");
-          }
+      const { parallel, runCount } = parsedArguments;
+      let active = 0;
+      let failedRuns = 0;
+      let wake: (() => void) | undefined;
+      const waitForCompletion = () =>
+        new Promise<void>((resolve) => {
+          wake = resolve;
+        });
 
-          console.log(
-            `${tag("RUN", "cyan")} ${bold(
-              `${runIndex}/${parsedArguments.runCount}`,
-            )}`,
-          );
-        }
-
-        if (abortController.signal.aborted) throw abortController.signal.reason;
-        const selection = await claimNextGeneration();
-        if (!selection) {
-          console.log(
-            `${tag("EMPTY", "yellow")} No eligible generation candidates.`,
-          );
-          break;
-        }
-
-        console.log(`${tag("CLAIM", "cyan")} ${candidateSummary(selection)}`);
-        console.log(
-          `      ${cfProblemsetUrl(selection.problem.contestId, selection.problem.index)}`,
-        );
+      async function generate(selection: GenerationClaim) {
         const generationStartedAt = Date.now();
 
         if (abortController.signal.aborted) {
@@ -211,14 +190,14 @@ async function main() {
           abortSignal: abortController.signal,
         });
 
-        if (interruptedBy) {
-          process.exitCode = interruptedBy === "SIGINT" ? 130 : 143;
-          return;
-        }
+        if (interruptedBy) return;
 
         if (result.outcome === "failed") {
-          console.error(`${tag("FAIL", "red")} ${result.error}`);
-          process.exitCode = 1;
+          failedRuns++;
+          console.error(
+            `${tag("FAIL", "red")} ${toProblemLabel(selection.problem)}: ${result.error}`,
+          );
+          if (parallel === 1) gate.stop();
           return;
         }
 
@@ -245,9 +224,64 @@ async function main() {
         totalTokens += result.totalTokens ?? 0;
       }
 
-      if (parsedArguments.runCount > 1) {
+      if (parallel > 1) {
         console.log(
-          `${tag("DONE", "green")} ${gate.stopped ? "Stopped cleanly after" : "Finished"} ${completedRuns}/${parsedArguments.runCount} requested generations (${Math.round((Date.now() - startedAt) / 1000)}s, ${totalTokens.toLocaleString()} reported tokens).`,
+          `${tag("BATCH", "cyan")} Up to ${Math.min(parallel, runCount)} simultaneous generations on one OpenCode server.`,
+        );
+      }
+      try {
+        for (let runIndex = 1; runIndex <= runCount; runIndex++) {
+          if (active >= parallel) await waitForCompletion();
+          if (!(await gate.waitForNext(abortController.signal))) break;
+
+          // Claim serially so our own sessions don't contend for the same queue row.
+          const selection = await claimNextGeneration();
+          if (!selection) {
+            console.log(
+              `${tag("EMPTY", "yellow")} No eligible generation candidates.`,
+            );
+            break;
+          }
+          const label = toProblemLabel(selection.problem);
+          const progress = runCount > 1 ? `[${runIndex}/${runCount}] ` : "";
+          console.log(
+            `${tag("CLAIM", "cyan")} ${progress}${candidateSummary(selection)}`,
+          );
+          console.log(
+            `      ${cfProblemsetUrl(selection.problem.contestId, selection.problem.index)}`,
+          );
+          active++;
+          void generate(selection)
+            .catch((error: unknown) => {
+              failedRuns++;
+              gate.stop();
+              console.error(
+                `${tag("FAIL", "red")} ${label}: ${error instanceof Error ? error.message : String(error)}`,
+              );
+            })
+            .finally(() => {
+              active--;
+              wake?.();
+              wake = undefined;
+            });
+        }
+      } finally {
+        // Keep the shared server alive through every claimed job's persistence and cleanup.
+        while (active > 0) await waitForCompletion();
+      }
+      if (failedRuns > 0) process.exitCode = 1;
+      if (interruptedBy)
+        process.exitCode = interruptedBy === "SIGINT" ? 130 : 143;
+
+      if (runCount > 1) {
+        let status = "Finished";
+        if (gate.stopped)
+          status = failedRuns ? "Stopped after" : "Stopped cleanly after";
+        if (interruptedBy) status = "Interrupted after";
+        const failures = failedRuns ? `${failedRuns} failed, ` : "";
+        const seconds = Math.round((Date.now() - startedAt) / 1000);
+        console.log(
+          `${tag("DONE", failedRuns ? "yellow" : "green")} ${status} ${completedRuns}/${runCount} requested generations (${failures}${seconds}s, ${totalTokens.toLocaleString()} reported tokens).`,
         );
       }
     } catch (error) {

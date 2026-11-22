@@ -346,35 +346,19 @@ export class LocalOpenCodeRuntime implements OpenCodeRuntime {
     let transcriptPath: string | null = null;
     let abortPromise: Promise<void> | null = null;
 
-    const captureTranscript = async () => {
+    const captureTranscript = async (snapshot?: SessionTransferData) => {
       if (!sessionId) return null;
       try {
-        const exportProcess = Bun.spawn(
-          [
-            this.instance.executablePath,
-            "session",
-            "export",
-            sessionId,
-            "--server",
-            this.instance.server.url,
-          ],
-          {
-            cwd: workingDirectory,
-            env: this.instance.environment,
-            stdout: "pipe",
-            stderr: "pipe",
-            timeout: REQUEST_TIMEOUT_MS,
-          },
-        );
-        const [stdout, exitCode] = await Promise.all([
-          new Response(exportProcess.stdout).arrayBuffer(),
-          exportProcess.exited,
-          new Response(exportProcess.stderr).text(),
-        ]);
-        if (exitCode !== 0) return null;
+        // The pinned CLI prints this same export as two-space JSON plus a newline.
+        const transcript =
+          snapshot ??
+          (await this.instance.client.experimental.session.export(
+            { sessionID: sessionId },
+            { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) },
+          ));
         return await mirrorOpenCodeTranscript({
           sessionId,
-          transcript: new Uint8Array(stdout),
+          transcript: `${JSON.stringify(transcript, null, 2)}\n`,
         });
       } catch {
         return null;
@@ -439,11 +423,11 @@ export class LocalOpenCodeRuntime implements OpenCodeRuntime {
       );
       let exported: SessionTransferData | undefined;
       for (let attempt = 0; attempt <= STRUCTURED_OUTPUT_RETRIES; attempt++) {
-        await this.instance.client.session.wait(
+        await this.instance.client.experimental.session.wait(
           { sessionID: sessionId },
           request,
         );
-        exported = await this.instance.client.session.export(
+        exported = await this.instance.client.experimental.session.export(
           { sessionID: sessionId },
           request,
         );
@@ -462,7 +446,7 @@ export class LocalOpenCodeRuntime implements OpenCodeRuntime {
         );
       }
       generationAbort.signal.throwIfAborted();
-      transcriptPath = await captureTranscript();
+      transcriptPath = await captureTranscript(exported);
       generationAbort.signal.throwIfAborted();
       if (!exported) throw new Error("OpenCode returned no session transcript");
       return toStructuredResponse({
@@ -495,6 +479,17 @@ export class LocalOpenCodeRuntime implements OpenCodeRuntime {
           )
           .catch(() => undefined);
       }
+      // Removing the directory alone leaves its plugins and services cached in V2.
+      await this.instance.client.debug.location
+        .evict(
+          { location: { directory: workingDirectory } },
+          { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) },
+        )
+        .catch((error: unknown) => {
+          console.warn(
+            `Could not evict OpenCode location ${workingDirectory}: ${describeError(error)}`,
+          );
+        });
       await rm(workingDirectory, { recursive: true, force: true });
     }
   };
