@@ -164,7 +164,9 @@ async function main() {
 
       const { parallel, runCount } = parsedArguments;
       let active = 0;
-      let failedRuns = 0;
+      let failedAttempts = 0;
+      let fatalFailure = false;
+      const unresolvedClaims = new Map<string, string>();
       let wake: (() => void) | undefined;
       const waitForCompletion = () =>
         new Promise<void>((resolve) => {
@@ -193,7 +195,7 @@ async function main() {
         if (interruptedBy) return;
 
         if (result.outcome === "failed") {
-          failedRuns++;
+          failedAttempts++;
           console.error(
             `${tag("FAIL", "red")} ${toProblemLabel(selection.problem)}: ${result.error}`,
           );
@@ -220,6 +222,9 @@ async function main() {
           )}`,
         );
 
+        // An older response can arrive after the same problem has been reclaimed.
+        if (unresolvedClaims.get(selection.problem.id) === selection.claimId)
+          unresolvedClaims.delete(selection.problem.id);
         completedRuns++;
         totalTokens += result.totalTokens ?? 0;
       }
@@ -251,9 +256,11 @@ async function main() {
             `      ${cfProblemsetUrl(selection.problem.contestId, selection.problem.index)}`,
           );
           active++;
+          unresolvedClaims.set(selection.problem.id, selection.claimId);
           void generate(selection)
             .catch((error: unknown) => {
-              failedRuns++;
+              failedAttempts++;
+              fatalFailure = true;
               gate.stop();
               console.error(
                 `${tag("FAIL", "red")} ${label}: ${error instanceof Error ? error.message : String(error)}`,
@@ -269,19 +276,22 @@ async function main() {
         // Keep the shared server alive through every claimed job's persistence and cleanup.
         while (active > 0) await waitForCompletion();
       }
-      if (failedRuns > 0) process.exitCode = 1;
+      const batchFailed = fatalFailure || unresolvedClaims.size > 0;
+      if (batchFailed) process.exitCode = 1;
       if (interruptedBy)
         process.exitCode = interruptedBy === "SIGINT" ? 130 : 143;
 
       if (runCount > 1) {
         let status = "Finished";
         if (gate.stopped)
-          status = failedRuns ? "Stopped after" : "Stopped cleanly after";
+          status = batchFailed ? "Stopped after" : "Stopped cleanly after";
         if (interruptedBy) status = "Interrupted after";
-        const failures = failedRuns ? `${failedRuns} failed, ` : "";
+        const failures = failedAttempts
+          ? `${failedAttempts} failed attempt${failedAttempts === 1 ? "" : "s"}, ${unresolvedClaims.size} unresolved problem${unresolvedClaims.size === 1 ? "" : "s"}, `
+          : "";
         const seconds = Math.round((Date.now() - startedAt) / 1000);
         console.log(
-          `${tag("DONE", failedRuns ? "yellow" : "green")} ${status} ${completedRuns}/${runCount} requested generations (${failures}${seconds}s, ${totalTokens.toLocaleString()} reported tokens).`,
+          `${tag("DONE", batchFailed ? "yellow" : "green")} ${status} ${completedRuns}/${runCount} requested generations (${failures}${seconds}s, ${totalTokens.toLocaleString()} reported tokens).`,
         );
       }
     } catch (error) {

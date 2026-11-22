@@ -1,6 +1,4 @@
 import { describe, expect, test } from "bun:test";
-import assert from "node:assert/strict";
-import type { Node } from "comark";
 import {
   PREPARED_CONTENT_VERSION,
   type ProblemContentSource,
@@ -18,25 +16,8 @@ const source: ProblemContentSource = {
   solution: '#include <iostream>\nint main() { std::cout << "```"; }',
 };
 
-function descendants(nodes: Node[]): Exclude<Node, string>[] {
-  return nodes.flatMap((node) => {
-    if (typeof node === "string") return [];
-    return [
-      node,
-      ...descendants(
-        node
-          .slice(2)
-          .filter(
-            (child): child is Node =>
-              typeof child === "string" || Array.isArray(child),
-          ),
-      ),
-    ];
-  });
-}
-
 describe("persisted problem preparation", () => {
-  test("round-trips through JSON with prepared math and code, regardless of hint input order", async () => {
+  test("round-trips through JSON with rendered math and code, regardless of hint input order", async () => {
     const prepared = await prepareProblemContent(source);
     const saved = preparedContentJson(prepared);
     expect(readPreparedContent(saved, source)).toEqual(prepared);
@@ -47,21 +28,20 @@ describe("persisted problem preparation", () => {
       }),
     ).toEqual(prepared);
     expect(prepared.hints.map((hint) => hint.order)).toEqual([1, 2]);
-    assert(prepared.editorial);
-    for (const document of [
-      ...prepared.hints.map((hint) => hint.document),
-      prepared.editorial,
+    expect(prepared.editorial).toBeString();
+    for (const html of [
+      ...prepared.hints.map((hint) => hint.html),
+      prepared.editorial ?? "",
     ]) {
-      const math = descendants(document.nodes).filter(
-        (node) => node[0] === "math",
-      );
-      expect(math.length).toBeGreaterThan(0);
-      for (const node of math)
-        expect(node[1].renderedHtml).toContain('class="katex"');
+      expect(html).toMatch(/data-markdown="math(?:-display)?"/);
     }
-    expect(prepared.solution?.nodes[0][0]).toBe("pre");
-    expect(JSON.stringify(prepared.solution)).toContain("```");
-    expect(JSON.stringify(prepared.solution)).toContain("--shiki-dark");
+    expect(prepared.hints[0].html).toContain('aria-label="n"');
+    expect(prepared.solution).toContain(
+      'data-markdown="code-block" data-language="cpp"',
+    );
+    expect(prepared.solution).toContain("```");
+    expect(prepared.solution).toContain("light-dark(");
+    expect(prepared.solution).toContain('data-code-action="download"');
   });
 
   test("rejects source edits, old renderer versions, and incomplete stored documents", async () => {
@@ -80,28 +60,26 @@ describe("persisted problem preparation", () => {
       { ...prepared, hints: [] },
       { ...prepared, editorial: null },
       { ...prepared, solution: { nodes: "invalid" } },
+      {
+        ...prepared,
+        hints: prepared.hints.map((hint) => ({ ...hint, html: 1 })),
+      },
     ]) {
       expect(readPreparedContent(stale, source)).toBeNull();
     }
   });
 
-  test("prepares prose solutions and sanitizes content before persisting math HTML", async () => {
+  test("prepares prose solutions and sanitizes content before persisting HTML", async () => {
     const prepared = await prepareProblemContent({
       hints: [],
       editorial:
         "<script>alert(1)</script>\n\n$\\href{javascript:alert(1)}{x}$",
       solution: "```cpp\nint main() {}\n```\n\nThe answer is $3$.",
     });
-    const nodes = descendants([
-      ...(prepared.editorial?.nodes ?? []),
-      ...(prepared.solution?.nodes ?? []),
-    ]);
-    expect(nodes.some((node) => node[0] === "script")).toBe(false);
-    const math = nodes.filter((node) => node[0] === "math");
-    expect(math).toHaveLength(2);
-    for (const node of math) {
-      expect(node[1].renderedHtml).toBeString();
-      expect(node[1].renderedHtml).not.toContain('href="javascript:');
-    }
+    const html = `${prepared.editorial}${prepared.solution}`;
+    expect(html).not.toContain("<script");
+    expect(html).not.toContain('href="javascript:');
+    expect(html.match(/data-markdown="math"/g)).toHaveLength(2);
+    expect(prepared.solution).toContain('data-language="cpp"');
   });
 });

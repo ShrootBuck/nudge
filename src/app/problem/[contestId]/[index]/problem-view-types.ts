@@ -1,5 +1,4 @@
 import type { RunState } from "@prisma/client";
-import type { MarkdownDocument } from "comark";
 import { BadgeCheck, Ban, LoaderCircle, ShieldAlert, X } from "lucide-react";
 import type { ComponentType } from "react";
 
@@ -26,16 +25,16 @@ export type ProblemView = {
   hints: {
     id: string;
     order: number;
-    parsedDocument: MarkdownDocument;
+    /** Sanitized HTML rendered on the server by Pierre Words. */
+    html: string;
   }[];
   editorial: {
     id: string;
-    parsedDocument: MarkdownDocument;
+    html: string;
   } | null;
   solution: {
     id: string;
-    content: string;
-    parsedDocument: MarkdownDocument;
+    html: string;
   } | null;
 };
 

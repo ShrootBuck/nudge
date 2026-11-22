@@ -1,11 +1,11 @@
 import { createHash } from "node:crypto";
 import type { Prisma } from "@prisma/client";
-import type { MarkdownDocument } from "comark";
-import { prepareMarkdown } from "./prepare-markdown";
+import { renderMarkdown } from "./markdown";
 import { parseSolutionContent } from "./problem-solution";
 
 // Bump whenever the parser, sanitizer, math renderer, or highlighting output changes.
-export const PREPARED_CONTENT_VERSION = 2;
+// Version 3 stores HTML rendered by Pierre Words and Highlights.
+export const PREPARED_CONTENT_VERSION = 3;
 
 export type ProblemContentSource = {
   hints: { order: number; content: string }[];
@@ -16,9 +16,9 @@ export type ProblemContentSource = {
 export type PreparedProblemContent = {
   version: number;
   sourceHash: string;
-  hints: { order: number; document: MarkdownDocument }[];
-  editorial: MarkdownDocument | null;
-  solution: MarkdownDocument | null;
+  hints: { order: number; html: string }[];
+  editorial: string | null;
+  solution: string | null;
 };
 
 function orderedHints(source: ProblemContentSource) {
@@ -44,13 +44,8 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
-function isDocument(value: unknown): value is MarkdownDocument {
-  return (
-    isObject(value) &&
-    Array.isArray(value.nodes) &&
-    isObject(value.frontmatter) &&
-    isObject(value.meta)
-  );
+function isHtml(value: unknown): value is string {
+  return typeof value === "string";
 }
 
 export function readPreparedContent(
@@ -73,14 +68,14 @@ export function readPreparedContent(
       (hint, index) =>
         isObject(hint) &&
         hint.order === hints[index].order &&
-        isDocument(hint.document),
+        isHtml(hint.html),
     ) ||
     !(source.editorial === null
       ? value.editorial === null
-      : isDocument(value.editorial)) ||
+      : isHtml(value.editorial)) ||
     !(source.solution === null
       ? value.solution === null
-      : isDocument(value.solution))
+      : isHtml(value.solution))
   ) {
     return null;
   }
@@ -89,9 +84,14 @@ export function readPreparedContent(
   return value as PreparedProblemContent;
 }
 
-async function prepareSolution(content: string) {
+function prepareSolution(content: string) {
   const parsed = parseSolutionContent(content);
-  if (parsed.kind === "markdown") return prepareMarkdown(parsed.content);
+  if (parsed.kind === "markdown") {
+    return renderMarkdown(parsed.content, {
+      idPrefix: "solution-",
+      download: true,
+    });
+  }
 
   // Code can itself contain Markdown fences (for example, inside a C++ string).
   let longestFence = 2;
@@ -99,36 +99,37 @@ async function prepareSolution(content: string) {
     longestFence = Math.max(longestFence, match[0].length);
   }
   const fence = "`".repeat(longestFence + 1);
-  return prepareMarkdown(
+  return renderMarkdown(
     `${fence}${parsed.language}\n${parsed.code}\n${fence}`,
+    {
+      idPrefix: "solution-",
+      download: true,
+    },
   );
 }
 
 export async function prepareProblemContent(
   source: ProblemContentSource,
 ): Promise<PreparedProblemContent> {
-  const [hints, editorial, solution] = await Promise.all([
-    Promise.all(
-      orderedHints(source).map(async ({ order, content }) => ({
-        order,
-        document: await prepareMarkdown(content),
-      })),
-    ),
-    source.editorial === null ? null : prepareMarkdown(source.editorial),
-    source.solution === null ? null : prepareSolution(source.solution),
-  ]);
   return {
     version: PREPARED_CONTENT_VERSION,
     sourceHash: contentHash(source),
-    hints,
-    editorial,
-    solution,
+    hints: orderedHints(source).map(({ order, content }) => ({
+      order,
+      html: renderMarkdown(content, { idPrefix: `hint-${order}-` }),
+    })),
+    editorial:
+      source.editorial === null
+        ? null
+        : renderMarkdown(source.editorial, { idPrefix: "editorial-" }),
+    solution:
+      source.solution === null ? null : prepareSolution(source.solution),
   };
 }
 
 export function preparedContentJson(
   prepared: PreparedProblemContent,
 ): Prisma.InputJsonValue {
-  // Normalize the parser output to exactly the JSON representation persisted in Postgres.
+  // Normalize to exactly the JSON representation persisted in Postgres.
   return JSON.parse(JSON.stringify(prepared));
 }

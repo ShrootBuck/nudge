@@ -1,86 +1,121 @@
 "use client";
 
-import { MarkdownDocument as MarkdownDocumentRenderer } from "@comark/react";
-import type { MarkdownDocument } from "comark";
-import type { ComponentProps } from "react";
-import { cn } from "@/lib/utils";
+import type { MouseEvent } from "react";
+import { useEffect, useRef } from "react";
 
-export function StyledPre({
-  className,
-  children,
-  ...props
-}: ComponentProps<"pre">) {
-  return (
-    <pre
-      className={cn(
-        "m-0 max-w-full overflow-x-auto p-4 text-[13px] sm:p-6 sm:text-sm [&_code]:bg-transparent [&_code]:p-0",
-        className,
-      )}
-      {...props}
-    >
-      {children}
-    </pre>
-  );
+const EXTENSIONS: Record<string, string> = {
+  "c++": "cpp",
+  cc: "cpp",
+  cxx: "cpp",
+  javascript: "js",
+  plaintext: "txt",
+  python: "py",
+  py3: "py",
+  rust: "rs",
+  shell: "sh",
+  bash: "sh",
+  text: "txt",
+  typescript: "ts",
+};
+
+function fileExtension(language: string | null | undefined) {
+  const normalized = (language ?? "").toLowerCase();
+  if (!/^[a-z0-9+#]+$/.test(normalized)) return "txt";
+  return EXTENSIONS[normalized] ?? normalized.replace(/[^a-z0-9]/g, "");
 }
 
-function ProsePre(props: ComponentProps<"pre">) {
-  return (
-    <div className="max-w-full overflow-hidden rounded-xl border border-border/70 shadow-[0_16px_40px_-28px_rgba(15,23,42,0.55)] sm:rounded-2xl">
-      <StyledPre {...props} />
-    </div>
-  );
-}
-
-function ProseLink({ href, children, ...props }: ComponentProps<"a">) {
-  const isExternal = href?.startsWith("http");
-
-  return (
-    <a
-      href={href}
-      target={isExternal ? "_blank" : undefined}
-      rel={isExternal ? "noreferrer noopener" : undefined}
-      {...props}
-    >
-      {children}
-    </a>
-  );
-}
-
-function PreparedMath({
-  content,
-  className = "",
-  renderedHtml,
-}: {
-  content: string;
-  className?: string;
-  renderedHtml?: string;
-}) {
-  const Tag = className.includes("inline") ? "span" : "div";
-  if (renderedHtml === undefined) {
-    return <Tag className={className}>{content}</Tag>;
+async function writeClipboard(text: string) {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
   }
-  return (
-    <Tag
-      className={className}
-      // biome-ignore lint/security/noDangerouslySetInnerHtml: Produced only by server-side KaTeX with trust disabled, after sanitizing the Markdown.
-      dangerouslySetInnerHTML={{ __html: renderedHtml }}
-    />
-  );
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.opacity = "0";
+  document.body.append(textarea);
+  textarea.select();
+  try {
+    if (!document.execCommand("copy")) throw new Error("Copy command failed");
+  } finally {
+    textarea.remove();
+  }
 }
 
-const components = { Math: PreparedMath, pre: ProsePre, a: ProseLink };
-
+/**
+ * Displays Markdown that the server already rendered and sanitized with
+ * Pierre Words. The only client work is wiring the code block buttons.
+ */
 export function ProblemMarkdown({
-  parsedDocument,
+  html,
+  downloadName,
 }: {
-  parsedDocument: MarkdownDocument;
+  html: string;
+  /** Base file name (without extension) for code block downloads. */
+  downloadName?: string;
 }) {
+  const timers = useRef(new Map<HTMLButtonElement, number>());
+
+  useEffect(() => {
+    const pending = timers.current;
+    return () => {
+      for (const timer of pending.values()) window.clearTimeout(timer);
+    };
+  }, []);
+
+  function flash(button: HTMLButtonElement, state: "copied" | "error") {
+    const label = button.querySelector("span");
+    button.dataset.state = state;
+    if (label) label.textContent = state === "copied" ? "Copied" : "Failed";
+    window.clearTimeout(timers.current.get(button));
+    timers.current.set(
+      button,
+      window.setTimeout(() => {
+        delete button.dataset.state;
+        if (label) label.textContent = "Copy";
+        timers.current.delete(button);
+      }, 1800),
+    );
+  }
+
+  async function handleClick(event: MouseEvent<HTMLDivElement>) {
+    const button = (event.target as Element).closest<HTMLButtonElement>(
+      "button[data-code-action]",
+    );
+    if (!button || !event.currentTarget.contains(button)) return;
+    const block = button.closest<HTMLElement>('[data-markdown="code-block"]');
+    const code = block?.querySelector("pre code")?.textContent ?? "";
+
+    if (button.dataset.codeAction === "copy") {
+      try {
+        await writeClipboard(code);
+        flash(button, "copied");
+      } catch {
+        flash(button, "error");
+      }
+      return;
+    }
+
+    const extension = fileExtension(block?.getAttribute("data-language"));
+    const url = URL.createObjectURL(
+      new Blob([code], { type: "text/plain;charset=utf-8" }),
+    );
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${downloadName ?? "nudge-snippet"}.${extension}`;
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
+  }
+
   return (
-    <div className="prose prose-neutral max-w-full min-w-0 overflow-hidden text-[0.95rem] leading-7 dark:prose-invert sm:text-[0.98rem] prose-headings:font-semibold prose-headings:tracking-tight prose-p:break-words prose-p:text-foreground/80 prose-li:break-words prose-li:text-foreground/80 prose-strong:text-foreground prose-a:break-words prose-a:font-medium prose-a:text-foreground prose-a:underline prose-code:break-words prose-code:rounded-md prose-code:bg-muted/70 prose-code:px-1.5 prose-code:py-0.5 prose-code:font-mono prose-code:text-[0.9em] prose-code:before:content-none prose-code:after:content-none prose-pre:max-w-full prose-pre:bg-transparent prose-pre:p-0 prose-pre:shadow-none prose-blockquote:border-l-2 prose-blockquote:border-border prose-blockquote:text-muted-foreground [&_.katex-display]:max-w-full [&_table]:block [&_table]:max-w-full [&_table]:overflow-x-auto">
-      <MarkdownDocumentRenderer
-        value={parsedDocument}
-        components={components}
-      />
-    </div>
+    // biome-ignore lint/a11y/useKeyWithClickEvents lint/a11y/noStaticElementInteractions: Delegates clicks to the real <button> elements inside; keyboard activation of those buttons fires click too.
+    <div
+      data-markdown="root"
+      className="nudge-markdown"
+      onClick={handleClick}
+      // biome-ignore lint/security/noDangerouslySetInnerHtml: Rendered on the server by Pierre Words with raw HTML disabled, images removed, and URLs restricted to http(s), mailto, and in-page anchors.
+      dangerouslySetInnerHTML={{ __html: html }}
+    />
   );
 }

@@ -35,15 +35,18 @@ mock.module("../../src/lib/generation-api", () => ({
   claimNextGeneration: async () => {
     claims++;
     if (claims > available) return null;
+    const isRetry = mode === "recovered" && claims === 4;
+    const contestId = isRetry ? 2 : claims;
     return {
       claimId: `claim-${claims}`,
       selectionReason: "backfill",
       problem: {
-        contestId: claims,
+        id: `problem-${contestId}`,
+        contestId,
         index: "A",
         name: "Test problem",
         requestedCount: 0,
-        generationAttempts: 1,
+        generationAttempts: isRetry ? 2 : 1,
       },
     };
   },
@@ -75,7 +78,7 @@ mock.module("../../src/lib/generate-content/execution", () => ({
           // A free slot must refill even while the first generation is still busy.
           if (id === 1) await refill.promise;
           if (id === 4) refill.resolve();
-          if (mode === "failed" && id === 2)
+          if ((mode === "failed" || mode === "recovered") && id === 2)
             return { outcome: "failed", error: "bad result" };
         }
       }

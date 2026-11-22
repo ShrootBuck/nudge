@@ -7,6 +7,7 @@ const scenarios = [
   { mode: "parallel", available: 10, completed: 7, code: 0 },
   { mode: "parallel", available: 5, completed: 5, code: 0 },
   { mode: "failed", available: 10, completed: 6, code: 1 },
+  { mode: "recovered", available: 5, completed: 4, code: 0 },
   { mode: "fatal", available: 10, completed: 2, code: 1 },
   { mode: "interrupt", available: 10, completed: 0, code: 130 },
 ];
@@ -39,7 +40,14 @@ for (const scenario of scenarios) {
       child.exited,
     ]);
     expect(code, stderr).toBe(scenario.code);
-    if (scenario.code === 0) expect(stderr).toBe("");
+    if (mode === "recovered") {
+      expect(stderr).toContain("bad result");
+      expect(stdout).toContain("1 failed attempt, 0 unresolved problems");
+    } else if (scenario.code === 0) {
+      expect(stderr).toBe("");
+    }
+    if (mode === "failed")
+      expect(stdout).toContain("1 failed attempt, 1 unresolved problem");
     expect(stdout).toContain("batch verified");
     const count = mode === "empty" ? 100_000 : 7;
     if (available < count)

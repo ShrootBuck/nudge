@@ -120,21 +120,20 @@ async function getProblemContent(contestId: number, index: string) {
     hints: prepared.hints.map((hint, position) => ({
       id: problem.hints[position].id,
       order: hint.order,
-      parsedDocument: hint.document,
+      html: hint.html,
     })),
     editorial:
       problem.editorial && prepared.editorial
         ? {
             id: problem.editorial.id,
-            parsedDocument: prepared.editorial,
+            html: prepared.editorial,
           }
         : null,
     solution:
       problem.solution && prepared.solution
         ? {
             id: problem.solution.id,
-            content: problem.solution.content,
-            parsedDocument: prepared.solution,
+            html: prepared.solution,
           }
         : null,
   };

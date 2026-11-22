@@ -16,12 +16,7 @@ import {
   ReportSection,
   ReviewSection,
 } from "./problem-actions-panel";
-import {
-  CollapsibleSection,
-  HintCard,
-  SectionIntro,
-  SolutionCode,
-} from "./problem-cards";
+import { CollapsibleSection, HintCard, SectionIntro } from "./problem-cards";
 import { ProblemMarkdown } from "./problem-markdown";
 import {
   generationState,
@@ -243,9 +238,7 @@ export function ProblemContentBody({ problem }: { problem: ProblemView }) {
                 description="Open this when you want the whole argument, complexity included."
                 icon={BookOpenText}
               >
-                <ProblemMarkdown
-                  parsedDocument={problem.editorial.parsedDocument}
-                />
+                <ProblemMarkdown html={problem.editorial.html} />
               </CollapsibleSection>
             )}
 
@@ -258,10 +251,9 @@ export function ProblemContentBody({ problem }: { problem: ProblemView }) {
                 description={solutionSectionDescription(problem.reviewStatus)}
                 icon={Code2}
               >
-                <SolutionCode
-                  code={problem.solution.content}
-                  downloadFileName={`codeforces-${problem.contestId}-${problem.index}.cpp`}
-                  parsedDocument={problem.solution.parsedDocument}
+                <ProblemMarkdown
+                  html={problem.solution.html}
+                  downloadName={`codeforces-${problem.contestId}-${problem.index}`}
                 />
               </CollapsibleSection>
             )}

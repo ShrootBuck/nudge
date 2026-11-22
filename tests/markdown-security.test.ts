@@ -1,46 +1,53 @@
 import { describe, expect, test } from "bun:test";
-import { type MarkdownDocument, type Node, parseMarkdown } from "comark";
-import { markdownOptions, markdownPlugins } from "../src/lib/markdown";
+import { renderMarkdown } from "../src/lib/markdown";
 
-function elements(document: MarkdownDocument) {
-  const result: Exclude<Node, string>[] = [];
-
-  function visit(node: Node) {
-    if (typeof node === "string") return;
-    result.push(node);
-    for (const child of node.slice(2)) {
-      if (typeof child === "string" || Array.isArray(child)) visit(child);
-    }
-  }
-
-  for (const node of document.nodes) visit(node);
-  return result;
-}
+const render = (source: string) =>
+  renderMarkdown(source, { idPrefix: "test-" });
 
 describe("generated Markdown security", () => {
-  test("does not parse raw HTML, remote images, or unsafe links", async () => {
-    const document = await parseMarkdown(
+  test("drops raw HTML, remote images, and unsafe links", () => {
+    const html = render(
       [
         '<script src="https://example.com/evil.js"></script>',
         '<iframe src="https://example.com"></iframe>',
+        '<img src=x onerror="alert(1)">',
         "![tracker](https://example.com/pixel.gif)",
         "[unsafe](javascript:alert(1))",
+        "[data](data:text/html,<script>alert(1)</script>)",
+        "[protocol-relative](//evil.example)",
         "[safe](https://codeforces.com)",
+        "[mail](mailto:hi@example.com)",
+        "[internal](/problem/1/A)",
       ].join("\n\n"),
-      { ...markdownOptions, plugins: markdownPlugins },
     );
-    const parsedElements = elements(document);
-    const tags = parsedElements.map((node) => node[0]);
-    const links = parsedElements.filter((node) => node[0] === "a");
 
-    expect(tags).not.toContain("script");
-    expect(tags).not.toContain("iframe");
-    expect(tags).not.toContain("img");
-    expect(links.some((node) => node[1].href === "javascript:alert(1)")).toBe(
-      false,
+    expect(html).not.toContain("<script");
+    expect(html).not.toContain("<iframe");
+    expect(html).not.toContain("<img");
+    expect(html).not.toContain("onerror");
+    expect(html).not.toContain("pixel.gif");
+    expect(html).not.toContain('href="javascript:');
+    expect(html).not.toContain('href="data:');
+    expect(html).not.toContain('href="//evil.example"');
+    expect(html).toContain(
+      '<a target="_blank" rel="noreferrer noopener" data-markdown="a" href="https://codeforces.com">',
     );
-    expect(
-      links.some((node) => node[1].href === "https://codeforces.com"),
-    ).toBe(true);
+    expect(html).toContain('href="mailto:hi@example.com"');
+    expect(html).toContain('<a data-markdown="a" href="/problem/1/A">');
+  });
+
+  test("math cannot inject links or markup", () => {
+    const html = render(
+      '$\\href{javascript:alert(1)}{x}$ <math renderedHtml="<img src=x onerror=alert(1)>">x</math>',
+    );
+    expect(html).not.toContain('href="javascript:');
+    expect(html).not.toContain("<img");
+    expect(html).not.toContain("<math");
+  });
+
+  test("scopes footnote anchors to the document", () => {
+    const html = render("Claim.[^1]\n\n[^1]: Source.");
+    expect(html).toContain('href="#test-fn-1"');
+    expect(html).toContain('id="test-fn-1"');
   });
 });
