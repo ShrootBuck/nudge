@@ -73,7 +73,7 @@ const content = {
     content: `Hint ${index + 1}`,
   })),
   editorial: "A complete editorial.",
-  solution: "int main() {}",
+  solution: '#include <cstdio>\nint main() { std::puts("42"); }',
 };
 const completion = (claimId: string): GenerationCompletion => ({
   action: "complete",

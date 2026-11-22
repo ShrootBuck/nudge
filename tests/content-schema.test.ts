@@ -44,6 +44,36 @@ const validContent = {
   solution: "int main() { char c = '\\0'; }\n",
 };
 
+test("rejects empty C++ submissions after unwrapping Markdown", () => {
+  const setup = [
+    "#include <bits/stdc++.h>",
+    "using namespace std;",
+    "using ll = long long;",
+    "void setIO() { ios::sync_with_stdio(false); cin.tie(nullptr); }",
+  ].join("\n");
+  for (const solution of [
+    "int main() {}",
+    "int main(void){return 0;}",
+    `${setup}\nint main() { setIO(); // TODO: solve\n }`,
+    "```cpp\n" +
+      setup +
+      "\nint main(){setIO(); /* no solution */ return 0;}\n```",
+  ]) {
+    expect(
+      problemResultSchema.safeParse({ ...validContent, solution }).success,
+    ).toBe(false);
+  }
+  for (const solution of [
+    `${setup}\nint main() { setIO(); cout << 0; }`,
+    'void setIO(){puts("answer");} int main(){setIO();}',
+    'int answer = puts("answer"); int main(){}',
+  ]) {
+    expect(
+      problemResultSchema.safeParse({ ...validContent, solution }).success,
+    ).toBe(true);
+  }
+});
+
 describe("generated text storage validation", () => {
   test("decodes JSON-serialized hint arguments without altering their content", () => {
     expect(

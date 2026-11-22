@@ -31,6 +31,9 @@ function titleFontSize(name: string) {
 }
 
 function reviewBadge(problem: { runState: string; reviewStatus: string }) {
+  if (problem.reviewStatus === "UNSOLVABLE") {
+    return { label: "UNSOLVABLE", color: OG_COLORS.amber };
+  }
   if (problem.runState !== "SUCCEEDED") {
     return {
       label: problem.runState === "RUNNING" ? "GENERATING" : "CONTENT PENDING",
@@ -43,8 +46,6 @@ function reviewBadge(problem: { runState: string; reviewStatus: string }) {
       return { label: "VERIFIED", color: "#34d399" };
     case "INCORRECT":
       return { label: "MARKED INCORRECT", color: "#fb7185" };
-    case "UNSOLVABLE":
-      return { label: "UNSOLVABLE", color: OG_COLORS.amber };
     default:
       return null;
   }
@@ -67,11 +68,14 @@ async function getProblemImage(contestId: number, index: string) {
 
   const problemId = formatProblemId(problem.contestId, problem.index);
   const review = reviewBadge(problem);
-  const features = [
-    `${problem.hintCount} progressive hint${problem.hintCount === 1 ? "" : "s"}`,
-    problem.hasEditorial ? "Editorial ready" : "Editorial pending",
-    problem.hasSolution ? "C++ solution ready" : "Solution pending",
-  ];
+  const features =
+    problem.reviewStatus === "UNSOLVABLE"
+      ? []
+      : [
+          `${problem.hintCount} progressive hint${problem.hintCount === 1 ? "" : "s"}`,
+          problem.hasEditorial ? "Editorial ready" : "Editorial pending",
+          problem.hasSolution ? "C++ solution ready" : "Solution pending",
+        ];
 
   const image = new ImageResponse(
     <OgFrame>

@@ -111,7 +111,7 @@ describe("bundled OpenCode V2 runtime", () => {
         content: `Hint ${index + 1}`,
       })),
       editorial: "A sample explanation with $x$ and Unicode π.",
-      solution: "int main() { return 0; }",
+      solution: '#include <cstdio>\nint main() { std::puts("42"); }',
     };
     const invalidContent = structuredClone(validContent);
     invalidContent.hints[0].content = "Invalid NUL: \0";

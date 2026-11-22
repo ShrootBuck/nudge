@@ -28,3 +28,22 @@ export function parseSolutionContent(content: string): ParsedSolutionContent {
     language: "cpp",
   };
 }
+
+// Match the whole program so globals with initializers or a custom setIO()
+// that actually performs work are never mistaken for an empty entry point.
+export function isEmptyCppSolution(source: string) {
+  const compact = source
+    .replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, "")
+    .replace(/\s+/g, "");
+  const program = compact
+    .replace(/^#include<bits\/stdc\+\+\.h>/, "")
+    .replace(/^usingnamespacestd;/, "")
+    .replace(/^usingll=longlong;/, "")
+    .replace(
+      /^voidsetIO\(\)\{ios::sync_with_stdio\(false\);cin.tie\(nullptr\);\}/,
+      "",
+    );
+  return /^(?:int|signed)main\((?:void)?\)\{(?:setIO\(\);)?(?:return0;)?\}$/.test(
+    program,
+  );
+}

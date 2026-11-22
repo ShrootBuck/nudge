@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { OutputSchema } from "../ai";
+import { isEmptyCppSolution } from "../problem-solution";
 
 const MAX_HINT_LENGTH = 10_000;
 const MAX_EDITORIAL_LENGTH = 100_000;
@@ -32,7 +33,14 @@ export const contentSchema = z.object({
     z.array(hintSchema).min(1),
   ),
   editorial: generatedTextSchema.trim().min(1).max(MAX_EDITORIAL_LENGTH),
-  solution: generatedTextSchema.trim().min(1).max(MAX_SOLUTION_LENGTH),
+  solution: generatedTextSchema
+    .trim()
+    .min(1)
+    .max(MAX_SOLUTION_LENGTH)
+    .refine(
+      (solution) => !isEmptyCppSolution(solution),
+      "The C++ solution contains only starter code. Implement the editorial's algorithm and produce the required output.",
+    ),
 });
 
 const unsolvableContentSchema = z.object({
@@ -140,7 +148,7 @@ export const problemOutputSchema: OutputSchema = {
         type: "string",
         enum: ["success", "unsolvable"],
         description:
-          "Set to 'success' when the retrieved statement defines a solvable programming problem. Set to 'unsolvable' only if the statement is fundamentally incomplete, contradictory, remains inaccessible after retrieval attempts, or depends on an inaccessible required resource. PDF format or a missing editorial alone is not a blocker.",
+          "Set to 'success' when the retrieved statement defines a solvable programming problem. Set to 'unsolvable' only if the statement is fundamentally incomplete, contradictory, remains inaccessible after retrieval attempts, depends on an inaccessible required resource, or explicitly requires a judge interface unavailable in C++. PDF format or a missing editorial alone is not a blocker.",
       },
       reason: {
         anyOf: [
@@ -213,7 +221,7 @@ export const problemOutputSchema: OutputSchema = {
           { type: "null" },
         ],
         description:
-          "If status is 'success', a complete C++ solution. Otherwise null.",
+          "If status is 'success', a complete C++ implementation that produces the required output, including a feasible baseline for scored tasks. Otherwise null.",
       },
     },
     required: ["status", "reason", "hints", "editorial", "solution"],

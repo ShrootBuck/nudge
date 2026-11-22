@@ -112,7 +112,7 @@ async function getProblemContent(contestId: number, index: string) {
     transcriptDownloadUrl: problem.generationTranscriptUrl,
     lastGenerationError:
       problem.lastGenerationError && problem.reviewStatus === "UNSOLVABLE"
-        ? problem.lastGenerationError.slice(0, 500)
+        ? problem.lastGenerationError
         : problem.lastGenerationError
           ? "The last generation attempt failed. A retry is needed."
           : null,
