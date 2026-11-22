@@ -6,7 +6,7 @@
 
 Progressive hints, clean editorials, and full C++ solutions for Codeforces problems. Generated through OpenCode, served at your own pace.
 
-[Live Site](https://nudge.zaydkrunz.com)
+[Live Site](https://nudge.wiki)
 
 </div>
 
@@ -81,7 +81,7 @@ For a fresh Linux worker, install Bun and run `bun install --frozen-lockfile`. P
 
 1. Existing local provider credentials are reused. Check them with `bun run opencode -- auth list`. If needed, use `bun run opencode -- auth login` and select the provider/account you want to use. `bun run models` confirms which providers are available to Nudge.
    OpenCode picks an available web search provider at random for each session and retries with another provider on HTTP 429. For authenticated searches, set the provider keys listed in `.env.example` in the generation worker’s untracked `.env.local` or process environment. Start a new generation process to pick up the keys.
-2. Set `CACHE_REVALIDATION_URL=https://nudge.zaydkrunz.com` and the same strong `CACHE_REVALIDATION_SECRET` used by the deployed app. These authenticate the generator's HTTPS requests; keep the secret in your untracked environment, never in client code or Git.
+2. Set `CACHE_REVALIDATION_URL=https://nudge.wiki` and the same strong `CACHE_REVALIDATION_SECRET` used by the deployed app. These authenticate the generator's HTTPS requests; keep the secret in your untracked environment, never in client code or Git.
 3. Transcripts are stored in the deployed app's persistent `/data/transcripts` volume. No separate storage provider is required.
 4. Generation claims work and submits results through `/api/generation`. The server validates content, records usage, writes Postgres, and invalidates caches. No database credentials, SSH tunnel, Tailscale, or separate terminal are required for generation.
 5. Configure the model, reasoning variant, and public display label in `nudge.config.json` (see [Switching models or providers](#switching-models-or-providers)).

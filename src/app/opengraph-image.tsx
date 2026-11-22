@@ -102,7 +102,7 @@ async function getSiteImage() {
             fontWeight: 700,
           }}
         >
-          nudge.zaydkrunz.com
+          nudge.wiki
         </div>
       </div>
     </OgFrame>,

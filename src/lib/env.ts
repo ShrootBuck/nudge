@@ -31,4 +31,4 @@ export function verifyAdminPassword(password: string) {
 }
 
 export const SITE_URL =
-  process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://nudge.zaydkrunz.com";
+  process.env.NEXT_PUBLIC_SITE_URL?.trim() || "https://nudge.wiki";

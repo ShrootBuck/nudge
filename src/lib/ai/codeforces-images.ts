@@ -75,7 +75,7 @@ export async function downloadCodeforcesImage({
     const response = await fetchImplementation(url, {
       headers: {
         "User-Agent":
-          "nudge-bot/1.0 (+https://nudge.zaydkrunz.com; contact@zaydkrunz.com)",
+          "nudge-bot/1.0 (+https://nudge.wiki; contact@zaydkrunz.com)",
       },
       redirect: "error",
       signal,

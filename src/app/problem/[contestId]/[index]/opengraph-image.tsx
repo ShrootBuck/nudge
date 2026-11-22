@@ -217,7 +217,7 @@ async function getProblemImage(contestId: number, index: string) {
             fontWeight: 700,
           }}
         >
-          nudge.zaydkrunz.com
+          nudge.wiki
         </div>
       </div>
     </OgFrame>,
