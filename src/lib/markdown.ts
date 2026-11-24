@@ -5,10 +5,27 @@ import { createHtmlRenderer } from "@pierre/words/html";
 
 // Light and dark colors ship in one pass via CSS light-dark(), which follows
 // the `color-scheme` that the theme script sets on <html>.
-const code = createHighlightsPlugin({
+const highlighter = createHighlightsPlugin({
   themes: { light: pierreLight, dark: pierreDark },
   defaultColor: "light-dark()",
 });
+
+// Use related grammars for shared tokens while keeping the submission's own
+// language in the header, clipboard, and download controls.
+const fallbackGrammars = new Map([
+  ["qsharp", "csharp"],
+  ["q#", "csharp"],
+  ["qs", "csharp"],
+  ["pike", "c"],
+]);
+const code: typeof highlighter = {
+  highlight(options) {
+    const html = highlighter.highlight(options);
+    if (html !== null) return html;
+    const language = fallbackGrammars.get(options.language.toLowerCase());
+    return language ? highlighter.highlight({ ...options, language }) : null;
+  },
+};
 
 // Lucide's copy, check, and download glyphs, inlined so the server-rendered
 // buttons need no client-side React to look finished.
@@ -110,9 +127,13 @@ const LANGUAGE_LABELS: Record<string, string> = {
   js: "JavaScript",
   json: "JSON",
   kotlin: "Kotlin",
+  pike: "Pike",
   plaintext: "Text",
   py: "Python",
   python: "Python",
+  "q#": "Q#",
+  qs: "Q#",
+  qsharp: "Q#",
   rust: "Rust",
   sh: "Shell",
   shell: "Shell",

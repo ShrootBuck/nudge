@@ -48,7 +48,7 @@ export function problemSocialDescription(problem: ProblemSocialData) {
     );
   }
   if (problem.hasEditorial) features.push("a clean editorial");
-  if (problem.hasSolution) features.push("a C++ solution");
+  if (problem.hasSolution) features.push("a solution");
 
   const lead = features.length
     ? `Get ${joinItems(features)} for`

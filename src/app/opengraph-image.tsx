@@ -75,7 +75,7 @@ async function getSiteImage() {
               lineHeight: 1.45,
             }}
           >
-            Progressive hints, clean editorials, and full C++ solutions for
+            Progressive hints, clean editorials, and full solutions for
             Codeforces problems.
           </div>
         </div>

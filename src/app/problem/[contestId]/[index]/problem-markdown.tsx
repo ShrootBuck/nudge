@@ -11,6 +11,8 @@ const EXTENSIONS: Record<string, string> = {
   plaintext: "txt",
   python: "py",
   py3: "py",
+  "q#": "qs",
+  qsharp: "qs",
   rust: "rs",
   shell: "sh",
   bash: "sh",

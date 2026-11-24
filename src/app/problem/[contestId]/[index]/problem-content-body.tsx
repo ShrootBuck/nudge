@@ -247,7 +247,7 @@ export function ProblemContentBody({ problem }: { problem: ProblemView }) {
                 open={showSolution}
                 onToggle={() => setShowSolution(!showSolution)}
                 eyebrow="Solution"
-                title="Generated C++"
+                title="Full solution"
                 description={solutionSectionDescription(problem.reviewStatus)}
                 icon={Code2}
               >

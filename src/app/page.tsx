@@ -315,7 +315,7 @@ export default async function Home({
 
               <p className="mt-4 max-w-2xl text-sm/7 text-muted-foreground sm:text-lg/8">
                 Nudge stores completed Codeforces problems with progressive
-                hints, a clean editorial, and the full C++ write-up once you
+                hints, a clean editorial, and the full solution once you
                 actually want it.
               </p>
 

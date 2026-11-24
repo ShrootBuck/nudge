@@ -4,7 +4,7 @@
 
 **Get unstuck without skipping straight to the answer.**
 
-Progressive hints, clean editorials, and full C++ solutions for Codeforces problems. Generated through OpenCode, served at your own pace.
+Progressive hints, clean editorials, and full solutions for Codeforces problems. Generated through OpenCode, served at your own pace.
 
 [Live Site](https://nudge.wiki)
 
@@ -67,7 +67,7 @@ The test creates and removes its own schema. It checks fresh initialization, rep
 
 ## What is this?
 
-Most editorial sites give you the whole answer or nothing. Nudge sits in between: every problem has **progressive hints** that go from a gentle nudge toward the right area all the way to the key insight, plus a prose editorial and the full C++ solution when you're ready.
+Most editorial sites give you the whole answer or nothing. Nudge sits in between: every problem has **progressive hints** that go from a gentle nudge toward the right area all the way to the key insight, plus a prose editorial and the full solution when you're ready.
 
 All content is generated locally through OpenCode, then stored in Postgres and served through a Next.js frontend. Problems are synced from the Codeforces API automatically.
 

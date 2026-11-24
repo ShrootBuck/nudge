@@ -74,7 +74,7 @@ async function getProblemImage(contestId: number, index: string) {
       : [
           `${problem.hintCount} progressive hint${problem.hintCount === 1 ? "" : "s"}`,
           problem.hasEditorial ? "Editorial ready" : "Editorial pending",
-          problem.hasSolution ? "C++ solution ready" : "Solution pending",
+          problem.hasSolution ? "Solution ready" : "Solution pending",
         ];
 
   const image = new ImageResponse(

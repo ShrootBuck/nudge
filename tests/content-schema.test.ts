@@ -4,6 +4,7 @@ import {
   problemOutputSchema,
   problemResultSchema,
 } from "../src/lib/generate-content/content-schema";
+import { prepareProblemContent } from "../src/lib/prepared-content";
 
 describe("generated content schema", () => {
   test("rejects generic lack-of-confidence unsolvable reasons", () => {
@@ -71,6 +72,46 @@ test("rejects empty C++ submissions after unwrapping Markdown", () => {
     expect(
       problemResultSchema.safeParse({ ...validContent, solution }).success,
     ).toBe(true);
+  }
+});
+
+test.each([
+  ["qsharp", "Q#", "namespace Solution { operation Solve() : Unit {} }"],
+  ["pike", "Pike", 'int main() { write("hello"); }'],
+  ["text", "Text", "please"],
+  ["py", "Python", "print(42)"],
+])(
+  "renders a generated %s submission with its language and controls",
+  async (tag, label, code) => {
+    const solution = [`\`\`\`${tag}`, code, "```"].join("\n");
+    const result = problemResultSchema.parse({ ...validContent, solution });
+    expect(result.solution).toBe(solution);
+    if (result.status !== "success") throw new Error("Expected success");
+    const prepared = await prepareProblemContent(result);
+    expect(prepared.solution).toContain(`data-language="${tag}"`);
+    expect(prepared.solution).toContain(`<span>${label}</span>`);
+    expect(prepared.solution?.includes("light-dark(")).toBe(tag !== "text");
+    expect(prepared.solution).toContain('data-code-action="copy"');
+    expect(prepared.solution).toContain('data-code-action="download"');
+  },
+);
+
+test("preserves fenced literal text and rejects incomplete submission blocks", async () => {
+  const solution = ["````text", "  <tag>  ", "```", "````"].join("\n");
+  const result = problemResultSchema.parse({ ...validContent, solution });
+  if (result.status !== "success") throw new Error("Expected success");
+  expect((await prepareProblemContent(result)).solution).toContain(
+    "  &lt;tag&gt;  \n```",
+  );
+  for (const invalid of [
+    "```pike\n```",
+    "```text\n  \n```",
+    "```qsharp\nunfinished",
+  ]) {
+    expect(
+      problemResultSchema.safeParse({ ...validContent, solution: invalid })
+        .success,
+    ).toBe(false);
   }
 });
 

@@ -48,7 +48,9 @@ export default Plugin.define({
           .string()
           .nullable()
           .optional()
-          .describe("Complete raw C++ solution on success"),
+          .describe(
+            "Complete submission in one Markdown code fence tagged with its language. Use cpp whenever allowed, the required language otherwise, or text for literal answers.",
+          ),
       })
       .superRefine((value, context) => {
         const result = problemResultSchema.safeParse(value);

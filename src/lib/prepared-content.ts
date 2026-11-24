@@ -4,8 +4,7 @@ import { renderMarkdown } from "./markdown";
 import { parseSolutionContent } from "./problem-solution";
 
 // Bump whenever the parser, sanitizer, math renderer, or highlighting output changes.
-// Version 3 stores HTML rendered by Pierre Words and Highlights.
-export const PREPARED_CONTENT_VERSION = 3;
+export const PREPARED_CONTENT_VERSION = 4;
 
 export type ProblemContentSource = {
   hints: { order: number; content: string }[];

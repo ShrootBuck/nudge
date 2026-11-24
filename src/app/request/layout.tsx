@@ -4,7 +4,7 @@ import { createPageMetadata } from "@/lib/site-metadata";
 export const metadata: Metadata = createPageMetadata({
   title: "Request a problem",
   description:
-    "Request progressive hints, an editorial, and a C++ solution for a Codeforces problem.",
+    "Request progressive hints, an editorial, and a solution for a Codeforces problem.",
   path: "/request",
 });
 

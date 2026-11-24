@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 
 export const SITE_NAME = "Nudge";
 export const SITE_DESCRIPTION =
-  "Progressive hints, clean editorials, and full C++ solutions for Codeforces problems.";
+  "Progressive hints, clean editorials, and full solutions for Codeforces problems.";
 
 export const OG_IMAGE_SIZE = {
   width: 1200,

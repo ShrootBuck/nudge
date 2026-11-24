@@ -55,7 +55,7 @@ export async function generateMetadata({
       "competitive programming",
       "progressive hints",
       "editorial",
-      "C++ solution",
+      "Codeforces solution",
     ],
     category: "education",
     robots: isProblemIndexable(problem)

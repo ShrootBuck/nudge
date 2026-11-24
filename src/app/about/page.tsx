@@ -59,7 +59,7 @@ export default function AboutPage() {
               icon={Brain}
               step="2"
               title="AI generation"
-              description="Nudge generates five progressive hints, a clean editorial, and a full C++ solution."
+              description="Nudge generates five progressive hints, a clean editorial, and a full solution."
             />
             <StepCard
               icon={BookOpenText}
