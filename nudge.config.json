@@ -1,8 +1,8 @@
 {
-  "model": "openai/gpt-6.2-sol",
-  "variant": "low",
+  "model": "openai/gpt-6.2-astra",
+  "variant": "max",
   "display": {
-    "model": "GPT-6.2 Sol",
-    "reasoning": "low"
+    "model": "GPT-6.2 Astra",
+    "reasoning": "max"
   }
 }
