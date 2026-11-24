@@ -69,7 +69,7 @@ const unsolvableContentSchema = z.object({
     .max(MAX_REASON_LENGTH)
     .refine(
       (reason) =>
-        !/\b(can['’]?t|cannot)\s+(honestly\s+)?guarantee\b/i.test(reason) &&
+        !/\b(can['']?t|cannot)\s+(honestly\s+)?guarantee\b/i.test(reason) &&
         !/\bmade[- ]up code\b/i.test(reason) &&
         !/\bwithin this run\b/i.test(reason),
       {
